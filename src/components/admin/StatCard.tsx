@@ -1,21 +1,42 @@
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+type TrendColor = 'green' | 'amber' | 'gray';
+type ValueColor = 'default' | 'amber';
+
 interface StatCardProps {
   label: string;
   value: string | number;
-  change?: string;
+  /** Small subline beneath the number (e.g. "↑ 3 new this month"). */
+  trend?: string;
+  trendColor?: TrendColor;
+  /** Primary number color. 'amber' signals a value that deserves attention. */
+  valueColor?: ValueColor;
   icon?: LucideIcon;
-  tone?: 'default' | 'gold';
+  /** Icon chip background palette. Defaults to teal; 'gold' is reserved for spotlight cards. */
+  iconTone?: 'teal' | 'gold';
   className?: string;
 }
+
+const trendClasses: Record<TrendColor, string> = {
+  green: 'text-emerald-600',
+  amber: 'text-amber-600',
+  gray: 'text-[#737373]',
+};
+
+const valueClasses: Record<ValueColor, string> = {
+  default: 'text-gray-900',
+  amber: 'text-amber-600',
+};
 
 export function StatCard({
   label,
   value,
-  change,
+  trend,
+  trendColor = 'gray',
+  valueColor = 'default',
   icon: Icon,
-  tone = 'default',
+  iconTone = 'teal',
   className,
 }: StatCardProps) {
   return (
@@ -26,7 +47,7 @@ export function StatCard({
           <span
             className={cn(
               'flex h-8 w-8 items-center justify-center rounded-lg',
-              tone === 'gold'
+              iconTone === 'gold'
                 ? 'bg-brand-gold-50 text-brand-gold-400'
                 : 'bg-brand-teal-50 text-brand-teal-500',
             )}
@@ -35,10 +56,15 @@ export function StatCard({
           </span>
         )}
       </div>
-      <div className="text-brand-teal-500 text-4xl leading-none font-light tracking-tight">
+      <div
+        className={cn(
+          'text-4xl leading-none font-light tracking-tight',
+          valueClasses[valueColor],
+        )}
+      >
         {value}
       </div>
-      {change && <div className="text-xs text-[#737373]">{change}</div>}
+      {trend && <div className={cn('text-xs', trendClasses[trendColor])}>{trend}</div>}
     </div>
   );
 }

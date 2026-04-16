@@ -7,7 +7,7 @@ Admin portal for Insight Home Maintenance, a luxury home maintenance and remodel
 - Next.js 16+ (App Router), TypeScript strict
 - Tailwind CSS v4 with custom brand tokens (configured in `src/app/globals.css` via `@theme`)
 - Lucide React for icons
-- No backend yet — all data is mock data in `src/lib/mock-data.ts`
+- Supabase Postgres via Drizzle ORM — see "Database" / "Page query pattern" below. The legacy `src/lib/mock-data.ts` is dead code (no remaining imports) and will be deleted once every admin page is migrated.
 
 ## Commands
 
@@ -37,10 +37,14 @@ Admin portal for Insight Home Maintenance, a luxury home maintenance and remodel
 ## Architecture
 
 - `src/app/admin/` — all admin pages (App Router)
+- `src/app/admin/<page>/queries.ts` — Drizzle read queries for that page
+- `src/app/admin/<page>/actions.ts` — Server Actions for that page (mutations)
 - `src/components/` — shared UI components
-- `src/lib/types.ts` — all TypeScript interfaces
-- `src/lib/mock-data.ts` — all mock data (single source of truth)
+- `src/db/` — schema, migrations, Drizzle client
+- `src/lib/types.ts` — UI-only TypeScript interfaces (DB types come from the Drizzle schema)
 - `src/lib/utils.ts` — helper functions
+- `src/lib/mock-data.ts` — legacy, unused, slated for deletion
+- `scripts/` — CLI helpers (`seed.ts`, `verify-db.ts`, `apply-manual-sql.ts`). Every script that touches the DB starts with `import './_env';` before importing from `@/db`.
 
 ## Design rules — IMPORTANT
 
@@ -77,6 +81,19 @@ See `src/lib/types.ts` for complete interfaces.
 - `npx drizzle-kit migrate` — apply pending migrations
 - `npx drizzle-kit studio` — visual DB browser at localhost:4983
 - `npx tsx scripts/verify-db.ts` — one-off sanity check of tables / RLS / policies / enums
+- `npm run db:seed` — idempotent seed of test data (clears + re-inserts; leaves profiles alone)
+
+## Page query pattern
+
+Every admin page follows this structure:
+
+1. `src/app/admin/<page>/queries.ts` — exported async functions that run Drizzle queries. Pure reads, no auth check, no revalidation.
+2. `src/app/admin/<page>/page.tsx` — Server Component. Calls `await requireAdmin()` at the top, then fetches all data via `Promise.all()` with the query functions. Renders the UI.
+3. `src/app/admin/<page>/actions.ts` — `'use server'` mutations, each wrapped with `requireAdmin()` or `requireUser()`, followed by Drizzle writes and `revalidatePath()` of the affected routes.
+
+Never import `@/lib/mock-data` into a page. Once every page has migrated, `src/lib/mock-data.ts` is deleted.
+
+Money formatting: DB columns ending in `_cents` are `integer`. UI uses `formatCurrency(cents)` from `@/lib/utils` — do not pre-divide.
 
 ## Auth
 

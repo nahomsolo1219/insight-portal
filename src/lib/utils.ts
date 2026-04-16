@@ -7,13 +7,17 @@ export function cn(...inputs: ClassValue[]): string {
   return clsx(inputs);
 }
 
-export function formatCurrency(value: number): string {
+/**
+ * Format a money value stored in cents (the DB format) as USD.
+ * E.g. formatCurrency(462500) → "$4,625".
+ */
+export function formatCurrency(cents: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(cents / 100);
 }
 
 export function formatDate(iso: string): string {
