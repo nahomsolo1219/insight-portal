@@ -32,11 +32,12 @@ interface ClientDetailTabsProps {
   properties: PropertyRow[];
   activePropertyId: string | null;
   /**
-   * Server-rendered Projects-tab content. Passed in as a slot so we can keep
-   * data fetching on the server while tab switching stays a cheap client
-   * interaction.
+   * Server-rendered tab content. Slots live on the server so data fetching
+   * happens during the same render pass as the page; tab switching stays a
+   * cheap client interaction that just swaps which slot we render.
    */
   projectsSlot: React.ReactNode;
+  profileSlot: React.ReactNode;
 }
 
 export function ClientDetailTabs({
@@ -44,6 +45,7 @@ export function ClientDetailTabs({
   properties,
   activePropertyId,
   projectsSlot,
+  profileSlot,
 }: ClientDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('projects');
 
@@ -120,7 +122,8 @@ export function ClientDetailTabs({
           ? projectsSlot
           : <EmptyTab message="No properties yet. Add a property first." />
       )}
-      {activeTab !== 'projects' && (
+      {activeTab === 'profile' && profileSlot}
+      {activeTab !== 'projects' && activeTab !== 'profile' && (
         <ComingSoon tabLabel={TABS.find((t) => t.id === activeTab)!.label} />
       )}
     </div>

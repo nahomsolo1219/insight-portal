@@ -15,6 +15,8 @@
 - [x] Relaxed NOT NULL on `clients.email` + tightened UI types
 - [x] Manual migration file renamed to `manual_` prefix (no more numeric collision with drizzle)
 - [x] Client detail page shell (header + stats + property switcher) + Projects tab fully wired (milestone tick → progress % → audit)
+- [x] Profile tab (client + property edit modals, archive confirmation, reusable Modal / Field)
+- [x] Seed arithmetic: Annual plan progress 35 → 50 (matches 1/2 milestones complete)
 
 ## Client detail tabs still to build — each in its own session
 
@@ -23,7 +25,6 @@
 - [ ] Reports tab
 - [ ] Documents tab
 - [ ] Invoices tab (per-client view; cross-client invoices page separate)
-- [ ] Profile tab (contact / access notes / emergency)
 
 ## Other pages still on scaffold — migrate one at a time
 

@@ -4,6 +4,8 @@ import { X } from 'lucide-react';
 import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
+export type ModalSize = 'sm' | 'md' | 'lg';
+
 interface ModalProps {
   open: boolean;
   onClose: () => void;
@@ -11,13 +13,15 @@ interface ModalProps {
   description?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg';
+  size?: ModalSize;
+  /** While true, the modal is uncloseable — no Esc, no backdrop click, close button disabled. Use during in-flight submissions. */
+  locked?: boolean;
 }
 
-const sizes = {
+const sizes: Record<ModalSize, string> = {
   sm: 'max-w-md',
-  md: 'max-w-xl',
-  lg: 'max-w-3xl',
+  md: 'max-w-lg',
+  lg: 'max-w-2xl',
 };
 
 export function Modal({
@@ -28,50 +32,67 @@ export function Modal({
   children,
   footer,
   size = 'md',
+  locked = false,
 }: ModalProps) {
+  // Esc-to-close, ignored while locked. Registering even when !open would be
+  // cheap, but keeping it conditional avoids a stray listener in the common
+  // case where the modal is never opened.
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !locked) onClose();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open, locked, onClose]);
+
+  // Prevent background scroll while the modal is open.
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
 
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
-      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+      onClick={() => {
+        if (!locked) onClose();
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
     >
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
         className={cn(
-          'shadow-modal flex w-full flex-col overflow-hidden rounded-2xl bg-white',
+          'shadow-modal flex max-h-[85vh] w-full flex-col overflow-hidden rounded-3xl bg-white',
           sizes[size],
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-4">
+        <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-8 py-6">
           <div>
-            <h2 className="font-display text-brand-teal-500 text-2xl leading-tight">{title}</h2>
-            {description && <p className="mt-1 text-sm text-[#737373]">{description}</p>}
+            <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+            {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="hover:bg-brand-warm-100 hover:text-brand-teal-500 rounded-lg p-1.5 text-[#737373] transition-colors"
+            disabled={locked}
             aria-label="Close"
+            className="rounded-lg p-2 text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <X className="h-5 w-5" />
+            <X size={18} strokeWidth={1.5} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-6 pb-6">{children}</div>
+        <div className="flex-1 overflow-y-auto px-8 py-6">{children}</div>
         {footer && (
-          <div className="bg-brand-warm-100 border-brand-warm-300 flex items-center justify-end gap-3 border-t px-6 py-4">
+          <div className="bg-brand-warm-50 flex items-center justify-end gap-3 border-t border-gray-100 px-8 py-5">
             {footer}
           </div>
         )}

@@ -48,6 +48,32 @@ export interface ClientDetailStats {
   propertyCount: number;
 }
 
+/**
+ * Fetch a single property's full record for the Profile tab's edit modal.
+ * Returns null if the property doesn't exist.
+ */
+export async function getPropertyDetail(propertyId: string): Promise<PropertyRow | null> {
+  const [property] = await db
+    .select({
+      id: properties.id,
+      name: properties.name,
+      address: properties.address,
+      city: properties.city,
+      state: properties.state,
+      zipcode: properties.zipcode,
+      sqft: properties.sqft,
+      yearBuilt: properties.yearBuilt,
+      gateCode: properties.gateCode,
+      accessNotes: properties.accessNotes,
+      emergencyContact: properties.emergencyContact,
+    })
+    .from(properties)
+    .where(eq(properties.id, propertyId))
+    .limit(1);
+
+  return property ?? null;
+}
+
 export interface ClientDetailPayload {
   client: ClientDetailRow;
   properties: PropertyRow[];

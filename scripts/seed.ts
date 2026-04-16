@@ -187,7 +187,8 @@ async function seed() {
       status: 'active',
       startDate: '2026-01-01',
       endDate: '2026-12-31',
-      progress: 35,
+      // 1/2 milestones complete — matches toggleMilestoneComplete's recomputed progress.
+      progress: 50,
       description: 'Year-long comprehensive home care',
     })
     .returning();

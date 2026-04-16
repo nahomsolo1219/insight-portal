@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { formatCurrency, formatDate, initialsFrom } from '@/lib/utils';
 import { ClientDetailTabs } from './ClientDetailTabs';
+import { ProfileTab } from './ProfileTab';
 import { ProjectsTab } from './ProjectsTab';
 import { getClientDetail } from './queries';
 
@@ -29,12 +30,20 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
       ? propertyParam
       : (properties[0]?.id ?? null);
 
-  // Pre-render the Projects tab on the server so the initial HTML already has
-  // project data. The slot gets rebuilt on every navigation (tab switches
-  // remount a fresh copy via `key`).
+  // Pre-render each data-backed tab on the server so the initial HTML already
+  // has its content. Slots get rebuilt on every navigation; keying by the
+  // active property id means switching properties remounts a fresh subtree.
   const projectsSlot = activePropertyId ? (
     <ProjectsTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
   ) : null;
+  const profileSlot = (
+    <ProfileTab
+      key={activePropertyId ?? 'no-property'}
+      clientId={id}
+      propertyId={activePropertyId}
+      client={client}
+    />
+  );
 
   return (
     <div>
@@ -91,6 +100,7 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
         properties={properties}
         activePropertyId={activePropertyId}
         projectsSlot={projectsSlot}
+        profileSlot={profileSlot}
       />
     </div>
   );
