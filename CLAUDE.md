@@ -89,11 +89,35 @@ Every admin page follows this structure:
 
 1. `src/app/admin/<page>/queries.ts` — exported async functions that run Drizzle queries. Pure reads, no auth check, no revalidation.
 2. `src/app/admin/<page>/page.tsx` — Server Component. Calls `await requireAdmin()` at the top, then fetches all data via `Promise.all()` with the query functions. Renders the UI.
-3. `src/app/admin/<page>/actions.ts` — `'use server'` mutations, each wrapped with `requireAdmin()` or `requireUser()`, followed by Drizzle writes and `revalidatePath()` of the affected routes.
+3. `src/app/admin/<page>/actions.ts` — `'use server'` mutations, each wrapped with `requireAdmin()` or `requireUser()`, followed by Drizzle writes, `await logAudit(...)`, and `revalidatePath()` of the affected routes.
+4. Client components that post to Server Actions live alongside the page (e.g. `src/app/admin/<page>/NewThingButton.tsx`). They import the action directly and drive it with `useTransition`.
 
 Never import `@/lib/mock-data` into a page. Once every page has migrated, `src/lib/mock-data.ts` is deleted.
 
 Money formatting: DB columns ending in `_cents` are `integer`. UI uses `formatCurrency(cents)` from `@/lib/utils` — do not pre-divide.
+
+Shared admin chrome (sidebar badges, etc.) reads from `src/components/admin/queries.ts`. The admin layout awaits those once per request and threads them into `<Sidebar>` as props.
+
+## Audit logging
+
+Every Server Action that changes state must call `logAudit()` from `src/lib/audit.ts` after its Drizzle write. Pattern:
+
+```ts
+const user = await requireAdmin();
+// ... do the thing ...
+await logAudit({
+  actor: user,
+  action: 'created client',   // strongly typed — add new actions to the AuditAction union as needed
+  targetType: 'client',
+  targetId: newClient.id,
+  targetLabel: newClient.name,
+  clientId: newClient.id,
+});
+```
+
+- The `action` union is intentionally restrictive. Don't pass freeform strings; extend the union in `src/lib/audit.ts` when adding a new mutation.
+- `logAudit` never throws — a broken audit log must never block a user action. Failures land in the server logs.
+- Populate `clientId` with the affected client's id whenever the action is client-scoped; use `null` for workspace-wide changes (tiers, settings, staff invites).
 
 ## Auth
 

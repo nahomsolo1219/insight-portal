@@ -1,31 +1,34 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard,
   Calendar,
-  Users,
-  Images,
   CircleHelp,
   FileText,
   Hammer,
-  UserCog,
+  Images,
+  LayoutDashboard,
   LayoutTemplate,
-  Settings,
-  Search,
   LogOut,
+  Search,
+  Settings,
+  UserCog,
+  Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import type { CurrentUser } from '@/lib/auth/current-user';
 import { cn, initialsFrom } from '@/lib/utils';
+import type { SidebarCounts } from './queries';
+
+type BadgeKey = 'schedule' | 'photos' | 'decisions' | 'invoices';
 
 interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
-  badge?: number;
-  badgeTone?: 'gold' | 'teal';
+  /** Optional key into the counts object supplied by the layout. */
+  badgeKey?: BadgeKey;
 }
 
 interface NavSection {
@@ -38,28 +41,16 @@ const sections: NavSection[] = [
     heading: 'Overview',
     items: [
       { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-      { label: 'Schedule', href: '/admin/schedule', icon: Calendar, badge: 3, badgeTone: 'teal' },
+      { label: 'Schedule', href: '/admin/schedule', icon: Calendar },
     ],
   },
   {
     heading: 'Manage',
     items: [
       { label: 'Clients', href: '/admin/clients', icon: Users },
-      {
-        label: 'Photo Queue',
-        href: '/admin/photo-queue',
-        icon: Images,
-        badge: 12,
-        badgeTone: 'gold',
-      },
-      {
-        label: 'Decisions',
-        href: '/admin/decisions',
-        icon: CircleHelp,
-        badge: 4,
-        badgeTone: 'gold',
-      },
-      { label: 'Invoices', href: '/admin/invoices', icon: FileText, badge: 2, badgeTone: 'gold' },
+      { label: 'Photo Queue', href: '/admin/photo-queue', icon: Images, badgeKey: 'photos' },
+      { label: 'Decisions', href: '/admin/decisions', icon: CircleHelp, badgeKey: 'decisions' },
+      { label: 'Invoices', href: '/admin/invoices', icon: FileText, badgeKey: 'invoices' },
     ],
   },
   {
@@ -78,18 +69,34 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + '/');
 }
 
-interface SidebarProps {
-  user: CurrentUser;
+function countFor(key: BadgeKey | undefined, counts: SidebarCounts): number {
+  switch (key) {
+    case 'photos':
+      return counts.photosPending;
+    case 'decisions':
+      return counts.decisionsPending;
+    case 'invoices':
+      return counts.invoicesUnpaid;
+    case 'schedule':
+      return 0; // No schedule-count query yet; reserve the slot.
+    default:
+      return 0;
+  }
 }
 
-export function Sidebar({ user }: SidebarProps) {
+interface SidebarProps {
+  user: CurrentUser;
+  counts: SidebarCounts;
+}
+
+export function Sidebar({ user, counts }: SidebarProps) {
   const pathname = usePathname();
   const displayName = user.fullName ?? user.email;
   const initials = initialsFrom(displayName);
   const readableRole = user.role.replace('_', ' ');
 
   return (
-    <aside className="border-brand-warm-300 sticky top-0 flex h-screen w-64 flex-shrink-0 flex-col border-r bg-white">
+    <aside className="border-brand-warm-300 flex h-full w-64 flex-shrink-0 flex-col border-r bg-white">
       {/* Teal header band with white logo */}
       <div className="bg-brand-teal-500 px-5 py-5">
         {/* External SVG hosted on the marketing CDN — next/image is unnecessary for a 2KB vector. */}
@@ -123,6 +130,7 @@ export function Sidebar({ user }: SidebarProps) {
             <ul className="space-y-0.5">
               {section.items.map((item) => {
                 const active = isActive(pathname, item.href);
+                const badgeValue = countFor(item.badgeKey, counts);
                 const Icon = item.icon;
                 return (
                   <li key={item.href}>
@@ -142,16 +150,9 @@ export function Sidebar({ user }: SidebarProps) {
                         )}
                       />
                       <span className="flex-1">{item.label}</span>
-                      {item.badge && item.badge > 0 && (
-                        <span
-                          className={cn(
-                            'min-w-[18px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold',
-                            item.badgeTone === 'gold'
-                              ? 'bg-brand-gold-400 text-white'
-                              : 'bg-brand-teal-100 text-brand-teal-500',
-                          )}
-                        >
-                          {item.badge}
+                      {badgeValue > 0 && (
+                        <span className="bg-brand-gold-400 min-w-[18px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold text-white">
+                          {badgeValue}
                         </span>
                       )}
                     </Link>

@@ -8,10 +8,13 @@
 - [x] Auth wiring (Supabase Auth + middleware + login page + profile trigger + invite flow)
 - [x] Dashboard on real data (queries.ts + Server Component, empty-state aware)
 - [x] Seed script (`npm run db:seed`) — idempotent test data for dev
+- [x] Sidebar badges wired to live counts (photos pending, decisions pending, invoices unpaid)
+- [x] Admin layout restructured to h-screen + internal scroll (fixes sidebar footer layout)
+- [x] Audit logging helper (`logAudit` in `src/lib/audit.ts`) + `AuditAction` union
+- [x] Clients list page + New Client modal + `createClient` / `archiveClient` Server Actions
 
 ## Pages still on mock / scaffolded — migrate one at a time
 
-- [ ] Clients list
 - [ ] Client detail
 - [ ] Schedule
 - [ ] Photo queue
