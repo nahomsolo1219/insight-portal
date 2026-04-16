@@ -78,11 +78,35 @@ See `src/lib/types.ts` for complete interfaces.
 - `npx drizzle-kit studio` — visual DB browser at localhost:4983
 - `npx tsx scripts/verify-db.ts` — one-off sanity check of tables / RLS / policies / enums
 
-## Auth (coming next)
+## Auth
 
-- Supabase Auth via `@supabase/ssr`. Server Actions run as authenticated user.
-- `profiles` table extends `auth.users` with role + client_id/staff_id.
-- Never query the database from a client component directly. Use Server Actions or Server Components.
+- Supabase Auth via `@supabase/ssr`. Magic-link sign-in (passwordless).
+- `src/lib/supabase/server.ts` — server client (Server Components / Server Actions)
+- `src/lib/supabase/client.ts` — browser client (only from `'use client'` files)
+- `src/lib/supabase/middleware.ts` — refreshes the session cookie on every request
+- `src/middleware.ts` — protects `/admin/*`; redirects unauthenticated users to `/login?next=…`
+- `src/lib/auth/current-user.ts` — `getCurrentUser()`, `requireUser()`, `requireAdmin()` (server-only)
+- `src/app/login/page.tsx` + `LoginForm.tsx` — magic-link form
+- `src/app/auth/callback/route.ts` — exchanges the code for a session cookie
+- `src/app/logout/route.ts` — POST-only sign-out handler, posted to from the sidebar footer
+- Use `requireAdmin()` at the top of every admin-only Server Action. Do NOT rely on middleware alone for mutation authorization.
+- Never call the database from a client component. Client components invoke Server Actions or fetch from route handlers.
+
+## Manual Supabase SQL
+
+Files under `src/db/migrations/` prefixed with the names in the table in `src/db/migrations/README.md` are applied out of band (they touch the `auth` schema, which drizzle-kit cannot manage):
+
+- `0001_profile_trigger.sql` — `public.handle_new_user()` + `on_auth_user_created` trigger that creates a `profiles` row for every new `auth.users` row.
+- Apply with `npx tsx scripts/apply-manual-sql.ts <filename>` or paste into the Supabase SQL Editor.
+
+## Inviting users
+
+Users never self-sign-up for this product; every account is curated by David.
+
+- `inviteUser({ email, fullName, role, clientId?, staffId? })` in `src/app/admin/staff/actions.ts`
+- Uses the service-role Supabase client. Sends a Supabase invite email whose callback lands on `/auth/callback?next=/admin`.
+- `NEXT_PUBLIC_SITE_URL` in `.env.local` determines the callback origin — keep this in sync per environment.
+- The signup trigger defaults unspecified new users to `role = 'admin'` so that the very first account (David) can reach the dashboard. Tighten this default once the staff/client invite flows are in use and Supabase Dashboard → Authentication → "Enable sign ups" has been turned off.
 
 ## When compacting, preserve:
 

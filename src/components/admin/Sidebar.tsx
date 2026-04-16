@@ -14,9 +14,11 @@ import {
   LayoutTemplate,
   Settings,
   Search,
+  LogOut,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import type { CurrentUser } from '@/lib/auth/current-user';
+import { cn, initialsFrom } from '@/lib/utils';
 
 interface NavItem {
   label: string;
@@ -76,8 +78,15 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + '/');
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  user: CurrentUser;
+}
+
+export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
+  const displayName = user.fullName ?? user.email;
+  const initials = initialsFrom(displayName);
+  const readableRole = user.role.replace('_', ' ');
 
   return (
     <aside className="border-brand-warm-300 sticky top-0 flex h-screen w-64 flex-shrink-0 flex-col border-r bg-white">
@@ -157,12 +166,21 @@ export function Sidebar() {
       {/* User footer */}
       <div className="border-brand-warm-300 flex items-center gap-3 border-t px-4 py-3">
         <div className="bg-brand-teal-500 flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold text-white">
-          DH
+          {initials || displayName.slice(0, 2).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-[#333]">David Hughes</div>
-          <div className="truncate text-xs text-[#8a8a8a]">Owner</div>
+          <div className="truncate text-sm font-medium text-[#333]">{displayName}</div>
+          <div className="truncate text-xs text-[#8a8a8a] capitalize">{readableRole}</div>
         </div>
+        <form action="/logout" method="post">
+          <button
+            type="submit"
+            aria-label="Sign out"
+            className="hover:bg-brand-warm-100 hover:text-brand-teal-500 rounded-lg p-2 text-[#8a8a8a] transition-colors"
+          >
+            <LogOut size={16} strokeWidth={1.5} />
+          </button>
+        </form>
       </div>
     </aside>
   );

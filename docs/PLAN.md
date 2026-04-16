@@ -5,14 +5,14 @@
 - [x] Project scaffold + CLAUDE.md + hooks
 - [x] Sidebar + admin layout
 - [x] Database schema with RLS (Supabase + Drizzle)
+- [x] Auth wiring (Supabase Auth + middleware + login page + profile trigger + invite flow)
 
 ## In progress
 
-- [ ] Auth wiring (Supabase Auth + middleware + login page)
+- [ ] Replace mock-data on dashboard with real queries
 
 ## Next up
 
-- [ ] Replace mock-data on dashboard with real queries
 - [ ] Migrate remaining pages to real data
 - [ ] File uploads to Supabase Storage (photos, PDFs)
 - [ ] Email via Postmark
