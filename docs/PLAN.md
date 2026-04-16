@@ -18,13 +18,13 @@
 - [x] Profile tab (client + property edit modals, archive confirmation, reusable Modal / Field)
 - [x] Seed arithmetic: Annual plan progress 35 → 50 (matches 1/2 milestones complete)
 - [x] Supabase Storage infrastructure: `insight-files` bucket, path-based RLS, path/upload/validation helpers, reusable `FileUpload` component, smoke test
+- [x] Documents tab (per-project file library; multi-file upload, signed-URL download, delete with audit, orphan-safe rollbacks)
 
 ## Client detail tabs still to build — each in its own session
 
 - [ ] Appointments tab
 - [ ] Photos tab
 - [ ] Reports tab
-- [ ] Documents tab
 - [ ] Invoices tab (per-client view; cross-client invoices page separate)
 
 ## Other pages still on scaffold — migrate one at a time
@@ -46,8 +46,7 @@
 
 ## Next up
 
-- [ ] Documents tab (first consumer of the storage stack)
-- [ ] Reports tab (second consumer)
+- [ ] Reports tab (second consumer of the storage stack)
 - [ ] Invoices tab (third consumer, also the cross-client /admin/invoices page)
 - [ ] Email via Postmark
 - [ ] Deploy to Vercel

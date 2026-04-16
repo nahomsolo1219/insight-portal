@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { formatCurrency, formatDate, initialsFrom } from '@/lib/utils';
 import { ClientDetailTabs } from './ClientDetailTabs';
+import { DocumentsTab } from './DocumentsTab';
 import { ProfileTab } from './ProfileTab';
 import { ProjectsTab } from './ProjectsTab';
 import { getClientDetail } from './queries';
@@ -35,6 +36,9 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
   // active property id means switching properties remounts a fresh subtree.
   const projectsSlot = activePropertyId ? (
     <ProjectsTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
+  ) : null;
+  const documentsSlot = activePropertyId ? (
+    <DocumentsTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
   ) : null;
   const profileSlot = (
     <ProfileTab
@@ -100,6 +104,7 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
         properties={properties}
         activePropertyId={activePropertyId}
         projectsSlot={projectsSlot}
+        documentsSlot={documentsSlot}
         profileSlot={profileSlot}
       />
     </div>

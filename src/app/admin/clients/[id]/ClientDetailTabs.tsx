@@ -37,6 +37,7 @@ interface ClientDetailTabsProps {
    * cheap client interaction that just swaps which slot we render.
    */
   projectsSlot: React.ReactNode;
+  documentsSlot: React.ReactNode;
   profileSlot: React.ReactNode;
 }
 
@@ -45,6 +46,7 @@ export function ClientDetailTabs({
   properties,
   activePropertyId,
   projectsSlot,
+  documentsSlot,
   profileSlot,
 }: ClientDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('projects');
@@ -122,10 +124,17 @@ export function ClientDetailTabs({
           ? projectsSlot
           : <EmptyTab message="No properties yet. Add a property first." />
       )}
-      {activeTab === 'profile' && profileSlot}
-      {activeTab !== 'projects' && activeTab !== 'profile' && (
-        <ComingSoon tabLabel={TABS.find((t) => t.id === activeTab)!.label} />
+      {activeTab === 'documents' && (
+        activeProperty
+          ? documentsSlot
+          : <EmptyTab message="No properties yet. Add a property first." />
       )}
+      {activeTab === 'profile' && profileSlot}
+      {activeTab !== 'projects' &&
+        activeTab !== 'documents' &&
+        activeTab !== 'profile' && (
+          <ComingSoon tabLabel={TABS.find((t) => t.id === activeTab)!.label} />
+        )}
     </div>
   );
 }

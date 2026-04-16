@@ -36,6 +36,7 @@ export type AuditAction =
   | 'uploaded invoice'
   | 'updated invoice status'
   | 'uploaded document'
+  | 'deleted document'
   | 'posted weekly update'
   | 'added vendor'
   | 'updated vendor'

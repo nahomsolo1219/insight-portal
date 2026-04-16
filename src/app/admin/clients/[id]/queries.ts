@@ -6,6 +6,7 @@ import { and, asc, count, desc, eq, inArray, sum } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   clients,
+  documents,
   invoices,
   membershipTiers,
   milestones,
@@ -223,3 +224,62 @@ export async function getProjectsForProperty(propertyId: string) {
 
 export type ProjectWithMilestones = Awaited<ReturnType<typeof getProjectsForProperty>>[number];
 export type MilestoneRow = ProjectWithMilestones['milestones'][number];
+
+// ---------------------------------------------------------------------------
+// Documents tab
+// ---------------------------------------------------------------------------
+
+export interface DocumentRow {
+  id: string;
+  name: string;
+  /** YYYY-MM-DD string from the DB. */
+  date: string;
+  /** 'contract' | 'drawing' | 'permit' | 'spec_sheet' | 'warranty' | 'other' */
+  type: string;
+  storagePath: string;
+  projectId: string;
+  projectName: string;
+  createdAt: Date;
+}
+
+/**
+ * Every document attached to any project on this property. Sorted by
+ * document date descending (then createdAt as a tiebreaker for same-day
+ * uploads). Grouping by project happens on the client.
+ */
+export async function getDocumentsForProperty(propertyId: string): Promise<DocumentRow[]> {
+  return db
+    .select({
+      id: documents.id,
+      name: documents.name,
+      date: documents.date,
+      type: documents.type,
+      storagePath: documents.storagePath,
+      projectId: documents.projectId,
+      projectName: projects.name,
+      createdAt: documents.createdAt,
+    })
+    .from(documents)
+    .innerJoin(projects, eq(projects.id, documents.projectId))
+    .where(eq(projects.propertyId, propertyId))
+    .orderBy(desc(documents.date), desc(documents.createdAt));
+}
+
+export interface ProjectOption {
+  id: string;
+  name: string;
+  type: 'maintenance' | 'remodel';
+}
+
+/**
+ * Light project list for the "which project?" picker in the upload modal.
+ * Ordered newest-first so the most recently-started project is the
+ * default selection.
+ */
+export async function getProjectsForPropertySelect(propertyId: string): Promise<ProjectOption[]> {
+  return db
+    .select({ id: projects.id, name: projects.name, type: projects.type })
+    .from(projects)
+    .where(eq(projects.propertyId, propertyId))
+    .orderBy(desc(projects.startDate));
+}
