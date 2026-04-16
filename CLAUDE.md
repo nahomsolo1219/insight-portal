@@ -132,9 +132,9 @@ await logAudit({
 
 ## Manual Supabase SQL
 
-Files under `src/db/migrations/` prefixed with the names in the table in `src/db/migrations/README.md` are applied out of band (they touch the `auth` schema, which drizzle-kit cannot manage):
+Files under `src/db/migrations/` prefixed `manual_` are applied out of band — they touch the `auth` schema, which drizzle-kit cannot manage. See `src/db/migrations/README.md` for the full list and rationale.
 
-- `0001_profile_trigger.sql` — `public.handle_new_user()` + `on_auth_user_created` trigger that creates a `profiles` row for every new `auth.users` row.
+- `manual_profile_trigger.sql` — `public.handle_new_user()` + `on_auth_user_created` trigger that creates a `profiles` row for every new `auth.users` row.
 - Apply with `npx tsx scripts/apply-manual-sql.ts <filename>` or paste into the Supabase SQL Editor.
 
 ## Inviting users

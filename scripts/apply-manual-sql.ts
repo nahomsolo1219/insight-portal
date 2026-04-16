@@ -1,9 +1,10 @@
 // Applies a single SQL file from src/db/migrations/ using the DIRECT_URL
 // connection. Use this only for files that drizzle-kit can't track — e.g.
-// triggers on the auth schema.
+// triggers on the auth schema. Those files live alongside drizzle's
+// numbered migrations but are prefixed `manual_`.
 //
 // Usage:
-//   npx tsx scripts/apply-manual-sql.ts 0001_profile_trigger.sql
+//   npx tsx scripts/apply-manual-sql.ts manual_profile_trigger.sql
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';

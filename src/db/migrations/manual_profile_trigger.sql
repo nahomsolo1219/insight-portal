@@ -1,8 +1,11 @@
 -- This migration lives OUTSIDE drizzle-kit's tracking (see
 -- src/db/migrations/README.md). drizzle-kit cannot manage triggers on the
 -- auth.users table because that schema is owned by Supabase Auth. Apply this
--- file by running `npx tsx scripts/apply-manual-sql.ts 0001_profile_trigger.sql`
+-- file by running `npx tsx scripts/apply-manual-sql.ts manual_profile_trigger.sql`
 -- or by pasting it into the Supabase SQL Editor.
+--
+-- Filename uses a `manual_` prefix (not `000X_`) so it doesn't visually share
+-- drizzle's numbered sequence.
 
 -- When a new user signs up (via magic link, invite, or any other auth flow),
 -- automatically create a matching row in public.profiles so that the rest of

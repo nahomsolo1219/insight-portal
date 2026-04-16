@@ -14,7 +14,10 @@ via either:
 
 | File | Purpose |
 | ---- | ------- |
-| `0001_profile_trigger.sql` | Installs `public.handle_new_user()` + `auth.users` trigger that auto-creates a `profiles` row for every new auth user. |
+| `manual_profile_trigger.sql` | Installs `public.handle_new_user()` + `auth.users` trigger that auto-creates a `profiles` row for every new auth user. |
+
+Files here are prefixed `manual_` (no numeric `000X_`) so they're visually
+distinct from the drizzle-kit sequence.
 
 ### Re-generating migrations safely
 

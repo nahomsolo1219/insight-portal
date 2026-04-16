@@ -12,18 +12,35 @@
 - [x] Admin layout restructured to h-screen + internal scroll (fixes sidebar footer layout)
 - [x] Audit logging helper (`logAudit` in `src/lib/audit.ts`) + `AuditAction` union
 - [x] Clients list page + New Client modal + `createClient` / `archiveClient` Server Actions
+- [x] Relaxed NOT NULL on `clients.email` + tightened UI types
+- [x] Manual migration file renamed to `manual_` prefix (no more numeric collision with drizzle)
+- [x] Client detail page shell (header + stats + property switcher) + Projects tab fully wired (milestone tick → progress % → audit)
 
-## Pages still on mock / scaffolded — migrate one at a time
+## Client detail tabs still to build — each in its own session
 
-- [ ] Client detail
+- [ ] Appointments tab
+- [ ] Photos tab
+- [ ] Reports tab
+- [ ] Documents tab
+- [ ] Invoices tab (per-client view; cross-client invoices page separate)
+- [ ] Profile tab (contact / access notes / emergency)
+
+## Other pages still on scaffold — migrate one at a time
+
 - [ ] Schedule
 - [ ] Photo queue
 - [ ] Decisions
-- [ ] Invoices
+- [ ] Invoices (cross-client)
 - [ ] Vendors
 - [ ] Staff
 - [ ] Templates
 - [ ] Settings
+
+## Follow-up for client detail shell
+
+- [ ] Create-Project flow (currently a disabled placeholder button)
+- [ ] Decision-resolution flow (awaiting-client milestones — distinct from the complete/pending toggle)
+- [ ] Multi-property switcher end-to-end test (needs a seeded client with 2+ properties)
 
 ## Next up
 
