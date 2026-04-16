@@ -1,8 +1,24 @@
 # Insight HM Admin Portal — Build Plan
 
-## Current phase: UI scaffolding
+## Completed
 
-### Pages to build (in order)
+- [x] Project scaffold + CLAUDE.md + hooks
+- [x] Sidebar + admin layout
+- [x] Database schema with RLS (Supabase + Drizzle)
+
+## In progress
+
+- [ ] Auth wiring (Supabase Auth + middleware + login page)
+
+## Next up
+
+- [ ] Replace mock-data on dashboard with real queries
+- [ ] Migrate remaining pages to real data
+- [ ] File uploads to Supabase Storage (photos, PDFs)
+- [ ] Email via Postmark
+- [ ] Deploy to Vercel
+
+## Pages to build (in order)
 
 1. [x] Project scaffold + CLAUDE.md + hooks
 2. [x] Layout + Sidebar (teal header, white body)

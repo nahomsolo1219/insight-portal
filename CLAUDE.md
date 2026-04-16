@@ -62,6 +62,28 @@ Invoices are admin-uploaded PDFs with fields, NOT synced from QuickBooks.
 Milestones with status 'awaiting-client' are "Decisions" (aggregated in their own page).
 See `src/lib/types.ts` for complete interfaces.
 
+## Database
+
+- Supabase Postgres. Drizzle ORM. Connection via `DATABASE_URL` (pooled, port 6543) for app, `DIRECT_URL` (port 5432) for migrations.
+- Schema in `src/db/schema.ts`. Migrations in `src/db/migrations/`.
+- Every table has RLS enabled. Admin role bypasses all checks; client role sees only own data; field_staff inserts photos.
+- Monetary values stored as `integer` cents. Convert in UI layer.
+- All IDs are UUIDs (`defaultRandom()`).
+- `auth.users` is owned by Supabase Auth. We mirror it as an external schema reference in `src/db/schema.ts` only so the FK from `public.profiles.id` can be declared. The `CREATE TABLE "auth"."users"` block that drizzle-kit emits on `generate` MUST be stripped from new migrations before applying.
+
+## Drizzle commands
+
+- `npx drizzle-kit generate` — generate migration from schema changes
+- `npx drizzle-kit migrate` — apply pending migrations
+- `npx drizzle-kit studio` — visual DB browser at localhost:4983
+- `npx tsx scripts/verify-db.ts` — one-off sanity check of tables / RLS / policies / enums
+
+## Auth (coming next)
+
+- Supabase Auth via `@supabase/ssr`. Server Actions run as authenticated user.
+- `profiles` table extends `auth.users` with role + client_id/staff_id.
+- Never query the database from a client component directly. Use Server Actions or Server Components.
+
 ## When compacting, preserve:
 
 - The list of all modified files
