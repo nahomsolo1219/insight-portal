@@ -7,7 +7,7 @@ Admin portal for Insight Home Maintenance, a luxury home maintenance and remodel
 - Next.js 16+ (App Router), TypeScript strict
 - Tailwind CSS v4 with custom brand tokens (configured in `src/app/globals.css` via `@theme`)
 - Lucide React for icons
-- Supabase Postgres via Drizzle ORM — see "Database" / "Page query pattern" below. The legacy `src/lib/mock-data.ts` is dead code (no remaining imports) and will be deleted once every admin page is migrated.
+- Supabase Postgres via Drizzle ORM — see "Database" / "Page query pattern" below.
 
 ## Commands
 
@@ -43,7 +43,6 @@ Admin portal for Insight Home Maintenance, a luxury home maintenance and remodel
 - `src/db/` — schema, migrations, Drizzle client
 - `src/lib/types.ts` — UI-only TypeScript interfaces (DB types come from the Drizzle schema)
 - `src/lib/utils.ts` — helper functions
-- `src/lib/mock-data.ts` — legacy, unused, slated for deletion
 - `scripts/` — CLI helpers (`seed.ts`, `verify-db.ts`, `apply-manual-sql.ts`). Every script that touches the DB starts with `import './_env';` before importing from `@/db`.
 
 ## Design rules — IMPORTANT
@@ -91,8 +90,6 @@ Every admin page follows this structure:
 2. `src/app/admin/<page>/page.tsx` — Server Component. Calls `await requireAdmin()` at the top, then fetches all data via `Promise.all()` with the query functions. Renders the UI.
 3. `src/app/admin/<page>/actions.ts` — `'use server'` mutations, each wrapped with `requireAdmin()` or `requireUser()`, followed by Drizzle writes, `await logAudit(...)`, and `revalidatePath()` of the affected routes.
 4. Client components that post to Server Actions live alongside the page (e.g. `src/app/admin/<page>/NewThingButton.tsx`). They import the action directly and drive it with `useTransition`.
-
-Never import `@/lib/mock-data` into a page. Once every page has migrated, `src/lib/mock-data.ts` is deleted.
 
 Money formatting: DB columns ending in `_cents` are `integer`. UI uses `formatCurrency(cents)` from `@/lib/utils` — do not pre-divide.
 

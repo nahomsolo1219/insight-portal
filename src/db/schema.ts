@@ -111,7 +111,11 @@ export const membershipTiers = pgTable('membership_tiers', {
 export const clients = pgTable('clients', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
-  email: text('email').notNull(),
+  // email + phone are optional — for the wealthiest HNW clients the household
+  // office sometimes handles every inbound channel. Keep these nullable so an
+  // empty contact field persists as NULL (queryable) rather than '' (looks
+  // valid but breaks mailto:/tel: links).
+  email: text('email'),
   phone: text('phone'),
   membershipTierId: uuid('membership_tier_id').references(() => membershipTiers.id, {
     onDelete: 'set null',

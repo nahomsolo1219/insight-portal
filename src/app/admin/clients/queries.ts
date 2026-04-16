@@ -11,7 +11,7 @@ export interface ClientRow {
   id: string;
   name: string;
   status: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   memberSince: string | null;
   propertyCount: number;

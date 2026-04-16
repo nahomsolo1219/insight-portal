@@ -8,12 +8,12 @@ export type ClientStatus = 'active' | 'inactive' | 'paused';
 export interface Client {
   id: string;
   name: string;
-  email: string;
-  phone: string;
+  email: string | null;
+  phone: string | null;
   initials: string;
-  membershipTier: string; // free-form tag, resolves to MembershipTier.name
-  assignedPM: string;
-  memberSince: string; // ISO date
+  membershipTier: string | null; // free-form tag, resolves to MembershipTier.name
+  assignedPM: string | null;
+  memberSince: string | null; // ISO date
   status: ClientStatus;
   properties: Property[];
 }
@@ -23,12 +23,14 @@ export interface Property {
   clientId: string;
   name: string;
   address: string;
-  city: string;
-  sqft: number;
-  yearBuilt: number;
-  gateCode?: string;
-  accessNotes?: string;
-  emergencyContact?: string;
+  city: string | null;
+  state: string | null;
+  zipcode: string | null;
+  sqft: number | null;
+  yearBuilt: number | null;
+  gateCode: string | null;
+  accessNotes: string | null;
+  emergencyContact: string | null;
   projects: Project[];
 }
 

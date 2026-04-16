@@ -39,13 +39,13 @@ export async function createClient(
   if (validationError) return { success: false, error: validationError };
 
   try {
+    // Blank form fields become NULL, not '' — keeps `email IS NULL` queries
+    // and mailto: link guards working as intended.
     const [newClient] = await db
       .insert(clients)
       .values({
         name: input.name.trim(),
-        // The DB column is NOT NULL; fall back to an empty string so the
-        // insert succeeds when the admin leaves email blank.
-        email: input.email?.trim() || '',
+        email: input.email?.trim() || null,
         phone: input.phone?.trim() || null,
         membershipTierId: input.membershipTierId || null,
         assignedPmId: input.assignedPmId || null,
