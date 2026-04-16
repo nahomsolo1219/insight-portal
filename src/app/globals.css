@@ -1,26 +1,73 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
+/* ---------- Brand tokens ----------
+ * Tailwind v4 exposes any custom CSS variable defined in `@theme` as a
+ * utility class. `--color-brand-teal-500` becomes `bg-brand-teal-500`,
+ * `text-brand-teal-500`, `border-brand-teal-500`, etc.
+ * ------------------------------- */
+@theme {
+  /* Teal — primary */
+  --color-brand-teal-50: #eef5f6;
+  --color-brand-teal-100: #d5e8eb;
+  --color-brand-teal-200: #a8d0d6;
+  --color-brand-teal-300: #6badb8;
+  --color-brand-teal-400: #2d7f8c;
+  --color-brand-teal-500: #1b4f5a;
+  --color-brand-teal-600: #164149;
+  --color-brand-teal-700: #113338;
+  --color-brand-teal: #1b4f5a;
+
+  /* Gold — accent */
+  --color-brand-gold-50: #fbf6ee;
+  --color-brand-gold-100: #f5e8d0;
+  --color-brand-gold-200: #ebcfa0;
+  --color-brand-gold-300: #dfb26a;
+  --color-brand-gold-400: #c8963e;
+  --color-brand-gold-500: #a87b2f;
+  --color-brand-gold-600: #886223;
+  --color-brand-gold: #c8963e;
+
+  /* Warm neutrals */
+  --color-brand-warm-50: #fdfcfa;
+  --color-brand-warm-100: #f9f9f7;
+  --color-brand-warm-200: #f3f2ee;
+  --color-brand-warm-300: #e8e6e1;
+  --color-brand-warm-400: #d4d2cc;
+
+  /* Supporting tint used for active nav row */
+  --color-brand-nav-active: #f4f8f9;
+
+  /* Typography — backed by next/font/google in src/app/layout.tsx */
+  --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: var(--font-dm-serif), Georgia, serif;
+
+  /* Shadows — soft, warm, premium */
+  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.03);
+  --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.06);
+}
+
+/* ---------- Base styles ---------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f9f9f7; /* warm off-white */
+  --foreground: #444444; /* body */
+  --foreground-muted: #737373;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Utility for the premium display face used on page titles only. */
+.font-display {
+  font-family: var(--font-display);
 }
