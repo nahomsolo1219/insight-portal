@@ -132,10 +132,22 @@ await logAudit({
 
 ## Manual Supabase SQL
 
-Files under `src/db/migrations/` prefixed `manual_` are applied out of band — they touch the `auth` schema, which drizzle-kit cannot manage. See `src/db/migrations/README.md` for the full list and rationale.
+Files under `src/db/migrations/` prefixed `manual_` are applied out of band — they touch the `auth` or `storage` schemas, which drizzle-kit cannot manage. See `src/db/migrations/README.md` for the full list and rationale.
 
 - `manual_profile_trigger.sql` — `public.handle_new_user()` + `on_auth_user_created` trigger that creates a `profiles` row for every new `auth.users` row.
+- `manual_storage_rls.sql` — RLS policies on `storage.objects` for the `insight-files` bucket. Idempotent (drops then re-creates each policy).
 - Apply with `npx tsx scripts/apply-manual-sql.ts <filename>` or paste into the Supabase SQL Editor.
+
+## File storage
+
+- Single bucket `insight-files` on Supabase Storage (not public — we always sign URLs server-side).
+- Path layout: `{fileType}/{clientId}/...` where fileType ∈ `photos`, `documents`, `invoices`, `reports`. The RLS policy in `manual_storage_rls.sql` assumes exactly this shape.
+- Path helpers in `src/lib/storage/paths.ts` — always use `photoPath()`, `documentPath()`, `invoicePath()`, `reportPath()`; never build paths inline.
+- Upload / signed-URL / delete helpers in `src/lib/storage/upload.ts` (server-only).
+- Client-side shared validation in `src/lib/storage/validation.ts` (safe to import in client components; max 25 MB, explicit MIME allow-lists per `FileKind`).
+- `FileUpload` client component in `src/components/admin/FileUpload.tsx` — drag/drop, multi-file, image previews, client-side validation, does NOT upload on its own (parent form posts the staged files to a Server Action).
+- `uploadSingleFromForm` / `uploadManyFromForm` in `src/lib/storage/upload-from-form.ts` are the standard adapters from Server-Action `FormData` to the bucket.
+- Smoke test: `npx tsx scripts/test-storage.ts` uploads + signs + fetches + deletes a tiny file via service-role.
 
 ## Inviting users
 

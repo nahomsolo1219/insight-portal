@@ -15,6 +15,7 @@ via either:
 | File | Purpose |
 | ---- | ------- |
 | `manual_profile_trigger.sql` | Installs `public.handle_new_user()` + `auth.users` trigger that auto-creates a `profiles` row for every new auth user. |
+| `manual_storage_rls.sql` | RLS policies on `storage.objects` for the `insight-files` bucket: admin full access, clients scoped to their own path prefix (with pending photos admin-only), field staff write to `photos/` + read their own uploads. Idempotent. |
 
 Files here are prefixed `manual_` (no numeric `000X_`) so they're visually
 distinct from the drizzle-kit sequence.
