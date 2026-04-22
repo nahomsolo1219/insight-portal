@@ -28,10 +28,10 @@
 
 ## Other pages still on scaffold — migrate one at a time
 
-- [ ] Schedule
-- [ ] Photo queue
-- [ ] Decisions
-- [ ] Invoices (cross-client)
+- [x] Schedule (URL-driven date range, day/week toggle, grouped-by-day, reuses appointment status action)
+- [x] Photo queue (pending photos grouped by client, per-client select-all, inline review modal with approve/reject, bulk reject)
+- [x] Decisions (urgency-sorted list with overdue/soon/later badges, question body + options, client filter)
+- [x] Invoices (cross-client) (summary totals, status + client filters, scoped totals when filtering, inline status toggle)
 - [ ] Vendors
 - [ ] Staff
 - [ ] Templates
@@ -45,7 +45,7 @@
 
 ## Next up
 
-- [ ] Cross-client /admin/invoices page (reuses invoice upload/status components)
+- [ ] Vendors / Staff / Templates / Settings pages
 - [ ] Email via Postmark
 - [ ] Deploy to Vercel
 

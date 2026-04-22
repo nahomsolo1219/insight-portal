@@ -1,16 +1,34 @@
-export default function PhotoQueuePage() {
+import { requireAdmin } from '@/lib/auth/current-user';
+import { getSignedUrls } from '@/lib/storage/upload';
+import { PhotoQueueClient, type QueuePhotoWithUrl } from './PhotoQueueClient';
+import { getPendingPhotos } from './queries';
+
+export default async function PhotoQueuePage() {
+  await requireAdmin();
+
+  const pending = await getPendingPhotos();
+  const urlMap =
+    pending.length > 0
+      ? await getSignedUrls(pending.map((p) => p.storagePath))
+      : new Map<string, string>();
+
+  const photosWithUrls: QueuePhotoWithUrl[] = pending.map((p) => ({
+    ...p,
+    signedUrl: urlMap.get(p.storagePath) ?? null,
+  }));
+
   return (
     <div className="space-y-6">
-      <header>
+      <header className="flex items-center gap-3">
         <h1 className="font-display text-brand-teal-500 text-3xl">Photo queue</h1>
-        <p className="mt-1 text-sm text-[#737373]">
-          Scaffold ready. Bulk categorization UI will be built next.
-        </p>
+        {photosWithUrls.length > 0 && (
+          <span className="bg-brand-gold-400 rounded-full px-3 py-1 text-sm font-medium text-white">
+            {photosWithUrls.length}
+          </span>
+        )}
       </header>
-      <div className="shadow-card rounded-2xl bg-white p-8 text-sm text-[#737373]">
-        Placeholder — next step: grid of pending photos with inline category/tag pickers and batch
-        actions.
-      </div>
+
+      <PhotoQueueClient photos={photosWithUrls} />
     </div>
   );
 }
