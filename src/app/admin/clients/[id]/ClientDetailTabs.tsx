@@ -39,6 +39,7 @@ interface ClientDetailTabsProps {
   projectsSlot: React.ReactNode;
   documentsSlot: React.ReactNode;
   reportsSlot: React.ReactNode;
+  invoicesSlot: React.ReactNode;
   profileSlot: React.ReactNode;
 }
 
@@ -49,6 +50,7 @@ export function ClientDetailTabs({
   projectsSlot,
   documentsSlot,
   reportsSlot,
+  invoicesSlot,
   profileSlot,
 }: ClientDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('projects');
@@ -136,10 +138,13 @@ export function ClientDetailTabs({
           ? reportsSlot
           : <EmptyTab message="No properties yet. Add a property first." />
       )}
+      {/* Invoices are client-scoped — they render even when no property is selected. */}
+      {activeTab === 'invoices' && invoicesSlot}
       {activeTab === 'profile' && profileSlot}
       {activeTab !== 'projects' &&
         activeTab !== 'documents' &&
         activeTab !== 'reports' &&
+        activeTab !== 'invoices' &&
         activeTab !== 'profile' && (
           <ComingSoon tabLabel={TABS.find((t) => t.id === activeTab)!.label} />
         )}

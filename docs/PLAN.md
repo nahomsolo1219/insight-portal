@@ -20,12 +20,12 @@
 - [x] Supabase Storage infrastructure: `insight-files` bucket, path-based RLS, path/upload/validation helpers, reusable `FileUpload` component, smoke test
 - [x] Documents tab (per-project file library; multi-file upload, signed-URL download, delete with audit, orphan-safe rollbacks)
 - [x] Reports tab (single-PDF upload, vendor/project optional, type badges, read tracking on download, delete with audit)
+- [x] Invoices tab (8-field upload with dollars→cents parsing, inline status dropdown, summary bar, property→project cascade, delete with audit)
 
 ## Client detail tabs still to build — each in its own session
 
 - [ ] Appointments tab
 - [ ] Photos tab
-- [ ] Invoices tab (per-client view; cross-client invoices page separate)
 
 ## Other pages still on scaffold — migrate one at a time
 
@@ -46,7 +46,7 @@
 
 ## Next up
 
-- [ ] Invoices tab (third consumer, also the cross-client /admin/invoices page)
+- [ ] Cross-client /admin/invoices page (reuses invoice upload/status components)
 - [ ] Email via Postmark
 - [ ] Deploy to Vercel
 

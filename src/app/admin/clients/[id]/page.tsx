@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/auth/current-user';
 import { formatCurrency, formatDate, initialsFrom } from '@/lib/utils';
 import { ClientDetailTabs } from './ClientDetailTabs';
 import { DocumentsTab } from './DocumentsTab';
+import { InvoicesTab } from './InvoicesTab';
 import { ProfileTab } from './ProfileTab';
 import { ProjectsTab } from './ProjectsTab';
 import { ReportsTab } from './ReportsTab';
@@ -44,6 +45,15 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
   const reportsSlot = activePropertyId ? (
     <ReportsTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
   ) : null;
+  // Invoices are client-scoped, not property-scoped — keyed by client id so
+  // switching properties does NOT remount (and refetch) the tab.
+  const invoicesSlot = (
+    <InvoicesTab
+      key={id}
+      clientId={id}
+      properties={properties.map((p) => ({ id: p.id, name: p.name }))}
+    />
+  );
   const profileSlot = (
     <ProfileTab
       key={activePropertyId ?? 'no-property'}
@@ -110,6 +120,7 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
         projectsSlot={projectsSlot}
         documentsSlot={documentsSlot}
         reportsSlot={reportsSlot}
+        invoicesSlot={invoicesSlot}
         profileSlot={profileSlot}
       />
     </div>

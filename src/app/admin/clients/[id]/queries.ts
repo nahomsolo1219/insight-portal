@@ -351,3 +351,125 @@ export async function getVendorsForSelect(): Promise<VendorOption[]> {
     .where(eq(vendors.active, true))
     .orderBy(asc(vendors.name));
 }
+
+// ---------------------------------------------------------------------------
+// Invoices tab
+// ---------------------------------------------------------------------------
+
+export interface InvoiceRow {
+  id: string;
+  invoiceNumber: string;
+  description: string | null;
+  amountCents: number;
+  invoiceDate: string;
+  dueDate: string;
+  /** 'paid' | 'unpaid' | 'partial' */
+  status: 'paid' | 'unpaid' | 'partial';
+  storagePath: string;
+  projectId: string | null;
+  projectName: string | null;
+  propertyId: string | null;
+  propertyName: string | null;
+  createdAt: Date;
+}
+
+/**
+ * Every invoice for this client — across all properties. Invoices are
+ * client-scoped (not property-scoped like documents/reports), so switching
+ * the property tab does NOT filter this list. Date descending with
+ * createdAt as tiebreaker.
+ */
+export async function getInvoicesForClient(clientId: string): Promise<InvoiceRow[]> {
+  return db
+    .select({
+      id: invoices.id,
+      invoiceNumber: invoices.invoiceNumber,
+      description: invoices.description,
+      amountCents: invoices.amountCents,
+      invoiceDate: invoices.invoiceDate,
+      dueDate: invoices.dueDate,
+      status: invoices.status,
+      storagePath: invoices.storagePath,
+      projectId: invoices.projectId,
+      projectName: projects.name,
+      propertyId: invoices.propertyId,
+      propertyName: properties.name,
+      createdAt: invoices.createdAt,
+    })
+    .from(invoices)
+    .leftJoin(projects, eq(projects.id, invoices.projectId))
+    .leftJoin(properties, eq(properties.id, invoices.propertyId))
+    .where(eq(invoices.clientId, clientId))
+    .orderBy(desc(invoices.invoiceDate), desc(invoices.createdAt));
+}
+
+export interface InvoiceSummary {
+  totalInvoiced: number;
+  totalPaid: number;
+  totalOutstanding: number;
+  invoiceCount: number;
+}
+
+/**
+ * Grouped invoice totals for the summary bar above the table.
+ * `totalOutstanding` = unpaid + partial combined — David just wants to see
+ * "how much money is still owed", regardless of whether it's fully or
+ * partially outstanding.
+ */
+export async function getInvoiceSummaryForClient(clientId: string): Promise<InvoiceSummary> {
+  const rows = await db
+    .select({
+      status: invoices.status,
+      total: sum(invoices.amountCents).mapWith(Number),
+      count: count(),
+    })
+    .from(invoices)
+    .where(eq(invoices.clientId, clientId))
+    .groupBy(invoices.status);
+
+  let totalInvoiced = 0;
+  let totalPaid = 0;
+  let totalOutstanding = 0;
+  let invoiceCount = 0;
+
+  for (const row of rows) {
+    const amount = row.total ?? 0;
+    invoiceCount += Number(row.count);
+    totalInvoiced += amount;
+    if (row.status === 'paid') totalPaid += amount;
+    else totalOutstanding += amount;
+  }
+
+  return { totalInvoiced, totalPaid, totalOutstanding, invoiceCount };
+}
+
+export interface ProjectOptionWithProperty {
+  id: string;
+  name: string;
+  type: 'maintenance' | 'remodel';
+  propertyId: string;
+  propertyName: string;
+}
+
+/**
+ * Every project belonging to any of this client's properties, plus each
+ * project's property name. Drives the property→project cascade in the
+ * invoice upload modal. One round-trip; beats N+1-ing
+ * `getProjectsForPropertySelect` per property.
+ */
+export async function getAllProjectsForClient(
+  clientId: string,
+): Promise<ProjectOptionWithProperty[]> {
+  return db
+    .select({
+      id: projects.id,
+      name: projects.name,
+      type: projects.type,
+      propertyId: projects.propertyId,
+      propertyName: properties.name,
+    })
+    .from(projects)
+    .innerJoin(properties, eq(properties.id, projects.propertyId))
+    .where(eq(properties.clientId, clientId))
+    .orderBy(asc(properties.name), desc(projects.startDate));
+}
