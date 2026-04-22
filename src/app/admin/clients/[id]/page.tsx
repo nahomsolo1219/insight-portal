@@ -7,6 +7,7 @@ import { ClientDetailTabs } from './ClientDetailTabs';
 import { DocumentsTab } from './DocumentsTab';
 import { ProfileTab } from './ProfileTab';
 import { ProjectsTab } from './ProjectsTab';
+import { ReportsTab } from './ReportsTab';
 import { getClientDetail } from './queries';
 
 interface PageProps {
@@ -39,6 +40,9 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
   ) : null;
   const documentsSlot = activePropertyId ? (
     <DocumentsTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
+  ) : null;
+  const reportsSlot = activePropertyId ? (
+    <ReportsTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
   ) : null;
   const profileSlot = (
     <ProfileTab
@@ -105,6 +109,7 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
         activePropertyId={activePropertyId}
         projectsSlot={projectsSlot}
         documentsSlot={documentsSlot}
+        reportsSlot={reportsSlot}
         profileSlot={profileSlot}
       />
     </div>
