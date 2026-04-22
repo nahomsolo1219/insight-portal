@@ -22,10 +22,9 @@
 - [x] Reports tab (single-PDF upload, vendor/project optional, type badges, read tracking on download, delete with audit)
 - [x] Invoices tab (8-field upload with dollars→cents parsing, inline status dropdown, summary bar, property→project cascade, delete with audit)
 - [x] Appointments tab (create/status/delete, upcoming/past split with collapsible history, David-on-site flag, scope-of-work expansion)
+- [x] Photos tab (grid + filters, selection + bulk categorize/reject/delete, single-photo detail with inline categorization, admin upload with auto-categorize when tagged)
 
-## Client detail tabs still to build — each in its own session
-
-- [ ] Photos tab
+## Client detail tabs — all built ✓
 
 ## Other pages still on scaffold — migrate one at a time
 

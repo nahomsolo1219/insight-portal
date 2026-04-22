@@ -7,6 +7,7 @@ import { AppointmentsTab } from './AppointmentsTab';
 import { ClientDetailTabs } from './ClientDetailTabs';
 import { DocumentsTab } from './DocumentsTab';
 import { InvoicesTab } from './InvoicesTab';
+import { PhotosTab } from './PhotosTab';
 import { ProfileTab } from './ProfileTab';
 import { ProjectsTab } from './ProjectsTab';
 import { ReportsTab } from './ReportsTab';
@@ -48,6 +49,9 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
   ) : null;
   const appointmentsSlot = activePropertyId ? (
     <AppointmentsTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
+  ) : null;
+  const photosSlot = activePropertyId ? (
+    <PhotosTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
   ) : null;
   // Invoices are client-scoped, not property-scoped — keyed by client id so
   // switching properties does NOT remount (and refetch) the tab.
@@ -125,6 +129,7 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
         documentsSlot={documentsSlot}
         reportsSlot={reportsSlot}
         appointmentsSlot={appointmentsSlot}
+        photosSlot={photosSlot}
         invoicesSlot={invoicesSlot}
         profileSlot={profileSlot}
       />

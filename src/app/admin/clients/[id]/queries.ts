@@ -11,6 +11,7 @@ import {
   invoices,
   membershipTiers,
   milestones,
+  photos,
   projects,
   properties,
   reports,
@@ -582,4 +583,92 @@ export async function getActivePmsForSelect(): Promise<PmOption[]> {
     .from(staff)
     .where(and(eq(staff.status, 'active'), inArray(staff.role, ['founder', 'project_manager'])))
     .orderBy(asc(staff.name));
+}
+
+// ---------------------------------------------------------------------------
+// Photos tab
+// ---------------------------------------------------------------------------
+
+export interface PhotoRow {
+  id: string;
+  caption: string | null;
+  /** 'before' | 'during' | 'after' | null */
+  tag: 'before' | 'during' | 'after' | null;
+  category: string | null;
+  /** 'pending' | 'categorized' | 'rejected' */
+  status: 'pending' | 'categorized' | 'rejected';
+  storagePath: string;
+  uploadedByName: string | null;
+  uploadedAt: Date;
+  /** `numeric` columns round-trip as strings in pg — keep them as-is for display. */
+  gpsLat: string | null;
+  gpsLng: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  milestoneId: string | null;
+  milestoneTitle: string | null;
+}
+
+/**
+ * Every photo attached to this property. No server-side filters — all
+ * filtering (status, project, tag) happens client-side so toggles feel
+ * instant. If a property ever has thousands of photos we'd move filters
+ * to the DB, but typical counts are <100.
+ */
+export async function getPhotosForProperty(propertyId: string): Promise<PhotoRow[]> {
+  return db
+    .select({
+      id: photos.id,
+      caption: photos.caption,
+      tag: photos.tag,
+      category: photos.category,
+      status: photos.status,
+      storagePath: photos.storagePath,
+      uploadedByName: photos.uploadedByName,
+      uploadedAt: photos.uploadedAt,
+      gpsLat: photos.gpsLat,
+      gpsLng: photos.gpsLng,
+      projectId: photos.projectId,
+      projectName: projects.name,
+      milestoneId: photos.milestoneId,
+      milestoneTitle: milestones.title,
+    })
+    .from(photos)
+    .leftJoin(projects, eq(projects.id, photos.projectId))
+    .leftJoin(milestones, eq(milestones.id, photos.milestoneId))
+    .where(eq(photos.propertyId, propertyId))
+    .orderBy(desc(photos.uploadedAt));
+}
+
+export interface PhotoStats {
+  total: number;
+  pending: number;
+  categorized: number;
+  rejected: number;
+}
+
+/**
+ * Status rollup for the stats bar. One GROUP BY round-trip beats counting
+ * the same rows the client already has — keeps the tab responsive to
+ * filter changes without re-reading the full set.
+ */
+export async function getPhotoStats(propertyId: string): Promise<PhotoStats> {
+  const rows = await db
+    .select({
+      status: photos.status,
+      count: count(),
+    })
+    .from(photos)
+    .where(eq(photos.propertyId, propertyId))
+    .groupBy(photos.status);
+
+  const stats: PhotoStats = { total: 0, pending: 0, categorized: 0, rejected: 0 };
+  for (const row of rows) {
+    const c = Number(row.count);
+    stats.total += c;
+    if (row.status === 'pending') stats.pending = c;
+    if (row.status === 'categorized') stats.categorized = c;
+    if (row.status === 'rejected') stats.rejected = c;
+  }
+  return stats;
 }
