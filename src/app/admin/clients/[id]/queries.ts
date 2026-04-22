@@ -5,6 +5,7 @@
 import { and, asc, count, desc, eq, inArray, sum } from 'drizzle-orm';
 import { db } from '@/db';
 import {
+  appointments,
   clients,
   documents,
   invoices,
@@ -472,4 +473,113 @@ export async function getAllProjectsForClient(
     .innerJoin(properties, eq(properties.id, projects.propertyId))
     .where(eq(properties.clientId, clientId))
     .orderBy(asc(properties.name), desc(projects.startDate));
+}
+
+// ---------------------------------------------------------------------------
+// Appointments tab
+// ---------------------------------------------------------------------------
+
+export interface AppointmentRow {
+  id: string;
+  title: string;
+  date: string;
+  startTime: string | null;
+  endTime: string | null;
+  /** 'scheduled' | 'confirmed' | 'completed' | 'cancelled' */
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
+  davidOnSite: boolean;
+  scopeOfWork: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  milestoneId: string | null;
+  milestoneTitle: string | null;
+  vendorId: string | null;
+  vendorName: string | null;
+  pmId: string | null;
+  pmName: string | null;
+  createdAt: Date;
+}
+
+export interface AppointmentsPayload {
+  upcoming: AppointmentRow[];
+  past: AppointmentRow[];
+  /** Needed in client code because we may want to re-split after optimistic updates. */
+  all: AppointmentRow[];
+}
+
+/**
+ * Every appointment scheduled against this property, pre-split into
+ * upcoming and past. An appointment drops into "past" once its status is
+ * completed/cancelled OR its date is strictly before today — so a
+ * confirmed appointment today stays in "upcoming" until it's marked done,
+ * which matches how David actually uses the list.
+ *
+ * Sorting: upcoming is chronological (soonest first); past is reverse
+ * (most recent first). We sort client-side after splitting so the two
+ * lists can have different orderings without two DB round-trips.
+ */
+export async function getAppointmentsForProperty(
+  propertyId: string,
+): Promise<AppointmentsPayload> {
+  const rows = await db
+    .select({
+      id: appointments.id,
+      title: appointments.title,
+      date: appointments.date,
+      startTime: appointments.startTime,
+      endTime: appointments.endTime,
+      status: appointments.status,
+      davidOnSite: appointments.davidOnSite,
+      scopeOfWork: appointments.scopeOfWork,
+      projectId: appointments.projectId,
+      projectName: projects.name,
+      milestoneId: appointments.milestoneId,
+      milestoneTitle: milestones.title,
+      vendorId: appointments.vendorId,
+      vendorName: vendors.name,
+      pmId: appointments.assignedPmId,
+      pmName: staff.name,
+      createdAt: appointments.createdAt,
+    })
+    .from(appointments)
+    .leftJoin(projects, eq(projects.id, appointments.projectId))
+    .leftJoin(milestones, eq(milestones.id, appointments.milestoneId))
+    .leftJoin(vendors, eq(vendors.id, appointments.vendorId))
+    .leftJoin(staff, eq(staff.id, appointments.assignedPmId))
+    .where(eq(appointments.propertyId, propertyId));
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const upcoming = rows
+    .filter((r) => r.date >= today && r.status !== 'completed' && r.status !== 'cancelled')
+    .sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return (a.startTime ?? '').localeCompare(b.startTime ?? '');
+    });
+
+  const past = rows
+    .filter((r) => r.date < today || r.status === 'completed' || r.status === 'cancelled')
+    .sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      return (b.startTime ?? '').localeCompare(a.startTime ?? '');
+    });
+
+  return { upcoming, past, all: rows };
+}
+
+export interface PmOption {
+  id: string;
+  name: string;
+}
+
+/**
+ * Active staff who can be assigned as the PM on an appointment — founder
+ * and project managers only. Field staff/techs don't belong here.
+ */
+export async function getActivePmsForSelect(): Promise<PmOption[]> {
+  return db
+    .select({ id: staff.id, name: staff.name })
+    .from(staff)
+    .where(and(eq(staff.status, 'active'), inArray(staff.role, ['founder', 'project_manager'])))
+    .orderBy(asc(staff.name));
 }

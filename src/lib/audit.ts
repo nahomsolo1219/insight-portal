@@ -29,6 +29,8 @@ export type AuditAction =
   | 'created appointment'
   | 'completed appointment'
   | 'cancelled appointment'
+  | 'updated appointment status'
+  | 'deleted appointment'
   | 'uploaded photo'
   | 'categorized photo'
   | 'rejected photo'

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { formatCurrency, formatDate, initialsFrom } from '@/lib/utils';
+import { AppointmentsTab } from './AppointmentsTab';
 import { ClientDetailTabs } from './ClientDetailTabs';
 import { DocumentsTab } from './DocumentsTab';
 import { InvoicesTab } from './InvoicesTab';
@@ -44,6 +45,9 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
   ) : null;
   const reportsSlot = activePropertyId ? (
     <ReportsTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
+  ) : null;
+  const appointmentsSlot = activePropertyId ? (
+    <AppointmentsTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
   ) : null;
   // Invoices are client-scoped, not property-scoped — keyed by client id so
   // switching properties does NOT remount (and refetch) the tab.
@@ -120,6 +124,7 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
         projectsSlot={projectsSlot}
         documentsSlot={documentsSlot}
         reportsSlot={reportsSlot}
+        appointmentsSlot={appointmentsSlot}
         invoicesSlot={invoicesSlot}
         profileSlot={profileSlot}
       />
