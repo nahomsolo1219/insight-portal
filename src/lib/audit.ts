@@ -46,6 +46,7 @@ export type AuditAction =
   | 'added vendor'
   | 'updated vendor'
   | 'invited staff'
+  | 'updated staff'
   | 'invited client'
   | 'updated settings'
   | 'created tier'

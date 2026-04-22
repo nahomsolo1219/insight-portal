@@ -32,8 +32,8 @@
 - [x] Photo queue (pending photos grouped by client, per-client select-all, inline review modal with approve/reject, bulk reject)
 - [x] Decisions (urgency-sorted list with overdue/soon/later badges, question body + options, client filter)
 - [x] Invoices (cross-client) (summary totals, status + client filters, scoped totals when filtering, inline status toggle)
-- [ ] Vendors
-- [ ] Staff
+- [x] Vendors (searchable directory table, create/edit modals with datalist-suggested categories, toggle active/inactive, rating display)
+- [x] Staff (card grid with role/status badges, create/edit modals, optional Supabase invite on create with inviteRole mapping from staff role)
 - [ ] Templates
 - [ ] Settings
 
@@ -45,7 +45,7 @@
 
 ## Next up
 
-- [ ] Vendors / Staff / Templates / Settings pages
+- [ ] Templates / Settings pages
 - [ ] Email via Postmark
 - [ ] Deploy to Vercel
 
