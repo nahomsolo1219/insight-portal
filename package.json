@@ -10,6 +10,7 @@
     "db:seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
+    "@floating-ui/react": "^0.27.19",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.2",
     "clsx": "^2.1.1",

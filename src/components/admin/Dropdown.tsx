@@ -1,8 +1,19 @@
 'use client';
 
+import {
+  autoUpdate,
+  flip,
+  FloatingPortal,
+  offset,
+  shift,
+  useClick,
+  useDismiss,
+  useFloating,
+  useInteractions,
+  useRole,
+} from '@floating-ui/react';
 import { Check } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface DropdownOption {
@@ -31,17 +42,12 @@ interface DropdownProps {
 }
 
 /**
- * Status dropdown that escapes `overflow: hidden` containers.
+ * Status dropdown anchored via `@floating-ui/react`.
  *
- * Why a portal: the menu renders through `createPortal(..., document.body)`
- * so it's never clipped by cards, tables, or scroll containers that set
- * `overflow: hidden`. Positioning uses viewport coordinates (`position: fixed`)
- * anchored to the trigger's `getBoundingClientRect()`, re-measured on scroll
- * and resize.
- *
- * The click-outside handler runs on `mousedown` but ignores clicks inside
- * *either* the trigger OR the portal — otherwise the menu would close
- * before the `onClick` on an item had a chance to fire.
+ * `autoUpdate` keeps the menu pinned to the trigger across scroll, resize, and
+ * DOM shifts; `flip` swaps to `top-*` when the viewport edge is close; `shift`
+ * clamps the menu horizontally so it never runs off-screen. The menu renders
+ * through `FloatingPortal` so it escapes `overflow: hidden` ancestors.
  */
 export function Dropdown({
   trigger,
@@ -54,96 +60,57 @@ export function Dropdown({
   ariaLabel,
 }: DropdownProps) {
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<{ top: number; left: number; right?: number }>({
-    top: 0,
-    left: 0,
+
+  const { refs, floatingStyles, context } = useFloating({
+    open,
+    onOpenChange: (next) => {
+      if (disabled && next) return;
+      setOpen(next);
+    },
+    placement: align === 'right' ? 'bottom-end' : 'bottom-start',
+    middleware: [
+      offset(4),
+      flip({ fallbackPlacements: ['top-start', 'top-end'] }),
+      shift({ padding: 8 }),
+    ],
+    whileElementsMounted: autoUpdate,
   });
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const { setReference, setFloating } = refs;
 
-  const updatePosition = useCallback(() => {
-    if (!triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    if (align === 'right') {
-      setPosition({
-        top: rect.bottom + 4,
-        left: 0,
-        right: window.innerWidth - rect.right,
-      });
-    } else {
-      setPosition({ top: rect.bottom + 4, left: rect.left });
-    }
-  }, [align]);
-
-  useEffect(() => {
-    if (!open) return;
-    updatePosition();
-
-    function handleMouseDown(e: MouseEvent) {
-      const target = e.target as Node;
-      // Ignore clicks inside either the trigger or the portal — otherwise
-      // the menu would close before the item's onClick could run.
-      if (triggerRef.current?.contains(target)) return;
-      if (menuRef.current?.contains(target)) return;
-      setOpen(false);
-    }
-
-    function handleEscape(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
-    }
-
-    function handleReposition() {
-      updatePosition();
-    }
-
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleEscape);
-    // `true` for scroll captures scrolls on any ancestor, which covers
-    // modals, scrollable tables, and the body.
-    window.addEventListener('scroll', handleReposition, true);
-    window.addEventListener('resize', handleReposition);
-
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('keydown', handleEscape);
-      window.removeEventListener('scroll', handleReposition, true);
-      window.removeEventListener('resize', handleReposition);
-    };
-  }, [open, updatePosition]);
+  const click = useClick(context, { enabled: !disabled });
+  const dismiss = useDismiss(context);
+  const role = useRole(context, { role: 'menu' });
+  const { getReferenceProps, getFloatingProps, getItemProps } = useInteractions([
+    click,
+    dismiss,
+    role,
+  ]);
 
   function handleSelect(next: string) {
     setOpen(false);
     onSelect(next);
   }
 
-  const menuStyle: React.CSSProperties =
-    align === 'right'
-      ? { position: 'fixed', top: position.top, right: position.right }
-      : { position: 'fixed', top: position.top, left: position.left };
-
   return (
     <>
       <button
-        ref={triggerRef}
+        ref={setReference}
         type="button"
-        onClick={() => !disabled && setOpen((v) => !v)}
         disabled={disabled}
-        aria-haspopup="menu"
-        aria-expanded={open}
         aria-label={ariaLabel}
         className={className}
+        {...getReferenceProps()}
       >
         {trigger}
       </button>
 
-      {open &&
-        typeof document !== 'undefined' &&
-        createPortal(
+      {open && (
+        <FloatingPortal>
           <div
-            ref={menuRef}
-            role="menu"
-            style={menuStyle}
+            ref={setFloating}
+            style={floatingStyles}
             className="shadow-modal z-[100] min-w-[160px] overflow-hidden rounded-xl border border-gray-100 bg-white py-1"
+            {...getFloatingProps()}
           >
             {options.map((opt) => {
               const isCurrent = opt.value === value;
@@ -155,6 +122,7 @@ export function Dropdown({
                   aria-checked={isCurrent}
                   onClick={() => handleSelect(opt.value)}
                   className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-50"
+                  {...getItemProps()}
                 >
                   <span className={cn('inline-flex items-center gap-2', opt.color ?? 'text-gray-700')}>
                     {opt.badge ?? null}
@@ -164,9 +132,9 @@ export function Dropdown({
                 </button>
               );
             })}
-          </div>,
-          document.body,
-        )}
+          </div>
+        </FloatingPortal>
+      )}
     </>
   );
 }
