@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import { Field, inputClass, textareaClass } from '@/components/admin/Field';
 import { Modal } from '@/components/admin/Modal';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatCurrency } from '@/lib/utils';
 import { createTier, deleteTier, updateEmailTemplate, updateTier } from './actions';
 import type { EmailTemplateRow, MembershipTierRow } from './queries';
@@ -210,6 +211,7 @@ interface TierFormState {
 
 function CreateTierModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<TierFormState>({
@@ -237,8 +239,10 @@ function CreateTierModal({ onClose }: { onClose: () => void }) {
       });
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Tier created');
       onClose();
       router.refresh();
     });
@@ -261,6 +265,7 @@ function CreateTierModal({ onClose }: { onClose: () => void }) {
 
 function EditTierModal({ tier, onClose }: { tier: MembershipTierRow; onClose: () => void }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<TierFormState>({
@@ -288,8 +293,10 @@ function EditTierModal({ tier, onClose }: { tier: MembershipTierRow; onClose: ()
       });
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Tier updated');
       onClose();
       router.refresh();
     });
@@ -416,6 +423,7 @@ function TierFormModal({
 
 function DeleteTierModal({ tier, onClose }: { tier: MembershipTierRow; onClose: () => void }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -425,8 +433,10 @@ function DeleteTierModal({ tier, onClose }: { tier: MembershipTierRow; onClose: 
       const result = await deleteTier(tier.id);
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast(`Tier "${tier.name}" deleted`);
       onClose();
       router.refresh();
     });
@@ -542,6 +552,7 @@ function EmailTemplateCard({
   onSaved,
 }: EmailTemplateCardProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [subject, setSubject] = useState(template.subject);
@@ -564,8 +575,10 @@ function EmailTemplateCard({
       });
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Email template saved');
       onSaved();
       router.refresh();
     });

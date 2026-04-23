@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Field, inputClass, textareaClass } from '@/components/admin/Field';
 import { Modal } from '@/components/admin/Modal';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatDate } from '@/lib/utils';
 import { archiveClient } from '../actions';
 import { updateClient, updateProperty } from './actions';
@@ -188,6 +189,7 @@ interface EditClientModalProps {
 
 function EditClientModal({ onClose, client, tiers, pms }: EditClientModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(() => ({
@@ -212,8 +214,10 @@ function EditClientModal({ onClose, client, tiers, pms }: EditClientModalProps) 
       });
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Client updated');
       onClose();
       router.refresh();
     });
@@ -333,6 +337,7 @@ interface EditPropertyModalProps {
 
 function EditPropertyModal({ onClose, property, clientId }: EditPropertyModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(() => ({
@@ -365,8 +370,10 @@ function EditPropertyModal({ onClose, property, clientId }: EditPropertyModalPro
       });
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Property updated');
       onClose();
       router.refresh();
     });
@@ -517,6 +524,7 @@ interface ArchiveConfirmModalProps {
 
 function ArchiveConfirmModal({ onClose, clientId, clientName }: ArchiveConfirmModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -526,8 +534,10 @@ function ArchiveConfirmModal({ onClose, clientId, clientName }: ArchiveConfirmMo
       const result = await archiveClient(clientId);
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast(`Archived ${clientName}`);
       onClose();
       router.push('/admin/clients');
       router.refresh();

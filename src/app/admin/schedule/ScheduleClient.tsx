@@ -2,7 +2,6 @@
 
 import {
   Briefcase,
-  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -15,7 +14,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
+import { Dropdown } from '@/components/admin/Dropdown';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatTime } from '@/lib/utils';
 import {
   updateAppointmentStatus,
@@ -307,7 +308,7 @@ function MetaItem({ icon: Icon, label }: { icon: typeof Wrench; label: string })
   );
 }
 
-// ---------- status dropdown (same pattern as the per-client tab) ----------
+// ---------- status dropdown (portal-based — escapes card clipping) ----------
 
 function StatusBadgeButton({
   appointmentId,
@@ -319,36 +320,23 @@ function StatusBadgeButton({
   status: AppointmentStatus;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const wrapperRef = useRef<HTMLDivElement>(null);
   const meta = statusMeta(status);
 
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [open]);
-
-  function choose(next: AppointmentStatus) {
-    setOpen(false);
+  function choose(next: string) {
     if (next === status) return;
     startTransition(async () => {
-      const result = await updateAppointmentStatus(appointmentId, clientId, next);
+      const result = await updateAppointmentStatus(
+        appointmentId,
+        clientId,
+        next as AppointmentStatus,
+      );
       if (!result.success) {
-        console.error('[updateAppointmentStatus]', result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast(`Appointment marked ${next}`);
       // The action revalidates /admin/clients/{id} + /admin but NOT the
       // schedule route — router.refresh() pulls the new server render here.
       router.refresh();
@@ -356,50 +344,34 @@ function StatusBadgeButton({
   }
 
   return (
-    <div ref={wrapperRef} className="relative inline-block flex-shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        disabled={isPending}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className={cn(
-          'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all',
-          meta.badge,
-          'hover:ring-2 hover:ring-gray-100',
-          isPending && 'opacity-60',
-        )}
-      >
-        {meta.label}
-        <ChevronDown size={12} strokeWidth={2} className="opacity-60" />
-      </button>
-
-      {open && (
-        <div
-          role="menu"
-          className="shadow-modal absolute top-full right-0 z-10 mt-1 min-w-[160px] overflow-hidden rounded-xl border border-gray-100 bg-white py-1"
-        >
-          {STATUS_OPTIONS.map((opt) => {
-            const isCurrent = opt.id === status;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                role="menuitemradio"
-                aria-checked={isCurrent}
-                onClick={() => choose(opt.id)}
-                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
-              >
-                <span className={cn('rounded-md px-2 py-0.5 text-[11px] font-medium', opt.badge)}>
-                  {opt.label}
-                </span>
-                {isCurrent && <Check size={14} strokeWidth={2} className="text-brand-teal-500" />}
-              </button>
-            );
-          })}
-        </div>
+    <Dropdown
+      value={status}
+      onSelect={choose}
+      disabled={isPending}
+      align="right"
+      ariaLabel="Change appointment status"
+      className={cn(
+        'inline-flex flex-shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all',
+        meta.badge,
+        'hover:ring-2 hover:ring-gray-100',
+        isPending && 'opacity-60',
       )}
-    </div>
+      options={STATUS_OPTIONS.map((opt) => ({
+        value: opt.id,
+        label: opt.label,
+        badge: (
+          <span className={cn('rounded-md px-2 py-0.5 text-[11px] font-medium', opt.badge)}>
+            {opt.label}
+          </span>
+        ),
+      }))}
+      trigger={
+        <>
+          {meta.label}
+          <ChevronDown size={12} strokeWidth={2} className="opacity-60" />
+        </>
+      }
+    />
   );
 }
 

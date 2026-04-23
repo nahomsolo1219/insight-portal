@@ -1,19 +1,13 @@
 'use client';
 
-import {
-  Check,
-  ChevronDown,
-  Download,
-  FileText,
-  Plus,
-  Trash2,
-  Upload,
-} from 'lucide-react';
+import { ChevronDown, Download, FileText, Plus, Trash2, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
+import { Dropdown } from '@/components/admin/Dropdown';
 import { Field, inputClass } from '@/components/admin/Field';
 import { FileUpload, type FileUploadItem } from '@/components/admin/FileUpload';
 import { Modal } from '@/components/admin/Modal';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatCurrency, formatShortDate } from '@/lib/utils';
 import type { InvoiceRowWithUrl, InvoicesTabProperty } from './InvoicesTab';
 import {
@@ -270,7 +264,7 @@ function InvoiceTableRow({ invoice, clientId, onDelete }: InvoiceTableRowProps) 
 }
 
 // ---------------------------------------------------------------------------
-// Inline status dropdown
+// Inline status dropdown (portal-based — escapes card `overflow-hidden`)
 // ---------------------------------------------------------------------------
 
 interface StatusBadgeButtonProps {
@@ -281,95 +275,51 @@ interface StatusBadgeButtonProps {
 
 function StatusBadgeButton({ invoiceId, clientId, status }: StatusBadgeButtonProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const wrapperRef = useRef<HTMLDivElement>(null);
   const meta = statusMeta(status);
 
-  // Click-outside + Escape closes the dropdown. Only binds the listener
-  // while the dropdown is open so we're not leaving zombie listeners on
-  // every row of the table.
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [open]);
-
-  function choose(next: InvoiceStatus) {
-    setOpen(false);
+  function choose(next: string) {
     if (next === status) return;
     startTransition(async () => {
-      const result = await updateInvoiceStatus(invoiceId, clientId, next);
+      const result = await updateInvoiceStatus(invoiceId, clientId, next as InvoiceStatus);
       if (!result.success) {
-        // Non-blocking error: log it; a real toast system would show it.
-        console.error('[updateInvoiceStatus]', result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast(`Marked ${next}`);
       router.refresh();
     });
   }
 
   return (
-    <div ref={wrapperRef} className="relative inline-block">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        disabled={isPending}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className={cn(
-          'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all',
-          meta.badge,
-          'hover:ring-2 hover:ring-gray-100',
-          isPending && 'opacity-60',
-        )}
-      >
-        {meta.label}
-        <ChevronDown size={12} strokeWidth={2} className="opacity-60" />
-      </button>
-
-      {open && (
-        <div
-          role="menu"
-          className="shadow-modal absolute top-full left-0 z-10 mt-1 min-w-[140px] overflow-hidden rounded-xl border border-gray-100 bg-white py-1"
-        >
-          {STATUS_OPTIONS.map((opt) => {
-            const isCurrent = opt.id === status;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                role="menuitemradio"
-                aria-checked={isCurrent}
-                onClick={() => choose(opt.id)}
-                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
-              >
-                <span className="inline-flex items-center gap-2">
-                  <span className={cn('rounded-md px-2 py-0.5 text-[11px] font-medium', opt.badge)}>
-                    {opt.label}
-                  </span>
-                </span>
-                {isCurrent && (
-                  <Check size={14} strokeWidth={2} className="text-brand-teal-500" />
-                )}
-              </button>
-            );
-          })}
-        </div>
+    <Dropdown
+      value={status}
+      onSelect={choose}
+      disabled={isPending}
+      ariaLabel="Change invoice status"
+      className={cn(
+        'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all',
+        meta.badge,
+        'hover:ring-2 hover:ring-gray-100',
+        isPending && 'opacity-60',
       )}
-    </div>
+      options={STATUS_OPTIONS.map((opt) => ({
+        value: opt.id,
+        label: opt.label,
+        badge: (
+          <span className={cn('rounded-md px-2 py-0.5 text-[11px] font-medium', opt.badge)}>
+            {opt.label}
+          </span>
+        ),
+      }))}
+      trigger={
+        <>
+          {meta.label}
+          <ChevronDown size={12} strokeWidth={2} className="opacity-60" />
+        </>
+      }
+    />
   );
 }
 
@@ -413,6 +363,7 @@ interface UploadModalProps {
 
 function UploadModal({ onClose, clientId, properties, projects }: UploadModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -496,9 +447,11 @@ function UploadModal({ onClose, clientId, properties, projects }: UploadModalPro
 
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
 
+      showToast(`Invoice ${invoiceNumber.trim()} uploaded`);
       onClose();
       router.refresh();
     });
@@ -692,6 +645,7 @@ interface DeleteConfirmModalProps {
 
 function DeleteConfirmModal({ invoice, onClose, clientId }: DeleteConfirmModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -701,8 +655,10 @@ function DeleteConfirmModal({ invoice, onClose, clientId }: DeleteConfirmModalPr
       const result = await deleteInvoice(invoice.id, clientId);
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Invoice deleted');
       onClose();
       router.refresh();
     });

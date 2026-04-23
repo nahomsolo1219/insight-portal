@@ -3,7 +3,6 @@
 import {
   Briefcase,
   Calendar,
-  Check,
   ChevronDown,
   ChevronRight,
   ClipboardList,
@@ -15,9 +14,11 @@ import {
   Wrench,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
+import { Dropdown } from '@/components/admin/Dropdown';
 import { Field, inputClass, textareaClass } from '@/components/admin/Field';
 import { Modal } from '@/components/admin/Modal';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatTime } from '@/lib/utils';
 import {
   createAppointment,
@@ -318,7 +319,7 @@ function MetaItem({ icon: Icon, label }: { icon: typeof Wrench; label: string })
 }
 
 // ---------------------------------------------------------------------------
-// Inline status dropdown
+// Inline status dropdown (portal-based — escapes card `overflow-hidden`)
 // ---------------------------------------------------------------------------
 
 interface StatusBadgeButtonProps {
@@ -329,89 +330,56 @@ interface StatusBadgeButtonProps {
 
 function StatusBadgeButton({ appointmentId, clientId, status }: StatusBadgeButtonProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const wrapperRef = useRef<HTMLDivElement>(null);
   const meta = statusMeta(status);
 
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [open]);
-
-  function choose(next: AppointmentStatus) {
-    setOpen(false);
+  function choose(next: string) {
     if (next === status) return;
     startTransition(async () => {
-      const result = await updateAppointmentStatus(appointmentId, clientId, next);
+      const result = await updateAppointmentStatus(
+        appointmentId,
+        clientId,
+        next as AppointmentStatus,
+      );
       if (!result.success) {
-        console.error('[updateAppointmentStatus]', result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast(`Appointment marked ${next}`);
       router.refresh();
     });
   }
 
   return (
-    <div ref={wrapperRef} className="relative inline-block flex-shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        disabled={isPending}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className={cn(
-          'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all',
-          meta.badge,
-          'hover:ring-2 hover:ring-gray-100',
-          isPending && 'opacity-60',
-        )}
-      >
-        {meta.label}
-        <ChevronDown size={12} strokeWidth={2} className="opacity-60" />
-      </button>
-
-      {open && (
-        <div
-          role="menu"
-          className="shadow-modal absolute top-full right-0 z-10 mt-1 min-w-[160px] overflow-hidden rounded-xl border border-gray-100 bg-white py-1"
-        >
-          {STATUS_OPTIONS.map((opt) => {
-            const isCurrent = opt.id === status;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                role="menuitemradio"
-                aria-checked={isCurrent}
-                onClick={() => choose(opt.id)}
-                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
-              >
-                <span className={cn('rounded-md px-2 py-0.5 text-[11px] font-medium', opt.badge)}>
-                  {opt.label}
-                </span>
-                {isCurrent && (
-                  <Check size={14} strokeWidth={2} className="text-brand-teal-500" />
-                )}
-              </button>
-            );
-          })}
-        </div>
+    <Dropdown
+      value={status}
+      onSelect={choose}
+      disabled={isPending}
+      align="right"
+      ariaLabel="Change appointment status"
+      className={cn(
+        'inline-flex flex-shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all',
+        meta.badge,
+        'hover:ring-2 hover:ring-gray-100',
+        isPending && 'opacity-60',
       )}
-    </div>
+      options={STATUS_OPTIONS.map((opt) => ({
+        value: opt.id,
+        label: opt.label,
+        badge: (
+          <span className={cn('rounded-md px-2 py-0.5 text-[11px] font-medium', opt.badge)}>
+            {opt.label}
+          </span>
+        ),
+      }))}
+      trigger={
+        <>
+          {meta.label}
+          <ChevronDown size={12} strokeWidth={2} className="opacity-60" />
+        </>
+      }
+    />
   );
 }
 
@@ -464,6 +432,7 @@ function NewAppointmentModal({
   pms,
 }: NewAppointmentModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -513,9 +482,11 @@ function NewAppointmentModal({
 
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
 
+      showToast('Appointment created');
       onClose();
       router.refresh();
     });
@@ -688,6 +659,7 @@ interface DeleteConfirmModalProps {
 
 function DeleteConfirmModal({ appointment, onClose, clientId }: DeleteConfirmModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -697,8 +669,10 @@ function DeleteConfirmModal({ appointment, onClose, clientId }: DeleteConfirmMod
       const result = await deleteAppointment(appointment.id, clientId);
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Appointment deleted');
       onClose();
       router.refresh();
     });

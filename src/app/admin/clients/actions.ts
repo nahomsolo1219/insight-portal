@@ -9,7 +9,8 @@ import { requireAdmin } from '@/lib/auth/current-user';
 
 export interface CreateClientInput {
   name: string;
-  email?: string;
+  /** Required: clients need an email for portal invites. */
+  email: string;
   phone?: string;
   membershipTierId?: string;
   assignedPmId?: string;
@@ -26,7 +27,9 @@ function validateClient(input: CreateClientInput): string | null {
   const name = input.name?.trim() ?? '';
   if (!name) return 'Client name is required';
   if (name.length > 200) return 'Client name is too long';
-  if (input.email && !EMAIL_RE.test(input.email.trim())) return 'Invalid email address';
+  const email = input.email?.trim() ?? '';
+  if (!email) return 'Email is required — clients need it for portal access';
+  if (!EMAIL_RE.test(email)) return 'Invalid email address';
   return null;
 }
 
@@ -45,7 +48,7 @@ export async function createClient(
       .insert(clients)
       .values({
         name: input.name.trim(),
-        email: input.email?.trim() || null,
+        email: input.email.trim(),
         phone: input.phone?.trim() || null,
         membershipTierId: input.membershipTierId || null,
         assignedPmId: input.assignedPmId || null,

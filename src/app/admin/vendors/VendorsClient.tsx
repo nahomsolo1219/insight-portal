@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import { Field, inputClass, textareaClass } from '@/components/admin/Field';
 import { Modal } from '@/components/admin/Modal';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn } from '@/lib/utils';
 import { createVendor, toggleVendorActive, updateVendor } from './actions';
 import type { VendorRow } from './queries';
@@ -226,15 +227,17 @@ function RatingDisplay({ rating, muted }: { rating: number; muted: boolean }) {
 
 function ToggleActiveButton({ vendor }: { vendor: VendorRow }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
 
   function flip() {
     startTransition(async () => {
       const result = await toggleVendorActive(vendor.id);
       if (!result.success) {
-        console.error('[toggleVendorActive]', result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast(`${vendor.name} ${vendor.active ? 'deactivated' : 'activated'}`);
       router.refresh();
     });
   }
@@ -295,6 +298,7 @@ interface VendorFormState {
 
 function CreateVendorModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<VendorFormState>({
@@ -325,8 +329,10 @@ function CreateVendorModal({ onClose }: { onClose: () => void }) {
       });
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Vendor added');
       onClose();
       router.refresh();
     });
@@ -349,6 +355,7 @@ function CreateVendorModal({ onClose }: { onClose: () => void }) {
 
 function EditVendorModal({ vendor, onClose }: { vendor: VendorRow; onClose: () => void }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<VendorFormState>({
@@ -379,8 +386,10 @@ function EditVendorModal({ vendor, onClose }: { vendor: VendorRow; onClose: () =
       });
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Vendor updated');
       onClose();
       router.refresh();
     });

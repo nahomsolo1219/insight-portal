@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Field, inputClass } from '@/components/admin/Field';
 import { Modal } from '@/components/admin/Modal';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn, initialsFrom } from '@/lib/utils';
 import { createStaffMember, updateStaffMember } from './actions';
 import type { StaffRole, StaffRow, StaffStatus } from './queries';
@@ -176,6 +177,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
 
 function CreateStaffModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -209,6 +211,7 @@ function CreateStaffModal({ onClose }: { onClose: () => void }) {
 
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
 
@@ -216,15 +219,16 @@ function CreateStaffModal({ onClose }: { onClose: () => void }) {
       // so the user sees why — the staff row already exists, so closing
       // and showing an empty refresh would be confusing.
       if (sendInvite && result.data && !result.data.inviteSent) {
-        setNotice(
-          `Staff member created, but the invite email failed${
-            result.data.inviteError ? ` (${result.data.inviteError})` : ''
-          }. Resend from the edit modal later.`,
-        );
+        const noticeMsg = `Staff member created, but the invite email failed${
+          result.data.inviteError ? ` (${result.data.inviteError})` : ''
+        }. Resend from the edit modal later.`;
+        setNotice(noticeMsg);
+        showToast('Invite email failed — see modal for details', 'error');
         router.refresh();
         return;
       }
 
+      showToast(sendInvite ? 'Staff member added and invited' : 'Staff member added');
       onClose();
       router.refresh();
     });
@@ -339,6 +343,7 @@ function CreateStaffModal({ onClose }: { onClose: () => void }) {
 
 function EditStaffModal({ member, onClose }: { member: StaffRow; onClose: () => void }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -370,8 +375,10 @@ function EditStaffModal({ member, onClose }: { member: StaffRow; onClose: () => 
 
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Staff member updated');
       onClose();
       router.refresh();
     });

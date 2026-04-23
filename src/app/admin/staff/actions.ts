@@ -67,7 +67,11 @@ export async function inviteUser(params: InviteUserParams): Promise<InviteUserRe
   }
 
   const admin = adminClient();
-  const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/auth/callback`;
+  // Invitees land on the password-setup page so their first action is
+  // choosing a credential — after which they can use email+password
+  // for subsequent sign-ins without always going through magic links.
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+  const redirectTo = `${siteUrl}/auth/callback?next=/auth/reset-password`;
 
   const { data, error } = await admin.auth.admin.inviteUserByEmail(params.email, {
     data: {

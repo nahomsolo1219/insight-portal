@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import { Field, inputClass, textareaClass } from '@/components/admin/Field';
 import { FileUpload, type FileUploadItem } from '@/components/admin/FileUpload';
 import { Modal } from '@/components/admin/Modal';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn } from '@/lib/utils';
 import {
   bulkCategorizePhotos,
@@ -204,6 +205,7 @@ export function PhotosTabClient({
         <BulkConfirmModal
           title="Reject selected photos?"
           confirmLabel="Reject"
+          successMessage={`Rejected ${selectedIds.size} ${selectedIds.size === 1 ? 'photo' : 'photos'}`}
           body={
             <>
               You&apos;re about to reject{' '}
@@ -223,6 +225,7 @@ export function PhotosTabClient({
           title="Delete selected photos?"
           confirmLabel="Delete"
           danger
+          successMessage={`Deleted ${selectedIds.size} ${selectedIds.size === 1 ? 'photo' : 'photos'}`}
           body={
             <>
               You&apos;re about to permanently delete{' '}
@@ -636,6 +639,7 @@ function PhotoDetailModal({
   onRequestDelete,
 }: PhotoDetailModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -659,8 +663,10 @@ function PhotoDetailModal({
       });
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Photo categorized');
       onClose();
       router.refresh();
     });
@@ -672,8 +678,10 @@ function PhotoDetailModal({
       const result = await rejectPhoto(photo.id, clientId);
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Photo rejected');
       onClose();
       router.refresh();
     });
@@ -856,6 +864,7 @@ interface UploadPhotosModalProps {
 
 function UploadPhotosModal({ clientId, propertyId, projects, onClose }: UploadPhotosModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -889,28 +898,31 @@ function UploadPhotosModal({ clientId, propertyId, projects, onClose }: UploadPh
 
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
 
       const { uploadedCount, failedCount, errors } = result.data!;
       if (uploadedCount === 0) {
-        setError(
-          errors[0]?.error
-            ? `Upload failed: ${errors[0].error}`
-            : `Upload failed for all ${failedCount} file${failedCount === 1 ? '' : 's'}.`,
-        );
+        const msg = errors[0]?.error
+          ? `Upload failed: ${errors[0].error}`
+          : `Upload failed for all ${failedCount} file${failedCount === 1 ? '' : 's'}.`;
+        setError(msg);
+        showToast(msg, 'error');
         return;
       }
       if (failedCount > 0) {
         const first = errors[0];
-        setError(
+        const msg =
           `${uploadedCount} uploaded · ${failedCount} failed` +
-            (first ? ` — ${first.name}: ${first.error}` : ''),
-        );
+          (first ? ` — ${first.name}: ${first.error}` : '');
+        setError(msg);
+        showToast(msg, 'error');
         router.refresh();
         return;
       }
 
+      showToast(uploadedCount === 1 ? 'Photo uploaded' : `${uploadedCount} photos uploaded`);
       onClose();
       router.refresh();
     });
@@ -1065,6 +1077,7 @@ function BulkCategorizeModal({
   onSuccess,
 }: BulkCategorizeModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -1086,8 +1099,12 @@ function BulkCategorizeModal({
       });
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast(
+        `Categorized ${photoIds.length} ${photoIds.length === 1 ? 'photo' : 'photos'}`,
+      );
       onSuccess();
       onClose();
       router.refresh();
@@ -1188,6 +1205,8 @@ function BulkCategorizeModal({
 interface BulkConfirmModalProps {
   title: string;
   confirmLabel: string;
+  /** Toast text on success. Set to `null` to suppress the toast. */
+  successMessage: string | null;
   body: React.ReactNode;
   danger?: boolean;
   onClose: () => void;
@@ -1198,6 +1217,7 @@ interface BulkConfirmModalProps {
 function BulkConfirmModal({
   title,
   confirmLabel,
+  successMessage,
   body,
   danger,
   onClose,
@@ -1205,6 +1225,7 @@ function BulkConfirmModal({
   onSuccess,
 }: BulkConfirmModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -1214,8 +1235,10 @@ function BulkConfirmModal({
       const result = await run();
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      if (successMessage) showToast(successMessage);
       onSuccess();
       onClose();
       router.refresh();
@@ -1273,6 +1296,7 @@ interface SingleDeleteModalProps {
 
 function SingleDeleteModal({ photo, clientId, onClose }: SingleDeleteModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -1282,8 +1306,10 @@ function SingleDeleteModal({ photo, clientId, onClose }: SingleDeleteModalProps)
       const result = await deletePhoto(photo.id, clientId);
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Photo deleted');
       onClose();
       router.refresh();
     });

@@ -71,3 +71,24 @@ body {
 .font-display {
   font-family: var(--font-display);
 }
+
+/* ---------- Cursor affordances ----------
+ * Tailwind v4 ships with `cursor: default` on buttons by default. Force a
+ * pointer on every interactive control so clickables look clickable. The
+ * `:disabled` variants drop back to `not-allowed` without needing each
+ * component to remember.
+ */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+a[href],
+select:not(:disabled),
+summary,
+label[for] {
+  cursor: pointer;
+}
+
+button:disabled,
+[role='button'][aria-disabled='true'],
+select:disabled {
+  cursor: not-allowed;
+}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Field, inputClass } from '@/components/admin/Field';
 import { Modal } from '@/components/admin/Modal';
+import { useToast } from '@/components/admin/ToastProvider';
 import { createClient } from './actions';
 import type { PmOption, TierOption } from './queries';
 
@@ -35,6 +36,7 @@ export function NewClientButton({ tiers, pms }: NewClientButtonProps) {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const router = useRouter();
+  const { showToast } = useToast();
 
   function closeModal() {
     setOpen(false);
@@ -44,18 +46,30 @@ export function NewClientButton({ tiers, pms }: NewClientButtonProps) {
 
   function submit() {
     setError(null);
+    if (!form.name.trim()) {
+      setError('Client name is required.');
+      return;
+    }
+    // Email is required — clients need it to reach the portal. Server also
+    // enforces this; validating here gives an immediate inline error.
+    if (!form.email.trim()) {
+      setError('Email is required — clients need it for portal access.');
+      return;
+    }
     startTransition(async () => {
       const result = await createClient({
         name: form.name,
-        email: form.email || undefined,
+        email: form.email,
         phone: form.phone || undefined,
         membershipTierId: form.membershipTierId || undefined,
         assignedPmId: form.assignedPmId || undefined,
       });
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Client created');
       setOpen(false);
       setForm(emptyForm);
       if (result.data?.id) {
@@ -95,7 +109,7 @@ export function NewClientButton({ tiers, pms }: NewClientButtonProps) {
             <button
               type="button"
               onClick={submit}
-              disabled={isPending || !form.name.trim()}
+              disabled={isPending || !form.name.trim() || !form.email.trim()}
               className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-5 py-2.5 font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isPending ? 'Creating...' : 'Create client'}
@@ -116,9 +130,10 @@ export function NewClientButton({ tiers, pms }: NewClientButtonProps) {
             />
           </Field>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Email">
+            <Field label="Email" required hint="Used for portal invites.">
               <input
                 type="email"
+                required
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="client@example.com"

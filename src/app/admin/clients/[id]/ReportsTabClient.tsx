@@ -17,6 +17,7 @@ import { useState, useTransition } from 'react';
 import { Field, inputClass } from '@/components/admin/Field';
 import { FileUpload, type FileUploadItem } from '@/components/admin/FileUpload';
 import { Modal } from '@/components/admin/Modal';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatDate } from '@/lib/utils';
 import type { ProjectOption, ReportRow, VendorOption } from './queries';
 import {
@@ -273,6 +274,7 @@ interface UploadModalProps {
 
 function UploadModal({ onClose, clientId, propertyId, vendors, projects }: UploadModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -312,9 +314,11 @@ function UploadModal({ onClose, clientId, propertyId, vendors, projects }: Uploa
 
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
 
+      showToast('Report uploaded');
       onClose();
       router.refresh();
     });
@@ -457,6 +461,7 @@ interface DeleteConfirmModalProps {
 
 function DeleteConfirmModal({ report, onClose, clientId }: DeleteConfirmModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -466,8 +471,10 @@ function DeleteConfirmModal({ report, onClose, clientId }: DeleteConfirmModalPro
       const result = await deleteReport(report.id, clientId);
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Report deleted');
       onClose();
       router.refresh();
     });

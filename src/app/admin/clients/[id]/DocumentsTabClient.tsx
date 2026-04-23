@@ -18,6 +18,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { Field, inputClass } from '@/components/admin/Field';
 import { FileUpload, type FileUploadItem } from '@/components/admin/FileUpload';
 import { Modal } from '@/components/admin/Modal';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatDate } from '@/lib/utils';
 import { deleteDocument, uploadDocuments, type DocumentType } from './documents-actions';
 import type { DocumentRow, ProjectOption } from './queries';
@@ -238,6 +239,7 @@ interface UploadModalProps {
 
 function UploadModal({ onClose, clientId, projects }: UploadModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [projectId, setProjectId] = useState(() => projects[0]?.id ?? '');
@@ -263,6 +265,7 @@ function UploadModal({ onClose, clientId, projects }: UploadModalProps) {
       const result = await uploadDocuments(clientId, projectId, documentType, formData);
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
 
@@ -270,25 +273,31 @@ function UploadModal({ onClose, clientId, projects }: UploadModalProps) {
 
       if (uploadedCount === 0) {
         // Everything failed — surface the first error; the rest land in the console.
-        setError(
-          errors[0]?.error
-            ? `Upload failed: ${errors[0].error}`
-            : `Upload failed for all ${failedCount} file${failedCount === 1 ? '' : 's'}.`,
-        );
+        const msg = errors[0]?.error
+          ? `Upload failed: ${errors[0].error}`
+          : `Upload failed for all ${failedCount} file${failedCount === 1 ? '' : 's'}.`;
+        setError(msg);
+        showToast(msg, 'error');
         return;
       }
 
       if (failedCount > 0) {
         // Partial success — leave the modal open so the user can see what didn't land.
         const firstFailed = errors[0];
-        setError(
+        const msg =
           `${uploadedCount} uploaded · ${failedCount} failed` +
-            (firstFailed ? ` — ${firstFailed.name}: ${firstFailed.error}` : ''),
-        );
+          (firstFailed ? ` — ${firstFailed.name}: ${firstFailed.error}` : '');
+        setError(msg);
+        showToast(msg, 'error');
         router.refresh(); // still refresh so the successful ones appear underneath
         return;
       }
 
+      showToast(
+        uploadedCount === 1
+          ? 'Document uploaded'
+          : `${uploadedCount} documents uploaded`,
+      );
       onClose();
       router.refresh();
     });
@@ -400,6 +409,7 @@ interface DeleteConfirmModalProps {
 
 function DeleteConfirmModal({ doc, onClose, clientId }: DeleteConfirmModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -409,8 +419,10 @@ function DeleteConfirmModal({ doc, onClose, clientId }: DeleteConfirmModalProps)
       const result = await deleteDocument(doc.id, clientId);
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Document deleted');
       onClose();
       router.refresh();
     });

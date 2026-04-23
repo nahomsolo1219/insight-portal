@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Field, inputClass } from '@/components/admin/Field';
 import { Modal } from '@/components/admin/Modal';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn } from '@/lib/utils';
 import {
   createTemplate,
@@ -263,6 +264,7 @@ function newDraft(partial: Partial<MilestoneDraft> = {}): MilestoneDraft {
 
 function CreateTemplateModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<TemplateFormState>({
@@ -290,8 +292,10 @@ function CreateTemplateModal({ onClose }: { onClose: () => void }) {
       });
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Template created');
       onClose();
       router.refresh();
     });
@@ -322,6 +326,7 @@ function EditTemplateModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<TemplateFormState>({
@@ -354,8 +359,10 @@ function EditTemplateModal({
       });
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Template updated');
       onClose();
       router.refresh();
     });
@@ -665,6 +672,7 @@ function DeleteConfirmModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -674,8 +682,10 @@ function DeleteConfirmModal({
       const result = await deleteTemplate(template.id);
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Template deleted');
       onClose();
       router.refresh();
     });

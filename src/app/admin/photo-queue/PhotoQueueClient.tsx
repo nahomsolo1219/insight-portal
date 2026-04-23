@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import { Field, inputClass } from '@/components/admin/Field';
 import { Modal } from '@/components/admin/Modal';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn } from '@/lib/utils';
 import {
   bulkRejectPhotos,
@@ -268,6 +269,7 @@ interface PhotoReviewModalProps {
 
 function PhotoReviewModal({ photo, onClose }: PhotoReviewModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -288,8 +290,10 @@ function PhotoReviewModal({ photo, onClose }: PhotoReviewModalProps) {
       });
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Photo approved');
       onClose();
       router.refresh();
     });
@@ -301,8 +305,10 @@ function PhotoReviewModal({ photo, onClose }: PhotoReviewModalProps) {
       const result = await rejectPhoto(photo.id, photo.clientId);
       if (!result.success) {
         setError(result.error);
+        showToast(result.error, 'error');
         return;
       }
+      showToast('Photo rejected');
       onClose();
       router.refresh();
     });
@@ -447,6 +453,7 @@ interface BulkRejectModalProps {
 
 function BulkRejectModal({ selectedByClient, onClose, onSuccess }: BulkRejectModalProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -466,8 +473,10 @@ function BulkRejectModal({ selectedByClient, onClose, onSuccess }: BulkRejectMod
       const failure = results.find((r) => !r.success);
       if (failure && !failure.success) {
         setError(failure.error);
+        showToast(failure.error, 'error');
         return;
       }
+      showToast(`Rejected ${total} ${total === 1 ? 'photo' : 'photos'}`);
       onSuccess();
       onClose();
       router.refresh();
