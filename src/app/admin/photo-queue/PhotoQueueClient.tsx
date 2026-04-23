@@ -3,7 +3,7 @@
 import { CheckCheck, CheckSquare, ImageOff, MapPin, Square, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useOptimistic, useState, useTransition } from 'react';
 import { Field, inputClass } from '@/components/admin/Field';
 import { Modal } from '@/components/admin/Modal';
 import { useToast } from '@/components/admin/ToastProvider';
@@ -29,24 +29,92 @@ interface PhotoQueueClientProps {
 }
 
 export function PhotoQueueClient({ photos }: PhotoQueueClientProps) {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [, startTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [detailId, setDetailId] = useState<string | null>(null);
   const [bulkRejectOpen, setBulkRejectOpen] = useState(false);
+
+  // The queue only shows pending photos, so approving or rejecting removes
+  // them from the grid. The reducer filters out resolved ids — on success
+  // the server refetch drops them from the base list anyway, so the
+  // optimistic filter becomes a no-op at that point.
+  const [optimisticPhotos, applyOptimisticResolve] = useOptimistic(
+    photos,
+    (state, action: { ids: string[] }) => state.filter((p) => !action.ids.includes(p.id)),
+  );
+
+  function handleApprove(
+    photoId: string,
+    clientId: string,
+    data: { tag: PhotoTag; category: string | null; projectId: string | null },
+  ) {
+    startTransition(async () => {
+      applyOptimisticResolve({ ids: [photoId] });
+      const result = await categorizePhoto(photoId, clientId, data);
+      if (!result.success) {
+        showToast(result.error, 'error');
+        return;
+      }
+      showToast('Photo approved');
+      router.refresh();
+    });
+  }
+
+  function handleReject(photoId: string, clientId: string) {
+    startTransition(async () => {
+      applyOptimisticResolve({ ids: [photoId] });
+      const result = await rejectPhoto(photoId, clientId);
+      if (!result.success) {
+        showToast(result.error, 'error');
+        return;
+      }
+      showToast('Photo rejected');
+      router.refresh();
+    });
+  }
+
+  function handleBulkReject(selectedByClient: Map<string, string[]>) {
+    const allIds: string[] = [];
+    for (const ids of selectedByClient.values()) allIds.push(...ids);
+    const total = allIds.length;
+
+    startTransition(async () => {
+      applyOptimisticResolve({ ids: allIds });
+      // The action is client-scoped (ownership joins through properties),
+      // so we fan out one call per client and await them in parallel.
+      const results = await Promise.all(
+        Array.from(selectedByClient.entries()).map(([clientId, ids]) =>
+          bulkRejectPhotos(ids, clientId),
+        ),
+      );
+      const failure = results.find((r) => !r.success);
+      if (failure && !failure.success) {
+        showToast(failure.error, 'error');
+        return;
+      }
+      showToast(`Rejected ${total} ${total === 1 ? 'photo' : 'photos'}`);
+      router.refresh();
+    });
+  }
 
   // Group by client so David can see "4 from the Andersons, 2 from the
   // Smiths" rather than a flat mishmash. Ordering within each group stays
   // newest-first per the server sort.
   const byClient = useMemo(() => {
     const map = new Map<string, { clientName: string; photos: QueuePhotoWithUrl[] }>();
-    for (const p of photos) {
+    for (const p of optimisticPhotos) {
       const entry = map.get(p.clientId);
       if (entry) entry.photos.push(p);
       else map.set(p.clientId, { clientName: p.clientName, photos: [p] });
     }
     return Array.from(map.entries());
-  }, [photos]);
+  }, [optimisticPhotos]);
 
-  const detailPhoto = detailId ? photos.find((p) => p.id === detailId) ?? null : null;
+  const detailPhoto = detailId
+    ? optimisticPhotos.find((p) => p.id === detailId) ?? null
+    : null;
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -69,14 +137,14 @@ export function PhotoQueueClient({ photos }: PhotoQueueClientProps) {
     });
   }
 
-  if (photos.length === 0) {
+  if (optimisticPhotos.length === 0) {
     return <EmptyState />;
   }
 
   // Build a clientId map for bulkReject — selected photos may span
   // multiple clients, so we need to group the action call by client.
   const selectedByClient = new Map<string, string[]>();
-  for (const p of photos) {
+  for (const p of optimisticPhotos) {
     if (!selectedIds.has(p.id)) continue;
     const existing = selectedByClient.get(p.clientId);
     if (existing) existing.push(p.id);
@@ -136,6 +204,8 @@ export function PhotoQueueClient({ photos }: PhotoQueueClientProps) {
         <PhotoReviewModal
           photo={detailPhoto}
           onClose={() => setDetailId(null)}
+          onApprove={handleApprove}
+          onReject={handleReject}
         />
       )}
 
@@ -143,7 +213,10 @@ export function PhotoQueueClient({ photos }: PhotoQueueClientProps) {
         <BulkRejectModal
           selectedByClient={selectedByClient}
           onClose={() => setBulkRejectOpen(false)}
-          onSuccess={clearSelection}
+          onConfirm={(map) => {
+            handleBulkReject(map);
+            clearSelection();
+          }}
         />
       )}
     </div>
@@ -265,12 +338,15 @@ function BulkActionBar({
 interface PhotoReviewModalProps {
   photo: QueuePhotoWithUrl;
   onClose: () => void;
+  onApprove: (
+    photoId: string,
+    clientId: string,
+    data: { tag: PhotoTag; category: string | null; projectId: string | null },
+  ) => void;
+  onReject: (photoId: string, clientId: string) => void;
 }
 
-function PhotoReviewModal({ photo, onClose }: PhotoReviewModalProps) {
-  const router = useRouter();
-  const { showToast } = useToast();
-  const [isPending, startTransition] = useTransition();
+function PhotoReviewModal({ photo, onClose, onApprove, onReject }: PhotoReviewModalProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [tag, setTag] = useState<PhotoTag | null>(null);
@@ -282,36 +358,17 @@ function PhotoReviewModal({ photo, onClose }: PhotoReviewModalProps) {
       setError('Pick a tag to approve this photo.');
       return;
     }
-    startTransition(async () => {
-      const result = await categorizePhoto(photo.id, photo.clientId, {
-        tag,
-        category: category.trim() || null,
-        projectId: photo.projectId,
-      });
-      if (!result.success) {
-        setError(result.error);
-        showToast(result.error, 'error');
-        return;
-      }
-      showToast('Photo approved');
-      onClose();
-      router.refresh();
+    onApprove(photo.id, photo.clientId, {
+      tag,
+      category: category.trim() || null,
+      projectId: photo.projectId,
     });
+    onClose();
   }
 
   function reject() {
-    setError(null);
-    startTransition(async () => {
-      const result = await rejectPhoto(photo.id, photo.clientId);
-      if (!result.success) {
-        setError(result.error);
-        showToast(result.error, 'error');
-        return;
-      }
-      showToast('Photo rejected');
-      onClose();
-      router.refresh();
-    });
+    onReject(photo.id, photo.clientId);
+    onClose();
   }
 
   const hasGps =
@@ -323,14 +380,12 @@ function PhotoReviewModal({ photo, onClose }: PhotoReviewModalProps) {
       onClose={onClose}
       title={photo.caption || 'Review photo'}
       size="lg"
-      locked={isPending}
       footer={
         <>
           <button
             type="button"
             onClick={reject}
-            disabled={isPending}
-            className="rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 disabled:opacity-50"
+            className="rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100"
           >
             Reject
           </button>
@@ -338,18 +393,17 @@ function PhotoReviewModal({ photo, onClose }: PhotoReviewModalProps) {
           <button
             type="button"
             onClick={onClose}
-            disabled={isPending}
-            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
+            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100"
           >
             Close
           </button>
           <button
             type="button"
             onClick={approve}
-            disabled={isPending || !tag}
+            disabled={!tag}
             className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-5 py-2.5 font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isPending ? 'Saving...' : 'Approve'}
+            Approve
           </button>
         </>
       }
@@ -448,39 +502,15 @@ interface BulkRejectModalProps {
   /** photos to reject, grouped by clientId — each client call is a separate audit entry. */
   selectedByClient: Map<string, string[]>;
   onClose: () => void;
-  onSuccess: () => void;
+  onConfirm: (selectedByClient: Map<string, string[]>) => void;
 }
 
-function BulkRejectModal({ selectedByClient, onClose, onSuccess }: BulkRejectModalProps) {
-  const router = useRouter();
-  const { showToast } = useToast();
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
+function BulkRejectModal({ selectedByClient, onClose, onConfirm }: BulkRejectModalProps) {
   const total = Array.from(selectedByClient.values()).reduce((sum, ids) => sum + ids.length, 0);
 
   function confirm() {
-    setError(null);
-    startTransition(async () => {
-      // Fan out one bulkRejectPhotos per client — the action is client-
-      // scoped (ownership check joins through properties) so we can't
-      // batch across clients in a single call.
-      const results = await Promise.all(
-        Array.from(selectedByClient.entries()).map(([clientId, ids]) =>
-          bulkRejectPhotos(ids, clientId),
-        ),
-      );
-      const failure = results.find((r) => !r.success);
-      if (failure && !failure.success) {
-        setError(failure.error);
-        showToast(failure.error, 'error');
-        return;
-      }
-      showToast(`Rejected ${total} ${total === 1 ? 'photo' : 'photos'}`);
-      onSuccess();
-      onClose();
-      router.refresh();
-    });
+    onConfirm(selectedByClient);
+    onClose();
   }
 
   return (
@@ -489,24 +519,21 @@ function BulkRejectModal({ selectedByClient, onClose, onSuccess }: BulkRejectMod
       onClose={onClose}
       title="Reject selected photos?"
       size="sm"
-      locked={isPending}
       footer={
         <>
           <button
             type="button"
             onClick={onClose}
-            disabled={isPending}
-            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
+            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={confirm}
-            disabled={isPending}
-            className="shadow-soft rounded-xl bg-red-500 px-5 py-2.5 font-medium text-white transition-all hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="shadow-soft rounded-xl bg-red-500 px-5 py-2.5 font-medium text-white transition-all hover:bg-red-600"
           >
-            {isPending ? 'Rejecting...' : 'Reject'}
+            Reject
           </button>
         </>
       }
@@ -518,11 +545,6 @@ function BulkRejectModal({ selectedByClient, onClose, onSuccess }: BulkRejectMod
         {selectedByClient.size === 1 ? 'client' : 'clients'}. Rejected photos are hidden from the
         client and can be re-categorized later.
       </p>
-      {error && (
-        <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
-          {error}
-        </div>
-      )}
     </Modal>
   );
 }

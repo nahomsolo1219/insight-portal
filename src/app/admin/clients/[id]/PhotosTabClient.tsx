@@ -14,7 +14,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useOptimistic, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Field, inputClass, textareaClass } from '@/components/admin/Field';
 import { FileUpload, type FileUploadItem } from '@/components/admin/FileUpload';
@@ -73,6 +73,16 @@ interface PhotosTabClientProps {
   projects: ProjectOption[];
 }
 
+type PhotoAction =
+  | {
+      type: 'categorize';
+      ids: string[];
+      tag: PhotoTag;
+      category: string | null;
+      projectId: string | null;
+    }
+  | { type: 'reject'; ids: string[] };
+
 export function PhotosTabClient({
   clientId,
   propertyId,
@@ -80,6 +90,10 @@ export function PhotosTabClient({
   stats,
   projects,
 }: PhotosTabClientProps) {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [, startTransition] = useTransition();
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [detailId, setDetailId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -92,16 +106,95 @@ export function PhotosTabClient({
   const [projectFilter, setProjectFilter] = useState<string>('');
   const [tagFilter, setTagFilter] = useState<'all' | PhotoTag>('all');
 
+  // Optimistic overlay — categorize and reject both collapse the server
+  // round-trip to a single frame. Delete stays non-optimistic because it's
+  // gated behind a confirm modal that already communicates the wait.
+  const [optimisticPhotos, applyOptimistic] = useOptimistic(
+    photos,
+    (state, action: PhotoAction): PhotoRowWithUrl[] => {
+      switch (action.type) {
+        case 'categorize':
+          return state.map((p) =>
+            action.ids.includes(p.id)
+              ? {
+                  ...p,
+                  status: 'categorized',
+                  tag: action.tag,
+                  category: action.category,
+                  projectId: action.projectId,
+                }
+              : p,
+          );
+        case 'reject':
+          return state.map((p) =>
+            action.ids.includes(p.id) ? { ...p, status: 'rejected' } : p,
+          );
+      }
+    },
+  );
+
+  // Derive the stats bar from optimistic photos so the Pending counter
+  // drops the instant the yellow ring disappears on a card.
+  const liveStats = useMemo<PhotoStats>(() => {
+    if (optimisticPhotos.length === 0) return stats;
+    let pending = 0;
+    let categorized = 0;
+    let rejected = 0;
+    for (const p of optimisticPhotos) {
+      if (p.status === 'pending') pending += 1;
+      else if (p.status === 'categorized') categorized += 1;
+      else if (p.status === 'rejected') rejected += 1;
+    }
+    return { total: optimisticPhotos.length, pending, categorized, rejected };
+  }, [optimisticPhotos, stats]);
+
   const filtered = useMemo(() => {
-    return photos.filter((p) => {
+    return optimisticPhotos.filter((p) => {
       if (statusFilter !== 'all' && p.status !== statusFilter) return false;
       if (projectFilter && p.projectId !== projectFilter) return false;
       if (tagFilter !== 'all' && p.tag !== tagFilter) return false;
       return true;
     });
-  }, [photos, statusFilter, projectFilter, tagFilter]);
+  }, [optimisticPhotos, statusFilter, projectFilter, tagFilter]);
 
-  const detailPhoto = detailId ? photos.find((p) => p.id === detailId) ?? null : null;
+  const detailPhoto = detailId
+    ? optimisticPhotos.find((p) => p.id === detailId) ?? null
+    : null;
+
+  function handleCategorize(
+    ids: string[],
+    data: { tag: PhotoTag; category: string | null; projectId: string | null },
+  ) {
+    startTransition(async () => {
+      applyOptimistic({ type: 'categorize', ids, ...data });
+      const result =
+        ids.length === 1
+          ? await categorizePhoto(ids[0], clientId, data)
+          : await bulkCategorizePhotos(ids, clientId, data);
+      if (!result.success) {
+        showToast(result.error, 'error');
+        return;
+      }
+      showToast(ids.length === 1 ? 'Photo categorized' : `Categorized ${ids.length} photos`);
+      router.refresh();
+    });
+  }
+
+  function handleReject(ids: string[]) {
+    startTransition(async () => {
+      applyOptimistic({ type: 'reject', ids });
+      const result =
+        ids.length === 1
+          ? await rejectPhoto(ids[0], clientId)
+          : await bulkRejectPhotos(ids, clientId);
+      if (!result.success) {
+        showToast(result.error, 'error');
+        return;
+      }
+      showToast(ids.length === 1 ? 'Photo rejected' : `Rejected ${ids.length} photos`);
+      router.refresh();
+    });
+  }
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -122,7 +215,7 @@ export function PhotosTabClient({
 
   return (
     <div className="pb-24">
-      <StatsBar stats={stats} />
+      <StatsBar stats={liveStats} />
 
       <div className="mb-5 flex items-center justify-between gap-3">
         <FilterBar
@@ -172,9 +265,10 @@ export function PhotosTabClient({
       {detailPhoto && (
         <PhotoDetailModal
           photo={detailPhoto}
-          clientId={clientId}
           projects={projects}
           onClose={() => setDetailId(null)}
+          onCategorize={handleCategorize}
+          onReject={handleReject}
           onRequestDelete={() => {
             setDetailId(null);
             setDeleteSingleTarget(detailPhoto);
@@ -193,19 +287,18 @@ export function PhotosTabClient({
 
       {bulkCatOpen && (
         <BulkCategorizeModal
-          clientId={clientId}
           photoIds={Array.from(selectedIds)}
           projects={projects}
           onClose={() => setBulkCatOpen(false)}
-          onSuccess={clearSelection}
+          onCategorize={handleCategorize}
+          onDone={clearSelection}
         />
       )}
 
       {bulkRejectOpen && (
-        <BulkConfirmModal
+        <BulkOptimisticConfirmModal
           title="Reject selected photos?"
           confirmLabel="Reject"
-          successMessage={`Rejected ${selectedIds.size} ${selectedIds.size === 1 ? 'photo' : 'photos'}`}
           body={
             <>
               You&apos;re about to reject{' '}
@@ -215,8 +308,10 @@ export function PhotosTabClient({
             </>
           }
           onClose={() => setBulkRejectOpen(false)}
-          run={async () => bulkRejectPhotos(Array.from(selectedIds), clientId)}
-          onSuccess={clearSelection}
+          onConfirm={() => {
+            handleReject(Array.from(selectedIds));
+            clearSelection();
+          }}
         />
       )}
 
@@ -625,22 +720,24 @@ function BulkActionBar({
 
 interface PhotoDetailModalProps {
   photo: PhotoRowWithUrl;
-  clientId: string;
   projects: ProjectOption[];
   onClose: () => void;
+  onCategorize: (
+    ids: string[],
+    data: { tag: PhotoTag; category: string | null; projectId: string | null },
+  ) => void;
+  onReject: (ids: string[]) => void;
   onRequestDelete: () => void;
 }
 
 function PhotoDetailModal({
   photo,
-  clientId,
   projects,
   onClose,
+  onCategorize,
+  onReject,
   onRequestDelete,
 }: PhotoDetailModalProps) {
-  const router = useRouter();
-  const { showToast } = useToast();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const [tag, setTag] = useState<PhotoTag | null>(photo.tag);
@@ -655,36 +752,17 @@ function PhotoDetailModal({
       setError('Pick a tag to categorize this photo.');
       return;
     }
-    startTransition(async () => {
-      const result = await categorizePhoto(photo.id, clientId, {
-        tag,
-        category: category.trim() || null,
-        projectId: projectId || null,
-      });
-      if (!result.success) {
-        setError(result.error);
-        showToast(result.error, 'error');
-        return;
-      }
-      showToast('Photo categorized');
-      onClose();
-      router.refresh();
+    onCategorize([photo.id], {
+      tag,
+      category: category.trim() || null,
+      projectId: projectId || null,
     });
+    onClose();
   }
 
   function reject() {
-    setError(null);
-    startTransition(async () => {
-      const result = await rejectPhoto(photo.id, clientId);
-      if (!result.success) {
-        setError(result.error);
-        showToast(result.error, 'error');
-        return;
-      }
-      showToast('Photo rejected');
-      onClose();
-      router.refresh();
-    });
+    onReject([photo.id]);
+    onClose();
   }
 
   const hasGps =
@@ -696,14 +774,12 @@ function PhotoDetailModal({
       onClose={onClose}
       title={photo.caption || 'Photo'}
       size="lg"
-      locked={isPending}
       footer={
         <>
           <button
             type="button"
             onClick={onRequestDelete}
-            disabled={isPending}
-            className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium text-red-500 transition-all hover:bg-red-50 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium text-red-500 transition-all hover:bg-red-50"
           >
             <Trash2 size={14} strokeWidth={1.5} />
             Delete
@@ -712,8 +788,7 @@ function PhotoDetailModal({
             <button
               type="button"
               onClick={reject}
-              disabled={isPending}
-              className="rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 disabled:opacity-50"
+              className="rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100"
             >
               Reject
             </button>
@@ -722,18 +797,17 @@ function PhotoDetailModal({
           <button
             type="button"
             onClick={onClose}
-            disabled={isPending}
-            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
+            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100"
           >
             Close
           </button>
           <button
             type="button"
             onClick={save}
-            disabled={isPending || !tag}
+            disabled={!tag}
             className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-5 py-2.5 font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isPending ? 'Saving...' : photo.status === 'categorized' ? 'Update' : 'Categorize'}
+            {photo.status === 'categorized' ? 'Update' : 'Categorize'}
           </button>
         </>
       }
@@ -1062,23 +1136,23 @@ function UploadPhotosModal({ clientId, propertyId, projects, onClose }: UploadPh
 // ---------- bulk categorize modal ----------
 
 interface BulkCategorizeModalProps {
-  clientId: string;
   photoIds: string[];
   projects: ProjectOption[];
   onClose: () => void;
-  onSuccess: () => void;
+  onCategorize: (
+    ids: string[],
+    data: { tag: PhotoTag; category: string | null; projectId: string | null },
+  ) => void;
+  onDone: () => void;
 }
 
 function BulkCategorizeModal({
-  clientId,
   photoIds,
   projects,
   onClose,
-  onSuccess,
+  onCategorize,
+  onDone,
 }: BulkCategorizeModalProps) {
-  const router = useRouter();
-  const { showToast } = useToast();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const [tag, setTag] = useState<PhotoTag | null>(null);
@@ -1091,24 +1165,13 @@ function BulkCategorizeModal({
       setError('Pick a tag for the batch.');
       return;
     }
-    startTransition(async () => {
-      const result = await bulkCategorizePhotos(photoIds, clientId, {
-        tag,
-        category: category.trim() || null,
-        projectId: projectId || null,
-      });
-      if (!result.success) {
-        setError(result.error);
-        showToast(result.error, 'error');
-        return;
-      }
-      showToast(
-        `Categorized ${photoIds.length} ${photoIds.length === 1 ? 'photo' : 'photos'}`,
-      );
-      onSuccess();
-      onClose();
-      router.refresh();
+    onCategorize(photoIds, {
+      tag,
+      category: category.trim() || null,
+      projectId: projectId || null,
     });
+    onDone();
+    onClose();
   }
 
   return (
@@ -1117,24 +1180,22 @@ function BulkCategorizeModal({
       onClose={onClose}
       title={`Categorize ${photoIds.length} photo${photoIds.length === 1 ? '' : 's'}`}
       size="md"
-      locked={isPending}
       footer={
         <>
           <button
             type="button"
             onClick={onClose}
-            disabled={isPending}
-            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
+            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={submit}
-            disabled={isPending || !tag}
+            disabled={!tag}
             className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-5 py-2.5 font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isPending ? 'Applying...' : 'Apply to all'}
+            Apply to all
           </button>
         </>
       }
@@ -1196,6 +1257,57 @@ function BulkCategorizeModal({
           </div>
         )}
       </div>
+    </Modal>
+  );
+}
+
+// ---------- optimistic confirm (fires a synchronous parent handler) ----------
+
+interface BulkOptimisticConfirmModalProps {
+  title: string;
+  confirmLabel: string;
+  body: React.ReactNode;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+function BulkOptimisticConfirmModal({
+  title,
+  confirmLabel,
+  body,
+  onClose,
+  onConfirm,
+}: BulkOptimisticConfirmModalProps) {
+  function handle() {
+    onConfirm();
+    onClose();
+  }
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={title}
+      size="sm"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handle}
+            className="bg-brand-teal-500 hover:bg-brand-teal-600 shadow-soft rounded-xl px-5 py-2.5 font-medium text-white transition-all"
+          >
+            {confirmLabel}
+          </button>
+        </>
+      }
+    >
+      <p className="text-sm text-gray-700">{body}</p>
     </Modal>
   );
 }

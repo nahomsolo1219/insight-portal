@@ -14,7 +14,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useMemo, useOptimistic, useState, useTransition } from 'react';
 import { Dropdown } from '@/components/admin/Dropdown';
 import { Field, inputClass, textareaClass } from '@/components/admin/Field';
 import { Modal } from '@/components/admin/Modal';
@@ -63,11 +63,60 @@ export function AppointmentsTabClient({
   projects,
   pms,
 }: AppointmentsTabClientProps) {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [, startTransition] = useTransition();
   const [newOpen, setNewOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AppointmentRow | null>(null);
   const [pastExpanded, setPastExpanded] = useState(false);
 
-  const total = upcoming.length + past.length;
+  // Merge server-split halves so useOptimistic sees the full list — the
+  // upcoming/past split is re-derived client-side after each optimistic
+  // status change, so flipping an appointment to `completed` drops it into
+  // "past" in the same frame the badge flips color.
+  const all = useMemo(() => [...upcoming, ...past], [upcoming, past]);
+
+  const [optimisticAll, applyOptimisticStatus] = useOptimistic(
+    all,
+    (state, action: { id: string; status: AppointmentStatus }) =>
+      state.map((appt) => (appt.id === action.id ? { ...appt, status: action.status } : appt)),
+  );
+
+  // Mirror the server-side split logic in `queries.getAppointmentsForProperty`:
+  // an appointment is "past" once its date is strictly before today OR its
+  // status is completed/cancelled. Upcoming sorts soonest-first; past sorts
+  // most-recent-first.
+  const { liveUpcoming, livePast } = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const up = optimisticAll
+      .filter((r) => r.date >= today && r.status !== 'completed' && r.status !== 'cancelled')
+      .sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return (a.startTime ?? '').localeCompare(b.startTime ?? '');
+      });
+    const pa = optimisticAll
+      .filter((r) => r.date < today || r.status === 'completed' || r.status === 'cancelled')
+      .sort((a, b) => {
+        if (a.date !== b.date) return b.date.localeCompare(a.date);
+        return (b.startTime ?? '').localeCompare(a.startTime ?? '');
+      });
+    return { liveUpcoming: up, livePast: pa };
+  }, [optimisticAll]);
+
+  function handleStatusChange(appointmentId: string, newStatus: AppointmentStatus) {
+    startTransition(async () => {
+      applyOptimisticStatus({ id: appointmentId, status: newStatus });
+      const result = await updateAppointmentStatus(appointmentId, clientId, newStatus);
+      if (!result.success) {
+        showToast(result.error, 'error');
+        return;
+      }
+      showToast(`Appointment marked ${newStatus}`);
+      router.refresh();
+    });
+  }
+
+  const total = liveUpcoming.length + livePast.length;
 
   return (
     <div>
@@ -90,19 +139,19 @@ export function AppointmentsTabClient({
       ) : (
         <div className="space-y-6">
           <section>
-            <SectionHeader label="Upcoming" count={upcoming.length} />
-            {upcoming.length === 0 ? (
+            <SectionHeader label="Upcoming" count={liveUpcoming.length} />
+            {liveUpcoming.length === 0 ? (
               <div className="shadow-card rounded-2xl bg-white p-6 text-center text-sm text-gray-400">
                 Nothing scheduled ahead
               </div>
             ) : (
               <div className="space-y-3">
-                {upcoming.map((appt) => (
+                {liveUpcoming.map((appt) => (
                   <AppointmentCard
                     key={appt.id}
                     appointment={appt}
-                    clientId={clientId}
                     tone="upcoming"
+                    onStatusChange={handleStatusChange}
                     onDelete={() => setDeleteTarget(appt)}
                   />
                 ))}
@@ -110,7 +159,7 @@ export function AppointmentsTabClient({
             )}
           </section>
 
-          {past.length > 0 && (
+          {livePast.length > 0 && (
             <section>
               <button
                 type="button"
@@ -130,19 +179,19 @@ export function AppointmentsTabClient({
                     Past
                   </span>
                   <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
-                    {past.length}
+                    {livePast.length}
                   </span>
                 </span>
               </button>
 
               {pastExpanded && (
                 <div className="space-y-3">
-                  {past.map((appt) => (
+                  {livePast.map((appt) => (
                     <AppointmentCard
                       key={appt.id}
                       appointment={appt}
-                      clientId={clientId}
                       tone="past"
+                      onStatusChange={handleStatusChange}
                       onDelete={() => setDeleteTarget(appt)}
                     />
                   ))}
@@ -196,12 +245,12 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
 
 interface AppointmentCardProps {
   appointment: AppointmentRow;
-  clientId: string;
   tone: 'upcoming' | 'past';
+  onStatusChange: (appointmentId: string, status: AppointmentStatus) => void;
   onDelete: () => void;
 }
 
-function AppointmentCard({ appointment, clientId, tone, onDelete }: AppointmentCardProps) {
+function AppointmentCard({ appointment, tone, onStatusChange, onDelete }: AppointmentCardProps) {
   const [expanded, setExpanded] = useState(false);
   const { weekdayShort, day } = dateParts(appointment.date);
   const isPast = tone === 'past';
@@ -246,8 +295,8 @@ function AppointmentCard({ appointment, clientId, tone, onDelete }: AppointmentC
             </div>
             <StatusBadgeButton
               appointmentId={appointment.id}
-              clientId={clientId}
               status={appointment.status}
+              onChange={onStatusChange}
             />
           </div>
 
@@ -324,45 +373,28 @@ function MetaItem({ icon: Icon, label }: { icon: typeof Wrench; label: string })
 
 interface StatusBadgeButtonProps {
   appointmentId: string;
-  clientId: string;
   status: AppointmentStatus;
+  onChange: (appointmentId: string, status: AppointmentStatus) => void;
 }
 
-function StatusBadgeButton({ appointmentId, clientId, status }: StatusBadgeButtonProps) {
-  const router = useRouter();
-  const { showToast } = useToast();
-  const [isPending, startTransition] = useTransition();
+function StatusBadgeButton({ appointmentId, status, onChange }: StatusBadgeButtonProps) {
   const meta = statusMeta(status);
 
   function choose(next: string) {
     if (next === status) return;
-    startTransition(async () => {
-      const result = await updateAppointmentStatus(
-        appointmentId,
-        clientId,
-        next as AppointmentStatus,
-      );
-      if (!result.success) {
-        showToast(result.error, 'error');
-        return;
-      }
-      showToast(`Appointment marked ${next}`);
-      router.refresh();
-    });
+    onChange(appointmentId, next as AppointmentStatus);
   }
 
   return (
     <Dropdown
       value={status}
       onSelect={choose}
-      disabled={isPending}
       align="right"
       ariaLabel="Change appointment status"
       className={cn(
         'inline-flex flex-shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all',
         meta.badge,
         'hover:ring-2 hover:ring-gray-100',
-        isPending && 'opacity-60',
       )}
       options={STATUS_OPTIONS.map((opt) => ({
         value: opt.id,

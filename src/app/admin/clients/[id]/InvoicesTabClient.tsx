@@ -2,7 +2,7 @@
 
 import { ChevronDown, Download, FileText, Plus, Trash2, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useOptimistic, useState, useTransition } from 'react';
 import { Dropdown } from '@/components/admin/Dropdown';
 import { Field, inputClass } from '@/components/admin/Field';
 import { FileUpload, type FileUploadItem } from '@/components/admin/FileUpload';
@@ -43,16 +43,61 @@ export function InvoicesTabClient({
   properties,
   projects,
 }: InvoicesTabClientProps) {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [, startTransition] = useTransition();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<InvoiceRowWithUrl | null>(null);
 
+  // Optimistic status overlay. The reducer "sets" the status (not "toggles")
+  // so replaying the action against the refreshed server data is a no-op.
+  const [optimisticInvoices, applyOptimisticStatus] = useOptimistic(
+    invoices,
+    (state, action: { id: string; status: InvoiceStatus }) =>
+      state.map((inv) => (inv.id === action.id ? { ...inv, status: action.status } : inv)),
+  );
+
+  // Derive the summary from optimistic invoices so the Paid / Outstanding
+  // counters move at the same instant the badge flips color. Server-rendered
+  // `summary` is only used as a sanity fallback when no invoices are loaded.
+  const liveSummary = useMemo(() => {
+    if (optimisticInvoices.length === 0) return summary;
+    let totalInvoiced = 0;
+    let totalPaid = 0;
+    let totalOutstanding = 0;
+    for (const inv of optimisticInvoices) {
+      totalInvoiced += inv.amountCents;
+      if (inv.status === 'paid') totalPaid += inv.amountCents;
+      else totalOutstanding += inv.amountCents;
+    }
+    return {
+      totalInvoiced,
+      totalPaid,
+      totalOutstanding,
+      invoiceCount: optimisticInvoices.length,
+    };
+  }, [optimisticInvoices, summary]);
+
+  function handleStatusChange(invoiceId: string, newStatus: InvoiceStatus) {
+    startTransition(async () => {
+      applyOptimisticStatus({ id: invoiceId, status: newStatus });
+      const result = await updateInvoiceStatus(invoiceId, clientId, newStatus);
+      if (!result.success) {
+        showToast(result.error, 'error');
+        return;
+      }
+      showToast(`Marked ${newStatus}`);
+      router.refresh();
+    });
+  }
+
   return (
     <div>
-      <SummaryBar summary={summary} />
+      <SummaryBar summary={liveSummary} />
 
       <div className="mb-5 flex items-center justify-between">
         <div className="text-sm text-gray-500">
-          {invoices.length} {invoices.length === 1 ? 'invoice' : 'invoices'}
+          {optimisticInvoices.length} {optimisticInvoices.length === 1 ? 'invoice' : 'invoices'}
         </div>
         <button
           type="button"
@@ -64,12 +109,12 @@ export function InvoicesTabClient({
         </button>
       </div>
 
-      {invoices.length === 0 ? (
+      {optimisticInvoices.length === 0 ? (
         <EmptyState onUploadClick={() => setUploadOpen(true)} />
       ) : (
         <InvoiceTable
-          invoices={invoices}
-          clientId={clientId}
+          invoices={optimisticInvoices}
+          onStatusChange={handleStatusChange}
           onDelete={setDeleteTarget}
         />
       )}
@@ -153,11 +198,11 @@ function SummaryCard({ label, value, hint, tone = 'default' }: SummaryCardProps)
 
 interface InvoiceTableProps {
   invoices: InvoiceRowWithUrl[];
-  clientId: string;
+  onStatusChange: (invoiceId: string, status: InvoiceStatus) => void;
   onDelete: (invoice: InvoiceRowWithUrl) => void;
 }
 
-function InvoiceTable({ invoices, clientId, onDelete }: InvoiceTableProps) {
+function InvoiceTable({ invoices, onStatusChange, onDelete }: InvoiceTableProps) {
   return (
     <div className="shadow-card overflow-hidden rounded-2xl bg-white">
       <div className="overflow-x-auto">
@@ -179,7 +224,7 @@ function InvoiceTable({ invoices, clientId, onDelete }: InvoiceTableProps) {
               <InvoiceTableRow
                 key={inv.id}
                 invoice={inv}
-                clientId={clientId}
+                onStatusChange={onStatusChange}
                 onDelete={() => onDelete(inv)}
               />
             ))}
@@ -205,11 +250,11 @@ function Th({ children, align = 'left' }: { children: React.ReactNode; align?: '
 
 interface InvoiceTableRowProps {
   invoice: InvoiceRowWithUrl;
-  clientId: string;
+  onStatusChange: (invoiceId: string, status: InvoiceStatus) => void;
   onDelete: () => void;
 }
 
-function InvoiceTableRow({ invoice, clientId, onDelete }: InvoiceTableRowProps) {
+function InvoiceTableRow({ invoice, onStatusChange, onDelete }: InvoiceTableRowProps) {
   return (
     <tr className="hover:bg-brand-warm-50 border-b border-gray-50 transition-colors last:border-b-0">
       <td className="px-4 py-4 text-sm font-medium text-gray-900">{invoice.invoiceNumber}</td>
@@ -229,8 +274,8 @@ function InvoiceTableRow({ invoice, clientId, onDelete }: InvoiceTableRowProps) 
       <td className="px-4 py-4">
         <StatusBadgeButton
           invoiceId={invoice.id}
-          clientId={clientId}
           status={invoice.status}
+          onChange={onStatusChange}
         />
       </td>
       <td className="px-4 py-4 text-sm text-gray-600">{invoice.projectName ?? '—'}</td>
@@ -269,40 +314,27 @@ function InvoiceTableRow({ invoice, clientId, onDelete }: InvoiceTableRowProps) 
 
 interface StatusBadgeButtonProps {
   invoiceId: string;
-  clientId: string;
   status: InvoiceStatus;
+  onChange: (invoiceId: string, status: InvoiceStatus) => void;
 }
 
-function StatusBadgeButton({ invoiceId, clientId, status }: StatusBadgeButtonProps) {
-  const router = useRouter();
-  const { showToast } = useToast();
-  const [isPending, startTransition] = useTransition();
+function StatusBadgeButton({ invoiceId, status, onChange }: StatusBadgeButtonProps) {
   const meta = statusMeta(status);
 
   function choose(next: string) {
     if (next === status) return;
-    startTransition(async () => {
-      const result = await updateInvoiceStatus(invoiceId, clientId, next as InvoiceStatus);
-      if (!result.success) {
-        showToast(result.error, 'error');
-        return;
-      }
-      showToast(`Marked ${next}`);
-      router.refresh();
-    });
+    onChange(invoiceId, next as InvoiceStatus);
   }
 
   return (
     <Dropdown
       value={status}
       onSelect={choose}
-      disabled={isPending}
       ariaLabel="Change invoice status"
       className={cn(
         'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all',
         meta.badge,
         'hover:ring-2 hover:ring-gray-100',
-        isPending && 'opacity-60',
       )}
       options={STATUS_OPTIONS.map((opt) => ({
         value: opt.id,

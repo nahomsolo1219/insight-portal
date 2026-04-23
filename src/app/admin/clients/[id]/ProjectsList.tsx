@@ -9,10 +9,13 @@ import {
   Plus,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useOptimistic, useState, useTransition } from 'react';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatCurrency, formatShortDate } from '@/lib/utils';
 import { toggleMilestoneComplete } from './actions';
 import type { MilestoneRow, ProjectWithMilestones } from './queries';
+
+type MilestoneStatus = MilestoneRow['status'];
 
 interface ProjectsListProps {
   clientId: string;
@@ -20,6 +23,36 @@ interface ProjectsListProps {
 }
 
 export function ProjectsList({ clientId, projects }: ProjectsListProps) {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [, startTransition] = useTransition();
+
+  // Optimistic layer over the server-provided projects. Each toggle dispatches
+  // a "setStatus" action (not a "toggle") so it's idempotent — when the server
+  // confirms and router.refresh() brings new data in, applying the same action
+  // against the new base is a no-op and nothing flickers.
+  const [optimisticProjects, applyOptimistic] = useOptimistic(
+    projects,
+    (state, action: { milestoneId: string; newStatus: MilestoneStatus }) =>
+      state.map((project) => {
+        if (!project.milestones.some((m) => m.id === action.milestoneId)) return project;
+        const nextMilestones = project.milestones.map((m) =>
+          m.id === action.milestoneId ? { ...m, status: action.newStatus } : m,
+        );
+        const completed = nextMilestones.filter((m) => m.status === 'complete').length;
+        const progress =
+          project.milestoneStats.total === 0
+            ? 0
+            : Math.round((completed / project.milestoneStats.total) * 100);
+        return {
+          ...project,
+          milestones: nextMilestones,
+          milestoneStats: { ...project.milestoneStats, completed },
+          progress,
+        };
+      }),
+  );
+
   // Initial-open set: just the first project, if any. The Set preserves
   // identity across renders and keeps toggle logic straightforward.
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -33,6 +66,24 @@ export function ProjectsList({ clientId, projects }: ProjectsListProps) {
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
+    });
+  }
+
+  function handleToggleMilestone(milestoneId: string, currentStatus: MilestoneStatus) {
+    // Decisions resolve through their own flow — never flipped here.
+    if (currentStatus === 'awaiting_client') return;
+    const newStatus: MilestoneStatus = currentStatus === 'complete' ? 'pending' : 'complete';
+
+    startTransition(async () => {
+      applyOptimistic({ milestoneId, newStatus });
+      const result = await toggleMilestoneComplete(milestoneId, clientId);
+      if (!result.success) {
+        // useOptimistic drops the pending action when the transition settles,
+        // so the UI reverts automatically — we just surface the error.
+        showToast(result.error, 'error');
+        return;
+      }
+      router.refresh();
     });
   }
 
@@ -57,13 +108,13 @@ export function ProjectsList({ clientId, projects }: ProjectsListProps) {
         <DisabledNewProjectButton />
       </div>
 
-      {projects.map((p) => (
+      {optimisticProjects.map((p) => (
         <ProjectCard
           key={p.id}
           project={p}
-          clientId={clientId}
           isOpen={expanded.has(p.id)}
           onToggle={() => toggle(p.id)}
+          onToggleMilestone={handleToggleMilestone}
         />
       ))}
     </div>
@@ -72,14 +123,14 @@ export function ProjectsList({ clientId, projects }: ProjectsListProps) {
 
 function ProjectCard({
   project,
-  clientId,
   isOpen,
   onToggle,
+  onToggleMilestone,
 }: {
   project: ProjectWithMilestones;
-  clientId: string;
   isOpen: boolean;
   onToggle: () => void;
+  onToggleMilestone: (milestoneId: string, currentStatus: MilestoneStatus) => void;
 }) {
   const Icon = project.type === 'maintenance' ? Briefcase : Hammer;
   const iconTone =
@@ -179,7 +230,11 @@ function ProjectCard({
             ) : (
               <div className="space-y-1">
                 {project.milestones.map((m) => (
-                  <MilestoneRowCard key={m.id} milestone={m} clientId={clientId} />
+                  <MilestoneRowCard
+                    key={m.id}
+                    milestone={m}
+                    onToggle={() => onToggleMilestone(m.id, m.status)}
+                  />
                 ))}
               </div>
             )}
@@ -217,30 +272,14 @@ function BudgetStat({
 
 function MilestoneRowCard({
   milestone,
-  clientId,
+  onToggle,
 }: {
   milestone: MilestoneRow;
-  clientId: string;
+  onToggle: () => void;
 }) {
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
   const isComplete = milestone.status === 'complete';
   const isAwaitingClient = milestone.status === 'awaiting_client';
   const isInProgress = milestone.status === 'in_progress';
-
-  function handleToggle() {
-    if (isAwaitingClient) return; // Decisions resolve through their own flow.
-    setError(null);
-    startTransition(async () => {
-      const result = await toggleMilestoneComplete(milestone.id, clientId);
-      if (!result.success) {
-        setError(result.error);
-        return;
-      }
-      router.refresh();
-    });
-  }
 
   const metaParts = [
     milestone.category,
@@ -249,16 +288,11 @@ function MilestoneRowCard({
   ].filter(Boolean);
 
   return (
-    <div
-      className={cn(
-        'flex items-center gap-3 rounded-lg px-2 py-2 transition-colors',
-        isPending ? 'opacity-50' : 'hover:bg-brand-warm-50',
-      )}
-    >
+    <div className="hover:bg-brand-warm-50 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors">
       <button
         type="button"
-        onClick={handleToggle}
-        disabled={isPending || isAwaitingClient}
+        onClick={onToggle}
+        disabled={isAwaitingClient}
         aria-label={isComplete ? 'Mark incomplete' : 'Mark complete'}
         title={isAwaitingClient ? 'Waiting on client response' : 'Toggle complete'}
         className={cn(
@@ -284,7 +318,6 @@ function MilestoneRowCard({
         {metaParts.length > 0 && (
           <div className="text-xs text-gray-500">{metaParts.join(' · ')}</div>
         )}
-        {error && <div className="mt-1 text-xs text-red-600">{error}</div>}
       </div>
       {isAwaitingClient && (
         <span className="rounded bg-pink-50 px-2 py-0.5 text-[10px] font-semibold tracking-wider text-pink-700 uppercase">

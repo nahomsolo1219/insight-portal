@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useOptimistic, useState, useTransition } from 'react';
 import { Dropdown } from '@/components/admin/Dropdown';
 import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatTime } from '@/lib/utils';
@@ -44,11 +44,39 @@ interface ScheduleClientProps {
 }
 
 export function ScheduleClient({ rows, startDate, endDate, viewMode, today }: ScheduleClientProps) {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [, startTransition] = useTransition();
   const [davidOnly, setDavidOnly] = useState(false);
 
+  const [optimisticRows, applyOptimisticStatus] = useOptimistic(
+    rows,
+    (state, action: { id: string; status: AppointmentStatus }) =>
+      state.map((r) => (r.id === action.id ? { ...r, status: action.status } : r)),
+  );
+
+  function handleStatusChange(
+    appointmentId: string,
+    clientId: string,
+    newStatus: AppointmentStatus,
+  ) {
+    startTransition(async () => {
+      applyOptimisticStatus({ id: appointmentId, status: newStatus });
+      const result = await updateAppointmentStatus(appointmentId, clientId, newStatus);
+      if (!result.success) {
+        showToast(result.error, 'error');
+        return;
+      }
+      showToast(`Appointment marked ${newStatus}`);
+      // The action revalidates /admin/clients/{id} + /admin but NOT the
+      // schedule route — router.refresh() pulls the new server render here.
+      router.refresh();
+    });
+  }
+
   const filtered = useMemo(
-    () => (davidOnly ? rows.filter((r) => r.davidOnSite) : rows),
-    [rows, davidOnly],
+    () => (davidOnly ? optimisticRows.filter((r) => r.davidOnSite) : optimisticRows),
+    [optimisticRows, davidOnly],
   );
 
   // Group by date so each calendar day gets its own header + list.
@@ -82,7 +110,7 @@ export function ScheduleClient({ rows, startDate, endDate, viewMode, today }: Sc
               <DayHeader date={date} today={today} count={dayRows.length} />
               <div className="space-y-3">
                 {dayRows.map((row) => (
-                  <AppointmentCard key={row.id} row={row} />
+                  <AppointmentCard key={row.id} row={row} onStatusChange={handleStatusChange} />
                 ))}
               </div>
             </section>
@@ -222,7 +250,13 @@ function DayHeader({ date, today, count }: { date: string; today: string; count:
 
 // ---------- appointment card ----------
 
-function AppointmentCard({ row }: { row: ScheduleRow }) {
+function AppointmentCard({
+  row,
+  onStatusChange,
+}: {
+  row: ScheduleRow;
+  onStatusChange: (appointmentId: string, clientId: string, status: AppointmentStatus) => void;
+}) {
   const { weekdayShort, day } = dateParts(row.date);
 
   return (
@@ -249,6 +283,7 @@ function AppointmentCard({ row }: { row: ScheduleRow }) {
               appointmentId={row.id}
               clientId={row.clientId}
               status={row.status}
+              onChange={onStatusChange}
             />
           </div>
 
@@ -314,47 +349,30 @@ function StatusBadgeButton({
   appointmentId,
   clientId,
   status,
+  onChange,
 }: {
   appointmentId: string;
   clientId: string;
   status: AppointmentStatus;
+  onChange: (appointmentId: string, clientId: string, status: AppointmentStatus) => void;
 }) {
-  const router = useRouter();
-  const { showToast } = useToast();
-  const [isPending, startTransition] = useTransition();
   const meta = statusMeta(status);
 
   function choose(next: string) {
     if (next === status) return;
-    startTransition(async () => {
-      const result = await updateAppointmentStatus(
-        appointmentId,
-        clientId,
-        next as AppointmentStatus,
-      );
-      if (!result.success) {
-        showToast(result.error, 'error');
-        return;
-      }
-      showToast(`Appointment marked ${next}`);
-      // The action revalidates /admin/clients/{id} + /admin but NOT the
-      // schedule route — router.refresh() pulls the new server render here.
-      router.refresh();
-    });
+    onChange(appointmentId, clientId, next as AppointmentStatus);
   }
 
   return (
     <Dropdown
       value={status}
       onSelect={choose}
-      disabled={isPending}
       align="right"
       ariaLabel="Change appointment status"
       className={cn(
         'inline-flex flex-shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all',
         meta.badge,
         'hover:ring-2 hover:ring-gray-100',
-        isPending && 'opacity-60',
       )}
       options={STATUS_OPTIONS.map((opt) => ({
         value: opt.id,

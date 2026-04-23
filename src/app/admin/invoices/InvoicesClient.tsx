@@ -3,7 +3,7 @@
 import { ChevronDown, Download } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useOptimistic, useState, useTransition } from 'react';
 import { Dropdown } from '@/components/admin/Dropdown';
 import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatCurrency, formatShortDate } from '@/lib/utils';
@@ -38,24 +38,49 @@ interface InvoicesClientProps {
 }
 
 export function InvoicesClient({ invoices, summary }: InvoicesClientProps) {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [, startTransition] = useTransition();
   const [statusFilter, setStatusFilter] = useState<'all' | InvoiceStatus>('all');
   const [clientFilter, setClientFilter] = useState<string>('');
 
+  // Optimistic status overlay — the filtered list + scoped summary below both
+  // derive from `optimisticInvoices`, so both update the instant a badge flips.
+  const [optimisticInvoices, applyOptimisticStatus] = useOptimistic(
+    invoices,
+    (state, action: { id: string; status: InvoiceStatus }) =>
+      state.map((inv) => (inv.id === action.id ? { ...inv, status: action.status } : inv)),
+  );
+
+  function handleStatusChange(invoiceId: string, clientId: string, newStatus: InvoiceStatus) {
+    startTransition(async () => {
+      applyOptimisticStatus({ id: invoiceId, status: newStatus });
+      const result = await updateInvoiceStatus(invoiceId, clientId, newStatus);
+      if (!result.success) {
+        showToast(result.error, 'error');
+        return;
+      }
+      showToast(`Marked ${newStatus}`);
+      router.refresh();
+    });
+  }
+
   const clientOptions = useMemo(() => {
     const seen = new Map<string, string>();
-    for (const inv of invoices) if (!seen.has(inv.clientId)) seen.set(inv.clientId, inv.clientName);
+    for (const inv of optimisticInvoices)
+      if (!seen.has(inv.clientId)) seen.set(inv.clientId, inv.clientName);
     return Array.from(seen.entries())
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [invoices]);
+  }, [optimisticInvoices]);
 
   const filtered = useMemo(() => {
-    return invoices.filter((inv) => {
+    return optimisticInvoices.filter((inv) => {
       if (statusFilter !== 'all' && inv.status !== statusFilter) return false;
       if (clientFilter && inv.clientId !== clientFilter) return false;
       return true;
     });
-  }, [invoices, statusFilter, clientFilter]);
+  }, [optimisticInvoices, statusFilter, clientFilter]);
 
   // Filter-aware totals so the summary bar reflects whatever the user is
   // looking at, not the global book. Matches how David thinks about it —
@@ -102,14 +127,14 @@ export function InvoicesClient({ invoices, summary }: InvoicesClientProps) {
         )}
       </div>
 
-      {invoices.length === 0 ? (
+      {optimisticInvoices.length === 0 ? (
         <EmptyState />
       ) : filtered.length === 0 ? (
         <div className="shadow-card rounded-2xl bg-white p-12 text-center text-sm text-gray-400">
           No invoices match the current filters.
         </div>
       ) : (
-        <InvoiceTable invoices={filtered} />
+        <InvoiceTable invoices={filtered} onStatusChange={handleStatusChange} />
       )}
     </div>
   );
@@ -206,7 +231,13 @@ function ToggleGroup<V extends string>({
 
 // ---------- table ----------
 
-function InvoiceTable({ invoices }: { invoices: InvoiceOverviewWithUrl[] }) {
+function InvoiceTable({
+  invoices,
+  onStatusChange,
+}: {
+  invoices: InvoiceOverviewWithUrl[];
+  onStatusChange: (invoiceId: string, clientId: string, status: InvoiceStatus) => void;
+}) {
   return (
     <div className="shadow-card overflow-hidden rounded-2xl bg-white">
       <div className="overflow-x-auto">
@@ -225,7 +256,7 @@ function InvoiceTable({ invoices }: { invoices: InvoiceOverviewWithUrl[] }) {
           </thead>
           <tbody>
             {invoices.map((inv) => (
-              <InvoiceRow key={inv.id} invoice={inv} />
+              <InvoiceRow key={inv.id} invoice={inv} onStatusChange={onStatusChange} />
             ))}
           </tbody>
         </table>
@@ -247,7 +278,13 @@ function Th({ children, align = 'left' }: { children: React.ReactNode; align?: '
   );
 }
 
-function InvoiceRow({ invoice }: { invoice: InvoiceOverviewWithUrl }) {
+function InvoiceRow({
+  invoice,
+  onStatusChange,
+}: {
+  invoice: InvoiceOverviewWithUrl;
+  onStatusChange: (invoiceId: string, clientId: string, status: InvoiceStatus) => void;
+}) {
   return (
     <tr className="hover:bg-brand-warm-50 border-b border-gray-50 transition-colors last:border-b-0">
       <td className="px-4 py-4 text-sm font-medium text-gray-900">{invoice.invoiceNumber}</td>
@@ -277,6 +314,7 @@ function InvoiceRow({ invoice }: { invoice: InvoiceOverviewWithUrl }) {
           invoiceId={invoice.id}
           clientId={invoice.clientId}
           status={invoice.status}
+          onChange={onStatusChange}
         />
       </td>
       <td className="px-4 py-4">
@@ -306,40 +344,29 @@ function StatusBadgeButton({
   invoiceId,
   clientId,
   status,
+  onChange,
 }: {
   invoiceId: string;
   clientId: string;
   status: InvoiceStatus;
+  onChange: (invoiceId: string, clientId: string, status: InvoiceStatus) => void;
 }) {
-  const router = useRouter();
-  const { showToast } = useToast();
-  const [isPending, startTransition] = useTransition();
   const meta = statusMeta(status);
 
   function choose(next: string) {
     if (next === status) return;
-    startTransition(async () => {
-      const result = await updateInvoiceStatus(invoiceId, clientId, next as InvoiceStatus);
-      if (!result.success) {
-        showToast(result.error, 'error');
-        return;
-      }
-      showToast(`Marked ${next}`);
-      router.refresh();
-    });
+    onChange(invoiceId, clientId, next as InvoiceStatus);
   }
 
   return (
     <Dropdown
       value={status}
       onSelect={choose}
-      disabled={isPending}
       ariaLabel="Change invoice status"
       className={cn(
         'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all',
         meta.badge,
         'hover:ring-2 hover:ring-gray-100',
-        isPending && 'opacity-60',
       )}
       options={STATUS_OPTIONS.map((opt) => ({
         value: opt.id,
