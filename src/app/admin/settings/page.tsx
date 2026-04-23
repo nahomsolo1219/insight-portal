@@ -1,16 +1,24 @@
-export default function SettingsPage() {
+import { requireAdmin } from '@/lib/auth/current-user';
+import { SettingsClient } from './SettingsClient';
+import { listEmailTemplates, listMembershipTiers } from './queries';
+
+export default async function SettingsPage() {
+  await requireAdmin();
+  const [tiers, emailTemplates] = await Promise.all([
+    listMembershipTiers(),
+    listEmailTemplates(),
+  ]);
+
   return (
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-brand-teal-500 text-3xl">Settings</h1>
         <p className="mt-1 text-sm text-[#737373]">
-          Scaffold ready. Company, tiers, emails, and integrations will be built next.
+          Company, membership tiers, and email templates.
         </p>
       </header>
-      <div className="shadow-card rounded-2xl bg-white p-8 text-sm text-[#737373]">
-        Placeholder — next step: four sections (Company, Membership tiers, Email templates,
-        Integrations).
-      </div>
+
+      <SettingsClient tiers={tiers} emailTemplates={emailTemplates} />
     </div>
   );
 }

@@ -51,7 +51,10 @@ export type AuditAction =
   | 'updated settings'
   | 'created tier'
   | 'updated tier'
-  | 'deleted tier';
+  | 'deleted tier'
+  | 'created template'
+  | 'updated template'
+  | 'deleted template';
 
 export type AuditTargetType =
   | 'client'
@@ -67,6 +70,7 @@ export type AuditTargetType =
   | 'vendor'
   | 'staff'
   | 'tier'
+  | 'template'
   | 'settings';
 
 export interface LogAuditParams {

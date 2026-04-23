@@ -34,8 +34,8 @@
 - [x] Invoices (cross-client) (summary totals, status + client filters, scoped totals when filtering, inline status toggle)
 - [x] Vendors (searchable directory table, create/edit modals with datalist-suggested categories, toggle active/inactive, rating display)
 - [x] Staff (card grid with role/status badges, create/edit modals, optional Supabase invite on create with inviteRole mapping from staff role)
-- [ ] Templates
-- [ ] Settings
+- [x] Templates (card list with expandable milestones, create/edit/delete modals, dynamic milestone builder with add/remove/reorder, delete-and-reinsert on update)
+- [x] Settings (vertical-tab layout: Company placeholder, Tiers CRUD with dollar→cents + client-count guard on delete, Email Templates inline editor)
 
 ## Follow-up for client detail shell
 
@@ -43,9 +43,10 @@
 - [ ] Decision-resolution flow (awaiting-client milestones — distinct from the complete/pending toggle)
 - [ ] Multi-property switcher end-to-end test (needs a seeded client with 2+ properties)
 
+## Admin pages — all built ✓
+
 ## Next up
 
-- [ ] Templates / Settings pages
 - [ ] Email via Postmark
 - [ ] Deploy to Vercel
 
