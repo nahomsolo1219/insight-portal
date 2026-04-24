@@ -18,6 +18,7 @@ export interface TemplateListRow {
   duration: string | null;
   createdAt: Date;
   milestoneCount: number;
+  usesPhases: boolean;
 }
 
 export interface TemplateMilestoneRow {
@@ -38,6 +39,7 @@ export async function listTemplates(): Promise<TemplateListRow[]> {
       description: projectTemplates.description,
       duration: projectTemplates.duration,
       createdAt: projectTemplates.createdAt,
+      usesPhases: projectTemplates.usesPhases,
     })
     .from(projectTemplates)
     .orderBy(asc(projectTemplates.name));

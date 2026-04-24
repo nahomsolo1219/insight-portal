@@ -13,6 +13,7 @@
     "@floating-ui/react": "^0.27.19",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.2",
+    "@xyflow/react": "^12.10.2",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.8.0",

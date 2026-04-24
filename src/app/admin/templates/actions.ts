@@ -188,8 +188,8 @@ export interface PhaseInput {
   estimatedDuration?: string | null;
   estimatedDays?: number | null;
   photoDocumentation?: PhotoDocumentation;
-  /** Index into the phases array this phase depends on (resolved to ID after insert). */
-  dependsOnPhaseIndex?: number | null;
+  /** Indexes into the phases array this phase depends on (resolved to IDs after insert). */
+  dependsOnPhaseIndices?: number[];
   milestones: PhaseMilestoneInput[];
 }
 
@@ -211,16 +211,20 @@ function validatePhaseInput(input: PhaseTemplateInput): string | null {
   if (input.phases.length === 0) return 'Add at least one phase.';
   for (const [i, phase] of input.phases.entries()) {
     if (!phase.title?.trim()) return `Phase ${i + 1} needs a title.`;
-    if (
-      phase.dependsOnPhaseIndex !== null &&
-      phase.dependsOnPhaseIndex !== undefined
-    ) {
-      const idx = phase.dependsOnPhaseIndex;
-      if (idx < 0 || idx >= input.phases.length) {
-        return `Phase "${phase.title}" has an invalid dependency.`;
-      }
-      if (idx === i) {
-        return `Phase "${phase.title}" can't depend on itself.`;
+    const deps = phase.dependsOnPhaseIndices;
+    if (deps) {
+      const seen = new Set<number>();
+      for (const idx of deps) {
+        if (idx < 0 || idx >= input.phases.length) {
+          return `Phase "${phase.title}" has an invalid dependency.`;
+        }
+        if (idx === i) {
+          return `Phase "${phase.title}" can't depend on itself.`;
+        }
+        if (seen.has(idx)) {
+          return `Phase "${phase.title}" lists the same dependency twice.`;
+        }
+        seen.add(idx);
       }
     }
   }
@@ -244,12 +248,14 @@ function buildPhaseRows(
     const phase = input.phases[i];
     const phaseId = insertedPhaseIds[i].id;
 
-    const depIndex = phase.dependsOnPhaseIndex;
-    if (depIndex !== null && depIndex !== undefined) {
-      dependencyRows.push({
-        phaseId,
-        dependsOnPhaseId: insertedPhaseIds[depIndex].id,
-      });
+    const deps = phase.dependsOnPhaseIndices;
+    if (deps) {
+      for (const depIndex of deps) {
+        dependencyRows.push({
+          phaseId,
+          dependsOnPhaseId: insertedPhaseIds[depIndex].id,
+        });
+      }
     }
 
     for (let j = 0; j < phase.milestones.length; j++) {

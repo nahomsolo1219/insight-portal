@@ -138,3 +138,53 @@ nav button:active {
   transform: scale(0.98);
   transition: transform 0.05s ease;
 }
+
+/* ---------- React Flow overrides ---------- */
+/* Warm background + brand-styled chrome for the template builder canvas.
+ * React Flow's default styles lean utilitarian; these align it with the
+ * rest of the admin surface (warm off-white, soft shadows, teal accents).
+ * The `:active` press rules above would try to scale Controls buttons on
+ * click, which fights with React Flow's own click handling — we opt those
+ * buttons out of the transform.
+ */
+.react-flow__background {
+  background-color: #f9f9f7 !important;
+}
+
+.react-flow__controls {
+  border-radius: 12px !important;
+  border: 0.5px solid #e8e6e1 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  border-bottom: 0.5px solid #e8e6e1 !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__controls-button:active {
+  transform: none !important;
+}
+
+.react-flow__minimap {
+  border-radius: 12px !important;
+  border: 0.5px solid #e8e6e1 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+
+.react-flow__handle:hover {
+  transform: scale(1.3) !important;
+}
+
+/* The node wrapper React Flow inserts around our custom PhaseNode sets
+ * its own border/bg by default — we style the inner card instead, so
+ * strip the wrapper's chrome. */
+.react-flow__node-phase {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
