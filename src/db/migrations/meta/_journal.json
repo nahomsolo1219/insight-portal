@@ -15,6 +15,13 @@
       "when": 1776326174004,
       "tag": "0001_opposite_wonder_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777006409715,
+      "tag": "0002_slippery_energizer",
+      "breakpoints": true
     }
   ]
 }

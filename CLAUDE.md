@@ -65,6 +65,15 @@ Invoices are admin-uploaded PDFs with fields, NOT synced from QuickBooks.
 Milestones with status 'awaiting-client' are "Decisions" (aggregated in their own page).
 See `src/lib/types.ts` for complete interfaces.
 
+## Template builder (phase-based)
+
+- Templates can be phase-based (`project_templates.uses_phases = true`) or legacy flat. Both shapes coexist; `getTemplateWithPhases` in `src/app/admin/templates/queries.ts` branches on the flag.
+- Phase-based: `project_templates` → `template_phases` → `template_milestones` (with `phase_id` FK).
+- Phase dependencies live in `template_phase_dependencies` (`phase_id` → `depends_on_phase_id`). A phase can depend on multiple predecessors; the input API uses `dependsOnPhaseIndex` which is resolved to IDs after the phases are inserted.
+- Decision points are `template_milestones` rows with `is_decision_point = true`, `decision_question`, `decision_type` (uses the shared `question_type` enum), and optional `decision_options` (jsonb string[]).
+- Phase-based milestones keep `offset` null — the legacy free-text `offset` field is only used by flat templates. Scheduling information for phase-based templates comes from `template_phases.estimated_days` / `estimated_duration`.
+- Create/update actions (`createPhaseTemplate`, `updatePhaseTemplate`) use a delete-and-reinsert pattern — same philosophy as the legacy `updateTemplate`.
+
 ## Database
 
 - Supabase Postgres. Drizzle ORM. Connection via `DATABASE_URL` (pooled, port 6543) for app, `DIRECT_URL` (port 5432) for migrations.

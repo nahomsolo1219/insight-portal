@@ -184,7 +184,46 @@ export const projectTemplates = pgTable('project_templates', {
   type: projectTypeEnum('type').notNull(),
   description: text('description'),
   duration: text('duration'),
+  // When true, milestones belong to phases (new visual builder model).
+  // When false, milestones hang directly off the template (legacy flat list).
+  // Lets existing templates keep working while new ones adopt phases.
+  usesPhases: boolean('uses_phases').notNull().default(false),
   ...timestamps,
+});
+
+// template_phases — ordered groups of milestones shown as sections on the
+// client-facing timeline. Only populated when the parent template has
+// `uses_phases = true`.
+export const templatePhases = pgTable('template_phases', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  templateId: uuid('template_id')
+    .notNull()
+    .references(() => projectTemplates.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  /** Client-facing description shown on the portal timeline for this phase. */
+  description: text('description'),
+  order: integer('order').notNull().default(0),
+  /** Human-readable: "2 weeks", "3-4 days" — free text for display. */
+  estimatedDuration: text('estimated_duration'),
+  /** Numeric duration for scheduling math (e.g. auto-set milestone due dates). */
+  estimatedDays: integer('estimated_days'),
+  /** Photo docs expected during this phase: 'none' | 'before_after' | 'before_during_after' | 'during_only'. */
+  photoDocumentation: text('photo_documentation').default('before_during_after'),
+  ...timestamps,
+});
+
+// template_phase_dependencies — phase-to-phase "can't start until X is
+// complete" edges. Stored as a separate table so a phase can depend on
+// multiple predecessors and the builder UI can render a proper DAG.
+export const templatePhaseDependencies = pgTable('template_phase_dependencies', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  phaseId: uuid('phase_id')
+    .notNull()
+    .references(() => templatePhases.id, { onDelete: 'cascade' }),
+  dependsOnPhaseId: uuid('depends_on_phase_id')
+    .notNull()
+    .references(() => templatePhases.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 // template_milestones
@@ -193,10 +232,24 @@ export const templateMilestones = pgTable('template_milestones', {
   templateId: uuid('template_id')
     .notNull()
     .references(() => projectTemplates.id, { onDelete: 'cascade' }),
+  // Set only for phase-based templates. Null for legacy flat milestones.
+  // Cascade delete so rewriting a phase's milestones (delete-and-reinsert)
+  // stays clean.
+  phaseId: uuid('phase_id').references(() => templatePhases.id, {
+    onDelete: 'cascade',
+  }),
   title: text('title').notNull(),
   category: text('category'),
   offset: text('offset'),
   order: integer('order').notNull().default(0),
+  /** Optional admin-facing detail for the milestone. */
+  description: text('description'),
+  /** Flags a milestone as a client-decision gate (same shape as `milestones.questionType` on live projects). */
+  isDecisionPoint: boolean('is_decision_point').notNull().default(false),
+  decisionQuestion: text('decision_question'),
+  decisionType: questionTypeEnum('decision_type'),
+  /** Canonical shape: string[] for single/multi questions; null for approval/open/acknowledge. */
+  decisionOptions: jsonb('decision_options'),
   ...timestamps,
 });
 
@@ -442,12 +495,49 @@ export const vendorsRelations = relations(vendors, ({ many }) => ({
 
 export const projectTemplatesRelations = relations(projectTemplates, ({ many }) => ({
   templateMilestones: many(templateMilestones),
+  phases: many(templatePhases),
 }));
+
+export const templatePhasesRelations = relations(templatePhases, ({ one, many }) => ({
+  template: one(projectTemplates, {
+    fields: [templatePhases.templateId],
+    references: [projectTemplates.id],
+  }),
+  milestones: many(templateMilestones),
+  // Two relations to the same join table — one for each side of the edge.
+  // Both sides need `relationName` so Drizzle can disambiguate.
+  dependencies: many(templatePhaseDependencies, {
+    relationName: 'phaseDependencies',
+  }),
+  dependedOnBy: many(templatePhaseDependencies, {
+    relationName: 'phaseDependedOnBy',
+  }),
+}));
+
+export const templatePhaseDependenciesRelations = relations(
+  templatePhaseDependencies,
+  ({ one }) => ({
+    phase: one(templatePhases, {
+      fields: [templatePhaseDependencies.phaseId],
+      references: [templatePhases.id],
+      relationName: 'phaseDependencies',
+    }),
+    dependsOnPhase: one(templatePhases, {
+      fields: [templatePhaseDependencies.dependsOnPhaseId],
+      references: [templatePhases.id],
+      relationName: 'phaseDependedOnBy',
+    }),
+  }),
+);
 
 export const templateMilestonesRelations = relations(templateMilestones, ({ one }) => ({
   template: one(projectTemplates, {
     fields: [templateMilestones.templateId],
     references: [projectTemplates.id],
+  }),
+  phase: one(templatePhases, {
+    fields: [templateMilestones.phaseId],
+    references: [templatePhases.id],
   }),
 }));
 

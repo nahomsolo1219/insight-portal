@@ -3,7 +3,12 @@
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
-import { projectTemplates, templateMilestones } from '@/db/schema';
+import {
+  projectTemplates,
+  templateMilestones,
+  templatePhaseDependencies,
+  templatePhases,
+} from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
 
@@ -149,6 +154,276 @@ export async function updateTemplate(
     return { success: true };
   } catch (error) {
     console.error('[updateTemplate]', error);
+    return { success: false, error: 'Failed to update template.' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Phase-based (visual-builder) template create / update
+// ---------------------------------------------------------------------------
+
+type DecisionType = 'single' | 'multi' | 'approval' | 'open' | 'acknowledge';
+type PhotoDocumentation =
+  | 'none'
+  | 'before_after'
+  | 'before_during_after'
+  | 'during_only';
+
+export interface PhaseMilestoneInput {
+  title: string;
+  category: string;
+  order: number;
+  description?: string | null;
+  isDecisionPoint?: boolean;
+  decisionQuestion?: string | null;
+  decisionType?: DecisionType | null;
+  /** Canonical shape for single/multi — `null` or omitted for other types. */
+  decisionOptions?: string[] | null;
+}
+
+export interface PhaseInput {
+  title: string;
+  description?: string | null;
+  order: number;
+  estimatedDuration?: string | null;
+  estimatedDays?: number | null;
+  photoDocumentation?: PhotoDocumentation;
+  /** Index into the phases array this phase depends on (resolved to ID after insert). */
+  dependsOnPhaseIndex?: number | null;
+  milestones: PhaseMilestoneInput[];
+}
+
+export interface PhaseTemplateInput {
+  name: string;
+  type: ProjectTemplateType;
+  description?: string | null;
+  duration?: string | null;
+  phases: PhaseInput[];
+}
+
+/**
+ * Validate phase input and surface a user-facing error on the first problem
+ * found. Returns null on success. Keeps the two action handlers (create /
+ * update) from duplicating identical checks.
+ */
+function validatePhaseInput(input: PhaseTemplateInput): string | null {
+  if (!input.name?.trim()) return 'Template name is required.';
+  if (input.phases.length === 0) return 'Add at least one phase.';
+  for (const [i, phase] of input.phases.entries()) {
+    if (!phase.title?.trim()) return `Phase ${i + 1} needs a title.`;
+    if (
+      phase.dependsOnPhaseIndex !== null &&
+      phase.dependsOnPhaseIndex !== undefined
+    ) {
+      const idx = phase.dependsOnPhaseIndex;
+      if (idx < 0 || idx >= input.phases.length) {
+        return `Phase "${phase.title}" has an invalid dependency.`;
+      }
+      if (idx === i) {
+        return `Phase "${phase.title}" can't depend on itself.`;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Build the per-phase row sets from the user input. Pure — used by both
+ * create and update so the two paths stay in sync. Order is re-derived from
+ * array index so the caller doesn't need to supply it correctly.
+ */
+function buildPhaseRows(
+  templateId: string,
+  insertedPhaseIds: { id: string }[],
+  input: PhaseTemplateInput,
+) {
+  const dependencyRows: { phaseId: string; dependsOnPhaseId: string }[] = [];
+  const milestoneRows: (typeof templateMilestones.$inferInsert)[] = [];
+
+  for (let i = 0; i < input.phases.length; i++) {
+    const phase = input.phases[i];
+    const phaseId = insertedPhaseIds[i].id;
+
+    const depIndex = phase.dependsOnPhaseIndex;
+    if (depIndex !== null && depIndex !== undefined) {
+      dependencyRows.push({
+        phaseId,
+        dependsOnPhaseId: insertedPhaseIds[depIndex].id,
+      });
+    }
+
+    for (let j = 0; j < phase.milestones.length; j++) {
+      const m = phase.milestones[j];
+      if (!m.title?.trim()) continue; // drop empties the way the legacy flow does
+      milestoneRows.push({
+        templateId,
+        phaseId,
+        title: m.title.trim(),
+        category: m.category?.trim() || null,
+        // Phase-based milestones have a real phaseId FK — we deliberately
+        // leave the legacy free-text `offset` null rather than repurposing
+        // it as "Phase N" (which would be redundant and misleading).
+        offset: null,
+        order: m.order ?? j + 1,
+        description: m.description?.trim() || null,
+        isDecisionPoint: m.isDecisionPoint ?? false,
+        decisionQuestion: m.decisionQuestion?.trim() || null,
+        decisionType: m.decisionType ?? null,
+        decisionOptions: m.decisionOptions ?? null,
+      });
+    }
+  }
+
+  return { dependencyRows, milestoneRows };
+}
+
+export async function createPhaseTemplate(
+  input: PhaseTemplateInput,
+): Promise<ActionResult<{ id: string }>> {
+  const user = await requireAdmin();
+
+  const validationError = validatePhaseInput(input);
+  if (validationError) return { success: false, error: validationError };
+
+  try {
+    const [template] = await db
+      .insert(projectTemplates)
+      .values({
+        name: input.name.trim(),
+        type: input.type,
+        description: input.description?.trim() || null,
+        duration: input.duration?.trim() || null,
+        usesPhases: true,
+      })
+      .returning({ id: projectTemplates.id, name: projectTemplates.name });
+
+    const phaseInserts = input.phases.map((p, i) => ({
+      templateId: template.id,
+      title: p.title.trim(),
+      description: p.description?.trim() || null,
+      order: p.order ?? i + 1,
+      estimatedDuration: p.estimatedDuration?.trim() || null,
+      estimatedDays: p.estimatedDays ?? null,
+      photoDocumentation: p.photoDocumentation ?? 'before_during_after',
+    }));
+    const insertedPhases = await db
+      .insert(templatePhases)
+      .values(phaseInserts)
+      .returning({ id: templatePhases.id });
+
+    const { dependencyRows, milestoneRows } = buildPhaseRows(
+      template.id,
+      insertedPhases,
+      input,
+    );
+
+    if (dependencyRows.length > 0) {
+      await db.insert(templatePhaseDependencies).values(dependencyRows);
+    }
+    if (milestoneRows.length > 0) {
+      await db.insert(templateMilestones).values(milestoneRows);
+    }
+
+    await logAudit({
+      actor: user,
+      action: 'created template',
+      targetType: 'template',
+      targetId: template.id,
+      targetLabel: template.name,
+      metadata: {
+        type: input.type,
+        phaseCount: input.phases.length,
+        milestoneCount: milestoneRows.length,
+      },
+    });
+
+    revalidatePath('/admin/templates');
+    return { success: true, data: { id: template.id } };
+  } catch (error) {
+    console.error('[createPhaseTemplate]', error);
+    return { success: false, error: 'Failed to create template.' };
+  }
+}
+
+/**
+ * Update a phase-based template. Same delete-and-reinsert pattern the legacy
+ * `updateTemplate` uses — cascades wipe phases + their dependencies + their
+ * milestones in one go; we then rebuild the tree from the new input. Legacy
+ * orphan milestones (if this template was ever flat) are purged too so a
+ * template that transitions from flat → phases doesn't carry stragglers.
+ */
+export async function updatePhaseTemplate(
+  templateId: string,
+  input: PhaseTemplateInput,
+): Promise<ActionResult> {
+  const user = await requireAdmin();
+
+  const validationError = validatePhaseInput(input);
+  if (validationError) return { success: false, error: validationError };
+
+  try {
+    const [updated] = await db
+      .update(projectTemplates)
+      .set({
+        name: input.name.trim(),
+        type: input.type,
+        description: input.description?.trim() || null,
+        duration: input.duration?.trim() || null,
+        usesPhases: true,
+      })
+      .where(eq(projectTemplates.id, templateId))
+      .returning({ id: projectTemplates.id, name: projectTemplates.name });
+
+    if (!updated) return { success: false, error: 'Template not found.' };
+
+    // Cascade via template_phases drops milestones (phase-attached) and
+    // dependencies. Then sweep any legacy phase-less milestones that remain.
+    await db.delete(templatePhases).where(eq(templatePhases.templateId, templateId));
+    await db.delete(templateMilestones).where(eq(templateMilestones.templateId, templateId));
+
+    const phaseInserts = input.phases.map((p, i) => ({
+      templateId,
+      title: p.title.trim(),
+      description: p.description?.trim() || null,
+      order: p.order ?? i + 1,
+      estimatedDuration: p.estimatedDuration?.trim() || null,
+      estimatedDays: p.estimatedDays ?? null,
+      photoDocumentation: p.photoDocumentation ?? 'before_during_after',
+    }));
+    const insertedPhases = await db
+      .insert(templatePhases)
+      .values(phaseInserts)
+      .returning({ id: templatePhases.id });
+
+    const { dependencyRows, milestoneRows } = buildPhaseRows(
+      templateId,
+      insertedPhases,
+      input,
+    );
+
+    if (dependencyRows.length > 0) {
+      await db.insert(templatePhaseDependencies).values(dependencyRows);
+    }
+    if (milestoneRows.length > 0) {
+      await db.insert(templateMilestones).values(milestoneRows);
+    }
+
+    await logAudit({
+      actor: user,
+      action: 'updated template',
+      targetType: 'template',
+      targetId: updated.id,
+      targetLabel: updated.name,
+      metadata: {
+        phaseCount: input.phases.length,
+        milestoneCount: milestoneRows.length,
+      },
+    });
+
+    revalidatePath('/admin/templates');
+    return { success: true };
+  } catch (error) {
+    console.error('[updatePhaseTemplate]', error);
     return { success: false, error: 'Failed to update template.' };
   }
 }
