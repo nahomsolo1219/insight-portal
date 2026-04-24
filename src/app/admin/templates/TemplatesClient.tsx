@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Field, inputClass } from '@/components/admin/Field';
+import { LoadingDots } from '@/components/admin/LoadingDots';
 import { Modal } from '@/components/admin/Modal';
 import { useToast } from '@/components/admin/ToastProvider';
 import { cn } from '@/lib/utils';
@@ -714,7 +715,14 @@ function DeleteConfirmModal({
             disabled={isPending}
             className="shadow-soft rounded-xl bg-red-500 px-5 py-2.5 font-medium text-white transition-all hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isPending ? 'Deleting...' : 'Delete'}
+            {isPending ? (
+              <>
+                Deleting
+                <LoadingDots />
+              </>
+            ) : (
+              'Delete'
+            )}
           </button>
         </>
       }

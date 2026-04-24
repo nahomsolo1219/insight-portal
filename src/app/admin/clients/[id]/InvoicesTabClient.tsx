@@ -6,6 +6,7 @@ import { useMemo, useOptimistic, useState, useTransition } from 'react';
 import { Dropdown } from '@/components/admin/Dropdown';
 import { Field, inputClass } from '@/components/admin/Field';
 import { FileUpload, type FileUploadItem } from '@/components/admin/FileUpload';
+import { LoadingDots } from '@/components/admin/LoadingDots';
 import { Modal } from '@/components/admin/Modal';
 import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatCurrency, formatShortDate } from '@/lib/utils';
@@ -512,7 +513,14 @@ function UploadModal({ onClose, clientId, properties, projects }: UploadModalPro
             disabled={isPending}
             className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-5 py-2.5 font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isPending ? 'Uploading...' : 'Upload invoice'}
+            {isPending ? (
+              <>
+                Uploading
+                <LoadingDots />
+              </>
+            ) : (
+              'Upload invoice'
+            )}
           </button>
         </>
       }
@@ -719,7 +727,14 @@ function DeleteConfirmModal({ invoice, onClose, clientId }: DeleteConfirmModalPr
             disabled={isPending}
             className="shadow-soft rounded-xl bg-red-500 px-5 py-2.5 font-medium text-white transition-all hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isPending ? 'Deleting...' : 'Delete'}
+            {isPending ? (
+              <>
+                Deleting
+                <LoadingDots />
+              </>
+            ) : (
+              'Delete'
+            )}
           </button>
         </>
       }

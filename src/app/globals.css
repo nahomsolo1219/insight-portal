@@ -92,3 +92,49 @@ button:disabled,
 select:disabled {
   cursor: not-allowed;
 }
+
+/* ---------- Instant click feedback ----------
+ * Tactile press states applied globally so clicks feel immediate even when
+ * the resulting action is async. The scale-down happens in the same frame
+ * as the mousedown; release animates back with a slight bounce.
+ */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']) {
+  transition:
+    transform 0.12s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+
+button:not(:disabled):active,
+[role='button']:not([aria-disabled='true']):active {
+  transform: scale(0.97);
+  transition: transform 0.05s ease;
+}
+
+/* Links and opt-in clickable containers get a subtle opacity dip. */
+a[href]:active,
+[data-clickable]:active {
+  opacity: 0.85;
+  transition: opacity 0.05s ease;
+}
+
+/* Tab buttons — whichever tabbed component uses the ARIA role or the
+ * `data-tab` opt-in — get a faster background blush so the press feels
+ * even more responsive than a generic button. */
+[role='tab']:active,
+[data-tab]:active {
+  background-color: rgba(0, 0, 0, 0.05);
+  transition: background-color 0.05s ease;
+}
+
+/* Sidebar nav items use a narrower scale so the full-width row doesn't
+ * shift visibly under the cursor — just a breath of movement. */
+nav a:active,
+nav button:active {
+  transform: scale(0.98);
+  transition: transform 0.05s ease;
+}
