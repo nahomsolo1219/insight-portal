@@ -1,10 +1,20 @@
 'use client';
 
-import { AlertCircle, Check, Pencil, Plus, X } from 'lucide-react';
-import { useState } from 'react';
+import { AlertCircle, Check, Image as ImageIcon, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { useToast } from '@/components/admin/ToastProvider';
 import { cn } from '@/lib/utils';
+import {
+  deleteDecisionOptionImage,
+  uploadDecisionOptionImage,
+} from '../actions';
 import { useBuilder } from '../builder-context';
-import { newMilestone, type BuilderMilestone, type DecisionType } from '../builder-types';
+import {
+  newMilestone,
+  type BuilderDecisionOption,
+  type BuilderMilestone,
+  type DecisionType,
+} from '../builder-types';
 
 const TYPE_LABELS: Record<DecisionType, string> = {
   single: 'Single choice',
@@ -133,6 +143,25 @@ function DecisionRowDisplay({
           </button>
         </div>
       </div>
+
+      {/* Show option thumbnails inline when collapsed — gives a glance at
+          which options have images without entering edit mode. */}
+      {showOptions && decision.decisionOptions.some((o) => o.imageUrl) && (
+        <div className="mt-2 ml-4 flex flex-wrap gap-1">
+          {decision.decisionOptions
+            .filter((o) => o.imageUrl)
+            .map((o, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                src={o.imageUrl!}
+                alt={o.label}
+                className="h-8 w-8 rounded border border-pink-100 object-cover"
+                loading="lazy"
+              />
+            ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -152,17 +181,17 @@ function DecisionRowEdit({
   const [type, setType] = useState<DecisionType>(
     (decision.decisionType || 'single') as DecisionType,
   );
-  const [options, setOptions] = useState<string[]>(
-    decision.decisionOptions.length > 0 ? decision.decisionOptions : [''],
+  const [options, setOptions] = useState<BuilderDecisionOption[]>(
+    decision.decisionOptions.length > 0 ? decision.decisionOptions : [emptyOption()],
   );
 
   const showOptions = TYPES_WITH_OPTIONS.includes(type);
 
   function save() {
-    const cleanOptions = showOptions ? options.map((o) => o.trim()).filter(Boolean) : [];
+    const cleanOptions = showOptions
+      ? options.filter((o) => o.label.trim())
+      : [];
     onSave({
-      // Decisions also have a `title` — use the question so display paths
-      // that show `milestone.title` don't render blank for decision rows.
       title: question.trim(),
       decisionQuestion: question.trim(),
       decisionType: type,
@@ -170,8 +199,8 @@ function DecisionRowEdit({
     });
   }
 
-  function updateOption(idx: number, value: string) {
-    setOptions((prev) => prev.map((o, i) => (i === idx ? value : o)));
+  function patchOption(idx: number, patch: Partial<BuilderDecisionOption>) {
+    setOptions((prev) => prev.map((o, i) => (i === idx ? { ...o, ...patch } : o)));
   }
 
   function removeOption(idx: number) {
@@ -205,33 +234,19 @@ function DecisionRowEdit({
       </select>
 
       {showOptions && (
-        <div className="space-y-1">
+        <div className="space-y-2">
           {options.map((opt, i) => (
-            <div key={i} className="flex gap-1">
-              <input
-                type="text"
-                value={opt}
-                onChange={(e) => updateOption(i, e.target.value)}
-                onMouseDown={stopCanvasEvent}
-                onKeyDown={stopCanvasEvent}
-                placeholder={`Option ${i + 1}`}
-                className={cn(editInputClass, 'flex-1')}
-              />
-              <button
-                type="button"
-                onClick={() => removeOption(i)}
-                onMouseDown={stopCanvasEvent}
-                disabled={options.length <= 1}
-                aria-label="Remove option"
-                className="rounded p-1 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                <X size={12} strokeWidth={2} />
-              </button>
-            </div>
+            <OptionRowEdit
+              key={i}
+              option={opt}
+              onChange={(patch) => patchOption(i, patch)}
+              onRemove={() => removeOption(i)}
+              canRemove={options.length > 1}
+            />
           ))}
           <button
             type="button"
-            onClick={() => setOptions((prev) => [...prev, ''])}
+            onClick={() => setOptions((prev) => [...prev, emptyOption()])}
             onMouseDown={stopCanvasEvent}
             className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-gray-200 py-1 text-[11px] text-gray-500 hover:border-pink-300 hover:text-pink-500"
           >
@@ -273,6 +288,161 @@ function DecisionRowEdit({
       </div>
     </div>
   );
+}
+
+/**
+ * Single option row in the edit form. Image is uploaded immediately on
+ * file selection — the spinner overlays the thumbnail until the server
+ * action returns. Removing or replacing an existing image fires a
+ * background delete so storage doesn't accumulate unreferenced files
+ * during the editing session.
+ */
+function OptionRowEdit({
+  option,
+  onChange,
+  onRemove,
+  canRemove,
+}: {
+  option: BuilderDecisionOption;
+  onChange: (patch: Partial<BuilderDecisionOption>) => void;
+  onRemove: () => void;
+  canRemove: boolean;
+}) {
+  const { showToast } = useToast();
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+
+    // If the option already had an image, fire-and-forget the delete so
+    // we don't accumulate orphans on every replacement. The server will
+    // log + ignore failures; the new upload is the user-visible action.
+    const previousPath = option.imageStoragePath;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    const result = await uploadDecisionOptionImage(formData);
+    setUploading(false);
+
+    if (!result.success) {
+      showToast(result.error, 'error');
+      return;
+    }
+
+    onChange({ imageStoragePath: result.path, imageUrl: result.signedUrl });
+
+    if (previousPath) {
+      // Background delete — ignore the result; the worst case is one
+      // orphaned image, not a UX-blocking failure.
+      void deleteDecisionOptionImage(previousPath);
+    }
+  }
+
+  async function handleRemoveImage() {
+    if (!option.imageStoragePath) return;
+    const previousPath = option.imageStoragePath;
+    onChange({ imageStoragePath: null, imageUrl: null });
+    void deleteDecisionOptionImage(previousPath);
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-2">
+      <div className="flex gap-2">
+        {/* Image zone */}
+        <div className="relative flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            onMouseDown={stopCanvasEvent}
+            disabled={uploading}
+            className={cn(
+              'flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white transition-all',
+              !uploading && 'hover:border-brand-teal-300 hover:bg-brand-warm-50',
+              uploading && 'cursor-wait',
+            )}
+            aria-label={option.imageStoragePath ? 'Replace image' : 'Add image'}
+          >
+            {option.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={option.imageUrl}
+                alt={option.label || 'Option'}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <ImageIcon size={20} strokeWidth={1.25} className="text-gray-300" />
+            )}
+            {uploading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/80">
+                <Loader2 size={16} strokeWidth={2} className="animate-spin text-gray-500" />
+              </div>
+            )}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFile}
+            onClick={stopCanvasEvent}
+            className="hidden"
+          />
+          {option.imageStoragePath && !uploading && (
+            <button
+              type="button"
+              onClick={handleRemoveImage}
+              onMouseDown={stopCanvasEvent}
+              aria-label="Remove image"
+              className="absolute -top-1.5 -right-1.5 rounded-full bg-white p-0.5 text-gray-400 shadow-sm ring-1 ring-gray-200 transition-all hover:text-red-500"
+            >
+              <Trash2 size={10} strokeWidth={2} />
+            </button>
+          )}
+        </div>
+
+        {/* Label + description + remove */}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex gap-1">
+            <input
+              type="text"
+              value={option.label}
+              onChange={(e) => onChange({ label: e.target.value })}
+              onMouseDown={stopCanvasEvent}
+              onKeyDown={stopCanvasEvent}
+              placeholder="Option label"
+              className={cn(editInputClass, 'flex-1')}
+            />
+            <button
+              type="button"
+              onClick={onRemove}
+              onMouseDown={stopCanvasEvent}
+              disabled={!canRemove}
+              aria-label="Remove option"
+              className="rounded p-1 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <X size={12} strokeWidth={2} />
+            </button>
+          </div>
+          <input
+            type="text"
+            value={option.description ?? ''}
+            onChange={(e) => onChange({ description: e.target.value || null })}
+            onMouseDown={stopCanvasEvent}
+            onKeyDown={stopCanvasEvent}
+            placeholder="Short description (optional)"
+            className={editInputClass}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function emptyOption(): BuilderDecisionOption {
+  return { label: '', imageStoragePath: null, imageUrl: null, description: null };
 }
 
 const editInputClass =

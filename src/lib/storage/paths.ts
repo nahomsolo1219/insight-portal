@@ -42,6 +42,19 @@ export function reportPath(clientId: string, reportId: string): string {
 }
 
 /**
+ * Path for a decision-option thumbnail in a project template.
+ *
+ * Decision options live outside the per-client hierarchy because templates
+ * are global (admin-only). We use a flat namespace with one fresh UUID per
+ * upload — this means reordering options, replacing milestone IDs on save,
+ * or uploading before the template has been persisted all "just work":
+ * the path travels inside the option object, decoupled from any other ID.
+ */
+export function decisionOptionImagePath(imageId: string, ext: string): string {
+  return `decision-options/${imageId}.${sanitizeExt(ext) || 'jpg'}`;
+}
+
+/**
  * Sanitise a user-supplied filename for storage. Removes control characters,
  * path separators and non-ASCII-safe characters so we never land something
  * that could confuse the S3-style key parser or leak path traversal.

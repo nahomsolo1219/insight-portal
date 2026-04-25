@@ -1,5 +1,6 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
@@ -11,6 +12,9 @@ import {
 } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { decisionOptionImagePath } from '@/lib/storage/paths';
+import { deleteFile, getSignedUrl, uploadFile } from '@/lib/storage/upload';
+import { getExtension, validateFile } from '@/lib/storage/validation';
 
 type ActionResult<T = undefined> =
   | { success: true; data?: T }
@@ -169,6 +173,16 @@ type PhotoDocumentation =
   | 'before_during_after'
   | 'during_only';
 
+/**
+ * Persisted shape of a decision option. The transient `imageUrl` (signed
+ * URL) is intentionally absent — we sign at load time, never write to DB.
+ */
+export interface DecisionOptionInput {
+  label: string;
+  imageStoragePath?: string | null;
+  description?: string | null;
+}
+
 export interface PhaseMilestoneInput {
   title: string;
   category: string;
@@ -177,8 +191,8 @@ export interface PhaseMilestoneInput {
   isDecisionPoint?: boolean;
   decisionQuestion?: string | null;
   decisionType?: DecisionType | null;
-  /** Canonical shape for single/multi — `null` or omitted for other types. */
-  decisionOptions?: string[] | null;
+  /** Stored as jsonb. Null or omitted for non-choice decision types. */
+  decisionOptions?: DecisionOptionInput[] | null;
 }
 
 export interface PhaseInput {
@@ -275,7 +289,17 @@ function buildPhaseRows(
         isDecisionPoint: m.isDecisionPoint ?? false,
         decisionQuestion: m.decisionQuestion?.trim() || null,
         decisionType: m.decisionType ?? null,
-        decisionOptions: m.decisionOptions ?? null,
+        // Normalize to the persisted shape — strip any client-side fields
+        // (e.g. transient `imageUrl`) and coerce missing keys to null so
+        // the jsonb stays canonical.
+        decisionOptions:
+          m.decisionOptions && m.decisionOptions.length > 0
+            ? m.decisionOptions.map((opt) => ({
+                label: opt.label,
+                imageStoragePath: opt.imageStoragePath ?? null,
+                description: opt.description ?? null,
+              }))
+            : null,
       });
     }
   }
@@ -432,6 +456,77 @@ export async function updatePhaseTemplate(
     console.error('[updatePhaseTemplate]', error);
     return { success: false, error: 'Failed to update template.' };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Decision-option image upload / delete
+// ---------------------------------------------------------------------------
+
+interface UploadDecisionImageSuccess {
+  success: true;
+  path: string;
+  signedUrl: string;
+}
+type UploadDecisionImageResult = UploadDecisionImageSuccess | { success: false; error: string };
+
+/**
+ * Upload a thumbnail for a decision-point option. The path is built
+ * server-side from a fresh UUID so the client can't choose where bytes
+ * land — that closes the door on a malicious admin client trying to
+ * overwrite, say, an invoice PDF at `invoices/.../foo.pdf`.
+ *
+ * Returns both the storage path (persisted in the option's
+ * `imageStoragePath`) and a fresh signed URL so the editor can render
+ * the thumbnail immediately without an extra round-trip.
+ */
+export async function uploadDecisionOptionImage(
+  formData: FormData,
+): Promise<UploadDecisionImageResult> {
+  await requireAdmin();
+
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0) {
+    return { success: false, error: 'No file provided.' };
+  }
+
+  const validation = validateFile(file, 'image');
+  if (!validation.ok) return { success: false, error: validation.error };
+
+  const ext = getExtension(file.name) || 'jpg';
+  const path = decisionOptionImagePath(randomUUID(), ext);
+
+  const result = await uploadFile({
+    path,
+    file,
+    contentType: file.type || 'image/jpeg',
+  });
+  if ('error' in result) return { success: false, error: result.error };
+
+  const signedUrl = await getSignedUrl(result.path);
+  return {
+    success: true,
+    path: result.path,
+    signedUrl: signedUrl ?? '',
+  };
+}
+
+/**
+ * Delete an option image. We constrain the path prefix in addition to
+ * `requireAdmin` so even a buggy client can't pass an arbitrary path and
+ * wipe something it shouldn't.
+ */
+export async function deleteDecisionOptionImage(
+  storagePath: string,
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  if (!storagePath.startsWith('decision-options/')) {
+    return { success: false, error: 'Invalid image path.' };
+  }
+
+  const ok = await deleteFile(storagePath);
+  if (!ok) return { success: false, error: 'Failed to delete image.' };
+  return { success: true };
 }
 
 /**

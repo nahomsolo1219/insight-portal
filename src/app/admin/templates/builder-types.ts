@@ -8,6 +8,19 @@ export type PhotoDocumentation =
   | 'during_only';
 
 /**
+ * In-memory shape for one option inside a decision point. Persisted as
+ * jsonb with `label`, `imageStoragePath`, and `description`. The
+ * `imageUrl` is a transient signed URL we attach at load time so the
+ * editor + preview can render thumbnails — never written back to the DB.
+ */
+export interface BuilderDecisionOption {
+  label: string;
+  imageStoragePath: string | null;
+  imageUrl: string | null;
+  description: string | null;
+}
+
+/**
  * In-memory shape for a single milestone inside the builder. Keeps both
  * regular milestones and decision points in the same array (distinguished
  * by `isDecisionPoint`) so save/load goes through one code path.
@@ -23,7 +36,7 @@ export interface BuilderMilestone {
   isDecisionPoint: boolean;
   decisionQuestion: string;
   decisionType: DecisionType | '';
-  decisionOptions: string[];
+  decisionOptions: BuilderDecisionOption[];
 }
 
 export interface BuilderPhase {

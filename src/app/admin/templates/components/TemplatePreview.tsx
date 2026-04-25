@@ -139,32 +139,75 @@ function PhasePreviewCard({
           </ul>
         )}
 
-        {decisions.map((d) => (
-          <div
-            key={d.id}
-            className="mt-3 rounded-lg border border-pink-100 bg-pink-50/50 p-3 text-xs"
-          >
-            <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-pink-700 uppercase">
-              <AlertCircle size={10} strokeWidth={2} />
-              Decision required
-            </div>
-            <div className="mt-1 text-sm font-medium text-gray-900">
-              {d.decisionQuestion || 'Unnamed decision'}
-            </div>
-            {d.decisionOptions.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {d.decisionOptions.map((opt) => (
-                  <span
-                    key={opt}
-                    className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700"
-                  >
-                    {opt}
-                  </span>
-                ))}
+        {decisions.map((d) => {
+          const hasAnyImage = d.decisionOptions.some((o) => o.imageUrl);
+          return (
+            <div
+              key={d.id}
+              className="mt-3 rounded-lg border border-pink-100 bg-pink-50/50 p-3 text-xs"
+            >
+              <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-pink-700 uppercase">
+                <AlertCircle size={10} strokeWidth={2} />
+                Decision required
               </div>
-            )}
-          </div>
-        ))}
+              <div className="mt-1 text-sm font-medium text-gray-900">
+                {d.decisionQuestion || 'Unnamed decision'}
+              </div>
+
+              {d.decisionOptions.length > 0 &&
+                (hasAnyImage ? (
+                  // Visual cards: use a 2-col grid so even a phone-width
+                  // preview keeps thumbnails legible. Options without an
+                  // image show a neutral placeholder so the grid stays
+                  // even-sized.
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {d.decisionOptions.map((opt, i) => (
+                      <div
+                        key={i}
+                        className="hover:border-brand-gold-400 overflow-hidden rounded-xl border border-gray-200 bg-white text-left transition-all"
+                      >
+                        <div className="aspect-[4/3] w-full overflow-hidden bg-gray-100">
+                          {opt.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={opt.imageUrl}
+                              alt={opt.label || 'Option image'}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-gray-300">
+                              <span className="text-[10px] uppercase tracking-wider">No image</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-2.5">
+                          <p className="text-[12px] font-medium text-gray-900">
+                            {opt.label || 'Untitled'}
+                          </p>
+                          {opt.description && (
+                            <p className="mt-0.5 text-[10px] text-gray-500">{opt.description}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  // No images on any option — fall back to text chips.
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {d.decisionOptions.map((opt, i) => (
+                      <span
+                        key={i}
+                        className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700"
+                      >
+                        {opt.label || 'Untitled'}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+            </div>
+          );
+        })}
 
         {phase.photoDocumentation !== 'none' && (
           <div className="mt-3 inline-flex items-center gap-1 text-[10px] text-gray-400">

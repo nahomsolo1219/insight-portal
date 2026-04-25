@@ -9,6 +9,7 @@ import {
   templatePhaseDependencies,
   templatePhases,
 } from '@/db/schema';
+import { getSignedUrls } from '@/lib/storage/upload';
 
 export interface TemplateListRow {
   id: string;
@@ -128,7 +129,11 @@ export async function getTemplateWithPhases(templateId: string): Promise<Templat
       .from(templateMilestones)
       .where(eq(templateMilestones.templateId, templateId))
       .orderBy(asc(templateMilestones.order));
-    return { ...template, phases: null, milestones };
+    return {
+      ...template,
+      phases: null,
+      milestones: await hydrateOptionImages(milestones),
+    };
   }
 
   const phases = await db
@@ -157,8 +162,10 @@ export async function getTemplateWithPhases(templateId: string): Promise<Templat
       .where(inArray(templatePhaseDependencies.phaseId, phaseIds)),
   ]);
 
+  const hydratedMilestones = await hydrateOptionImages(milestones);
+
   const milestonesByPhase = new Map<string, PhaseMilestoneRow[]>();
-  for (const m of milestones) {
+  for (const m of hydratedMilestones) {
     if (!m.phaseId) continue;
     const existing = milestonesByPhase.get(m.phaseId);
     if (existing) existing.push(m);
@@ -179,4 +186,60 @@ export async function getTemplateWithPhases(templateId: string): Promise<Templat
   }));
 
   return { ...template, phases: phasesWithContents, milestones: null };
+}
+
+/**
+ * Sign decision-option images in one batch and return the milestones with
+ * an `imageUrl` attached to each option that has a stored path. Plain
+ * strings (legacy seed format) are normalized into `{ label }` objects so
+ * the rest of the pipeline can ignore the difference.
+ */
+async function hydrateOptionImages(
+  rows: PhaseMilestoneRow[],
+): Promise<PhaseMilestoneRow[]> {
+  // 1. Walk every decision-point milestone and collect the unique paths.
+  const allPaths = new Set<string>();
+  for (const m of rows) {
+    if (!m.isDecisionPoint || !Array.isArray(m.decisionOptions)) continue;
+    for (const raw of m.decisionOptions) {
+      const path = readImagePath(raw);
+      if (path) allPaths.add(path);
+    }
+  }
+
+  // 2. One batch round-trip to Supabase storage instead of N signed-URL
+  //    calls. Empty path set short-circuits inside getSignedUrls.
+  const urlByPath =
+    allPaths.size > 0 ? await getSignedUrls(Array.from(allPaths)) : new Map<string, string>();
+
+  // 3. Rebuild the milestones with the hydrated option objects in place.
+  return rows.map((m) => {
+    if (!m.isDecisionPoint || !Array.isArray(m.decisionOptions)) return m;
+    const hydrated = (m.decisionOptions as unknown[]).map((raw) => {
+      if (typeof raw === 'string') {
+        return {
+          label: raw,
+          imageStoragePath: null,
+          imageUrl: null,
+          description: null,
+        };
+      }
+      const obj = (raw ?? {}) as Record<string, unknown>;
+      const imageStoragePath =
+        typeof obj.imageStoragePath === 'string' ? obj.imageStoragePath : null;
+      return {
+        label: typeof obj.label === 'string' ? obj.label : '',
+        imageStoragePath,
+        imageUrl: imageStoragePath ? urlByPath.get(imageStoragePath) ?? null : null,
+        description: typeof obj.description === 'string' ? obj.description : null,
+      };
+    });
+    return { ...m, decisionOptions: hydrated };
+  });
+}
+
+function readImagePath(raw: unknown): string | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const obj = raw as Record<string, unknown>;
+  return typeof obj.imageStoragePath === 'string' ? obj.imageStoragePath : null;
 }

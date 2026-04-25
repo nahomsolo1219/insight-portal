@@ -33,6 +33,7 @@ import {
 } from './builder-context';
 import {
   newPhase,
+  type BuilderDecisionOption,
   type BuilderMilestone,
   type BuilderPhase,
   type PhaseNode as PhaseNodeT,
@@ -441,8 +442,12 @@ function buildInitialState(template: TemplateDetail | null): InitialState {
       isDecisionPoint: m.isDecisionPoint,
       decisionQuestion: m.decisionQuestion ?? '',
       decisionType: (m.decisionType ?? '') as BuilderMilestone['decisionType'],
+      // `decisionOptions` arrives already hydrated by
+      // `hydrateOptionImages` in queries.ts — rich object shape with
+      // signed `imageUrl` attached. Cast through `unknown` because the
+      // jsonb column is typed as `unknown` at the Drizzle layer.
       decisionOptions: Array.isArray(m.decisionOptions)
-        ? (m.decisionOptions as string[])
+        ? (m.decisionOptions as unknown as BuilderDecisionOption[])
         : [],
     })),
   }));
@@ -524,8 +529,16 @@ function toInput(
           isDecisionPoint: m.isDecisionPoint,
           decisionQuestion: m.isDecisionPoint ? m.decisionQuestion : null,
           decisionType: m.isDecisionPoint && m.decisionType ? m.decisionType : null,
+          // Strip the transient `imageUrl` (signed URL) before persisting —
+          // we re-sign on load, so writing it would just go stale in jsonb.
           decisionOptions:
-            m.isDecisionPoint && m.decisionOptions.length > 0 ? m.decisionOptions : null,
+            m.isDecisionPoint && m.decisionOptions.length > 0
+              ? m.decisionOptions.map((opt) => ({
+                  label: opt.label,
+                  imageStoragePath: opt.imageStoragePath,
+                  description: opt.description,
+                }))
+              : null,
         }));
 
       return {
