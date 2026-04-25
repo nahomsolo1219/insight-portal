@@ -26,6 +26,7 @@ export type AuditAction =
   | 'marked milestone complete'
   | 'updated milestone'
   | 'requested decision from client'
+  | 'responded to decision'
   | 'created appointment'
   | 'completed appointment'
   | 'cancelled appointment'
