@@ -1,9 +1,19 @@
+import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
+import { getCurrentUser } from '@/lib/auth/current-user';
 import { LoginForm } from './LoginForm';
 
 // The form uses useSearchParams, which requires a Suspense boundary during
 // static rendering. Keep the page shell as a Server Component.
-export default function LoginPage() {
+export default async function LoginPage() {
+  // If the user is already signed in, kick them to their per-role home so
+  // they don't have to re-auth just to land on the right page.
+  const user = await getCurrentUser();
+  if (user) {
+    if (user.role === 'admin') redirect('/admin');
+    if (user.role === 'client') redirect('/portal');
+    // Field staff falls through to the form for now.
+  }
   return (
     <div className="bg-brand-warm-100 flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-md">

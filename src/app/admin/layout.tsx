@@ -9,8 +9,12 @@ import { getCurrentUser } from '@/lib/auth/current-user';
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   // Belt-and-suspenders: middleware already redirects unauthenticated users,
   // but checking here guarantees the Sidebar always receives a real user.
-  const [user, sidebarCounts] = await Promise.all([getCurrentUser(), getSidebarCounts()]);
+  // Role gate runs BEFORE getSidebarCounts so a client landing on /admin
+  // bounces home without firing admin-only counts under client RLS.
+  const user = await getCurrentUser();
   if (!user) redirect('/login');
+  if (user.role !== 'admin') redirect('/');
+  const sidebarCounts = await getSidebarCounts();
 
   // h-screen + overflow-hidden on the shell lets the main pane scroll
   // internally instead of the document. This avoids sticky-positioning

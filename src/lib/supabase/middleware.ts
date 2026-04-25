@@ -36,10 +36,15 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
-  const isAdminRoute = pathname.startsWith('/admin');
+  const isProtectedRoute = pathname.startsWith('/admin') || pathname.startsWith('/portal');
   const isAuthInfra = pathname.startsWith('/auth') || pathname === '/login' || pathname === '/logout';
 
-  if (!user && isAdminRoute && !isAuthInfra) {
+  // Unauthenticated access to a protected route → bounce to /login with the
+  // original destination preserved so we can return there post-magic-link.
+  // Role-based routing happens in the per-area layouts (admin / portal),
+  // which already query the user's profile — keeping that off this hot
+  // path avoids an extra DB roundtrip per request.
+  if (!user && isProtectedRoute && !isAuthInfra) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('next', pathname);

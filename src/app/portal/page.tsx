@@ -1,0 +1,443 @@
+import {
+  ArrowRight,
+  Briefcase,
+  Calendar,
+  ClipboardList,
+  Clock,
+  Hammer,
+  Home,
+  MapPin,
+  Sparkles,
+} from 'lucide-react';
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { getCurrentUser } from '@/lib/auth/current-user';
+import { cn, formatDate, formatTime, initialsFrom } from '@/lib/utils';
+import {
+  getClientActiveProjects,
+  getClientDashboardStats,
+  getClientUpcomingAppointments,
+  getMyClientProfile,
+  type ClientProfile,
+  type ClientProjectRow,
+  type UpcomingAppointmentRow,
+} from './queries';
+
+export default async function PortalDashboardPage() {
+  // Layout already gates by role, but we re-fetch the user here to read
+  // their `clientId` — the layout's user object isn't passed down.
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'client' || !user.clientId) redirect('/');
+
+  const clientId = user.clientId;
+  const [profile, stats, upcoming, activeProjects] = await Promise.all([
+    getMyClientProfile(clientId),
+    getClientDashboardStats(clientId),
+    getClientUpcomingAppointments(clientId, 3),
+    getClientActiveProjects(clientId),
+  ]);
+
+  const firstName = pickFirstName(user.fullName, profile?.name);
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  return (
+    <div className="space-y-10">
+      <Welcome firstName={firstName} today={today} />
+
+      <StatCards
+        activeProjects={stats.activeProjects}
+        pendingDecisions={stats.pendingDecisions}
+        upcomingAppointments={stats.upcomingAppointments}
+        nextAppointment={upcoming[0] ?? null}
+      />
+
+      <ActiveProjectsSection projects={activeProjects} />
+
+      <UpcomingVisitsSection appointments={upcoming} />
+
+      {profile && <ProjectManagerCard profile={profile} />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Welcome
+// ---------------------------------------------------------------------------
+
+function Welcome({ firstName, today }: { firstName: string; today: string }) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 className="font-display text-brand-teal-500 text-3xl tracking-tight">
+          Welcome back, {firstName}
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">Your home is in good hands.</p>
+      </div>
+      <p className="text-xs tracking-wider text-gray-400 uppercase">{today}</p>
+    </header>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stat cards
+// ---------------------------------------------------------------------------
+
+interface StatCardsProps {
+  activeProjects: number;
+  pendingDecisions: number;
+  upcomingAppointments: number;
+  nextAppointment: UpcomingAppointmentRow | null;
+}
+
+function StatCards({
+  activeProjects,
+  pendingDecisions,
+  upcomingAppointments,
+  nextAppointment,
+}: StatCardsProps) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <StatCard
+        href="/portal/projects"
+        icon={<Briefcase size={16} strokeWidth={1.5} />}
+        value={activeProjects}
+        label={activeProjects === 1 ? 'Active project' : 'Active projects'}
+        hint={activeProjects === 0 ? 'Nothing in flight' : 'See progress'}
+      />
+      <StatCard
+        href="/portal/projects"
+        icon={<ClipboardList size={16} strokeWidth={1.5} />}
+        value={pendingDecisions}
+        label={pendingDecisions === 1 ? 'Decision needs your input' : 'Decisions need your input'}
+        hint={pendingDecisions === 0 ? 'All caught up' : 'Review now'}
+        // Gold tint when there's something to do — drawing the eye matters
+        // here because pending decisions are the only thing the client
+        // *must* act on; everything else is informational.
+        accent={pendingDecisions > 0 ? 'gold' : 'default'}
+      />
+      <StatCard
+        href={upcomingAppointments > 0 ? '/portal/projects' : undefined}
+        icon={<Calendar size={16} strokeWidth={1.5} />}
+        value={upcomingAppointments}
+        label={upcomingAppointments === 1 ? 'Upcoming visit' : 'Upcoming visits'}
+        hint={
+          nextAppointment
+            ? `Next: ${formatDate(nextAppointment.date)}`
+            : 'No visits scheduled'
+        }
+      />
+    </div>
+  );
+}
+
+interface StatCardProps {
+  href?: string;
+  icon: React.ReactNode;
+  value: number;
+  label: string;
+  hint: string;
+  accent?: 'default' | 'gold';
+}
+
+function StatCard({ href, icon, value, label, hint, accent = 'default' }: StatCardProps) {
+  const inner = (
+    <div
+      className={cn(
+        'shadow-card group flex h-full flex-col rounded-2xl bg-white p-6 transition-all',
+        href && 'hover:shadow-elevated',
+        accent === 'gold' && 'ring-brand-gold-200 ring-1',
+      )}
+    >
+      <div
+        className={cn(
+          'mb-4 inline-flex h-8 w-8 items-center justify-center rounded-lg',
+          accent === 'gold'
+            ? 'bg-brand-gold-50 text-brand-gold-500'
+            : 'bg-brand-warm-200 text-brand-teal-500',
+        )}
+      >
+        {icon}
+      </div>
+      <div className="text-3xl font-light tracking-tight text-gray-900">{value}</div>
+      <div className="mt-1 text-sm font-medium text-gray-700">{label}</div>
+      <div
+        className={cn(
+          'mt-3 inline-flex items-center gap-1 text-xs',
+          accent === 'gold' ? 'text-brand-gold-500 font-medium' : 'text-gray-400',
+        )}
+      >
+        {hint}
+        {href && (
+          <ArrowRight
+            size={11}
+            strokeWidth={2}
+            className="-translate-x-0.5 transition-transform group-hover:translate-x-0"
+          />
+        )}
+      </div>
+    </div>
+  );
+
+  return href ? (
+    <Link href={href} className="block">
+      {inner}
+    </Link>
+  ) : (
+    inner
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Active projects
+// ---------------------------------------------------------------------------
+
+function ActiveProjectsSection({ projects }: { projects: ClientProjectRow[] }) {
+  return (
+    <section>
+      <SectionHeader title="Your projects" />
+      {projects.length === 0 ? (
+        <EmptyCard icon={<Sparkles size={20} strokeWidth={1.25} />}>
+          No active projects. Anything we&apos;re scheduling will show up here.
+        </EmptyCard>
+      ) : (
+        <div className="space-y-3">
+          {projects.map((p) => (
+            <ProjectRow key={p.id} project={p} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ProjectRow({ project }: { project: ClientProjectRow }) {
+  const Icon = project.type === 'remodel' ? Hammer : Briefcase;
+  const subtitleParts: string[] = [project.propertyName];
+  if (project.endDate) subtitleParts.push(`Est. ${formatDate(project.endDate)}`);
+
+  return (
+    <Link
+      href={`/portal/projects/${project.id}`}
+      className="shadow-card hover:shadow-elevated group flex items-center gap-5 rounded-2xl bg-white p-5 transition-all"
+    >
+      <div className="bg-brand-teal-50 text-brand-teal-500 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl">
+        <Icon size={18} strokeWidth={1.5} />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-3">
+          <h3 className="truncate text-base font-semibold text-gray-900">{project.name}</h3>
+          <span className="flex-shrink-0 text-xs font-medium tabular-nums text-gray-500">
+            {project.progress}%
+          </span>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
+          <div
+            className="bg-brand-teal-500 h-full rounded-full transition-all duration-300"
+            style={{ width: `${project.progress}%` }}
+          />
+        </div>
+        <p className="mt-2 text-xs text-gray-500">{subtitleParts.join(' · ')}</p>
+      </div>
+
+      <ArrowRight
+        size={14}
+        strokeWidth={1.5}
+        className="text-gray-400 transition-transform group-hover:translate-x-0.5"
+      />
+    </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Upcoming visits
+// ---------------------------------------------------------------------------
+
+function UpcomingVisitsSection({ appointments }: { appointments: UpcomingAppointmentRow[] }) {
+  return (
+    <section>
+      <SectionHeader title="Upcoming visits" />
+      {appointments.length === 0 ? (
+        <EmptyCard icon={<Calendar size={20} strokeWidth={1.25} />}>
+          No visits scheduled. Your project manager will add appointments as needed.
+        </EmptyCard>
+      ) : (
+        <div className="shadow-card overflow-hidden rounded-2xl bg-white">
+          {appointments.map((appt, i) => (
+            <AppointmentRow key={appt.id} appointment={appt} isLast={i === appointments.length - 1} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AppointmentRow({
+  appointment,
+  isLast,
+}: {
+  appointment: UpcomingAppointmentRow;
+  isLast: boolean;
+}) {
+  const { weekday, day } = dateParts(appointment.date);
+
+  return (
+    <div
+      className={cn(
+        'flex items-start gap-5 px-5 py-4',
+        !isLast && 'border-b border-gray-50',
+      )}
+    >
+      <div className="bg-brand-teal-50 text-brand-teal-500 flex h-12 w-12 flex-shrink-0 flex-col items-center justify-center rounded-xl text-center">
+        <span className="text-[10px] font-semibold tracking-wider uppercase">{weekday}</span>
+        <span className="text-base font-light">{day}</span>
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <h4 className="truncate text-sm font-semibold text-gray-900">{appointment.title}</h4>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+          {appointment.startTime && (
+            <span className="inline-flex items-center gap-1">
+              <Clock size={11} strokeWidth={1.5} />
+              {formatTime(appointment.startTime)}
+              {appointment.endTime && ` – ${formatTime(appointment.endTime)}`}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1">
+            <MapPin size={11} strokeWidth={1.5} />
+            {appointment.propertyName}
+          </span>
+          {appointment.projectName && (
+            <span className="inline-flex items-center gap-1">
+              <Briefcase size={11} strokeWidth={1.5} />
+              {appointment.projectName}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Project manager
+// ---------------------------------------------------------------------------
+
+function ProjectManagerCard({ profile }: { profile: ClientProfile }) {
+  if (!profile.assignedPmName) return null;
+  const initials = initialsFrom(profile.assignedPmName);
+
+  return (
+    <section>
+      <SectionHeader title="Your project manager" muted />
+      <div className="shadow-card flex items-center gap-4 rounded-2xl bg-white p-5">
+        <span className="bg-brand-teal-500 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white">
+          {initials || 'PM'}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h4 className="truncate text-sm font-semibold text-gray-900">
+            {profile.assignedPmName}
+          </h4>
+          <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-gray-500">
+            {profile.assignedPmEmail && (
+              <a
+                href={`mailto:${profile.assignedPmEmail}`}
+                className="hover:text-brand-teal-500 transition-colors"
+              >
+                {profile.assignedPmEmail}
+              </a>
+            )}
+            {profile.assignedPmPhone && (
+              <a
+                href={`tel:${profile.assignedPmPhone}`}
+                className="hover:text-brand-teal-500 transition-colors"
+              >
+                {profile.assignedPmPhone}
+              </a>
+            )}
+          </div>
+          <p className="mt-1 text-[11px] text-gray-400">Available Mon–Fri, 8 AM – 5 PM</p>
+        </div>
+        <Home size={16} strokeWidth={1.25} className="hidden text-gray-300 sm:block" />
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shared bits
+// ---------------------------------------------------------------------------
+
+function SectionHeader({ title, muted = false }: { title: string; muted?: boolean }) {
+  return (
+    <h2
+      className={cn(
+        'mb-3 text-[11px] font-semibold tracking-wider uppercase',
+        muted ? 'text-gray-400' : 'text-gray-500',
+      )}
+    >
+      {title}
+    </h2>
+  );
+}
+
+function EmptyCard({
+  icon,
+  children,
+}: {
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="shadow-card flex items-center gap-3 rounded-2xl bg-white px-5 py-4 text-sm text-gray-500">
+      <span className="bg-brand-warm-200 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-gray-400">
+        {icon}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Pick a friendly first name to greet the client. Prefers the profile's
+ * `full_name` (set by David at invite time), falling back to splitting the
+ * client record's name on whitespace. For "James and Sarah Anderson" this
+ * lands on "James" — we'd rather have a slightly imperfect greeting than
+ * write the household-formatting logic.
+ */
+function pickFirstName(fullName: string | null, clientName: string | undefined): string {
+  const source = (fullName || clientName || '').trim();
+  if (!source) return 'there';
+  return source.split(/\s+/)[0] ?? 'there';
+}
+
+/**
+ * Same parse-as-local-date trick used elsewhere — `new Date(iso)` reads
+ * "YYYY-MM-DD" as UTC midnight, which can shift the weekday backward in
+ * West Coast timezones. We split manually to keep the date row honest.
+ */
+function dateParts(iso: string): { weekday: string; day: string } {
+  const [yStr, mStr, dStr] = iso.split('-');
+  const y = Number.parseInt(yStr, 10);
+  const m = Number.parseInt(mStr, 10);
+  const d = Number.parseInt(dStr, 10);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
+    return { weekday: '—', day: '—' };
+  }
+  const localDate = new Date(y, m - 1, d);
+  return {
+    weekday: localDate
+      .toLocaleDateString('en-US', { weekday: 'short' })
+      .toUpperCase(),
+    day: d.toString(),
+  };
+}

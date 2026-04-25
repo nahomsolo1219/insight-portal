@@ -65,6 +65,17 @@ Invoices are admin-uploaded PDFs with fields, NOT synced from QuickBooks.
 Milestones with status 'awaiting-client' are "Decisions" (aggregated in their own page).
 See `src/lib/types.ts` for complete interfaces.
 
+## Client portal
+
+- Route group: `src/app/portal/` — separate from admin.
+- Layout: horizontal top nav (`src/components/portal/PortalNav.tsx`), narrower 900px content column. Designed to read like a concierge experience, not a software dashboard.
+- Auth: same Supabase Auth. **No role cookie.** Each layout calls `getCurrentUser()` and redirects on role mismatch — admin layout sends non-admins to `/`, portal layout sends non-clients to `/`. The root `/` page dispatches per role (admin → /admin, client → /portal, field_staff → /login for now).
+- Middleware (`src/lib/supabase/middleware.ts`) only handles auth gating: unauthenticated requests to `/admin/*` or `/portal/*` get redirected to `/login?next=…`. Role-based routing happens in the layouts to avoid an extra DB roundtrip on every request.
+- Queries in `src/app/portal/queries.ts` — every query takes `clientId` and filters explicitly even though RLS already enforces it.
+- Auth callback (`src/app/auth/callback/route.ts`) defaults `next=/`; the root page picks the right per-role destination.
+- Clients see: dashboard, projects (timeline), documents, invoices.
+- Clients do NOT see: admin pages, pending photos, internal milestones, staff/vendor/template/settings.
+
 ## Template builder (phase-based)
 
 - Templates can be phase-based (`project_templates.uses_phases = true`) or legacy flat. Both shapes coexist; `getTemplateWithPhases` in `src/app/admin/templates/queries.ts` branches on the flag.
