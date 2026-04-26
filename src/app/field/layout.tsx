@@ -17,7 +17,7 @@ export default async function FieldLayout({ children }: { children: React.ReactN
   if (user.role === 'client') redirect('/portal');
   if (user.role !== 'field_staff' && user.role !== 'admin') redirect('/');
 
-  const displayName = user.fullName || user.email;
+  const displayName = user.fullName || user.email || 'Field Staff';
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50 text-gray-900">

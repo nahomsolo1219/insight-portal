@@ -38,7 +38,7 @@ export default async function FieldUploadPage({ searchParams }: PageProps) {
   ]);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5 px-4 py-5">
+    <div className="mx-auto max-w-2xl space-y-5 px-4 pt-5 pb-24">
       <Link
         href="/field"
         className="hover:text-brand-teal-500 inline-flex items-center gap-1 text-sm text-gray-500 transition-colors"
