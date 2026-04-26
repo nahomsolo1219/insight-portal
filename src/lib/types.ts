@@ -163,7 +163,6 @@ export interface Vendor {
   phone: string;
   email: string;
   active: boolean;
-  rating: number; // 1-5
   jobsCompleted: number;
   notes?: string;
 }

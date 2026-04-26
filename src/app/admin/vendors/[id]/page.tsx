@@ -1,11 +1,4 @@
-import {
-  Briefcase,
-  ChevronLeft,
-  ClipboardList,
-  Mail,
-  Phone,
-  Star,
-} from 'lucide-react';
+import { Briefcase, ChevronLeft, ClipboardList, Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth/current-user';
@@ -95,7 +88,7 @@ export default async function VendorDetailPage({ params }: PageProps) {
         <VendorEditButton vendor={vendor} />
       </div>
 
-      <div className="mb-8 grid grid-cols-3 gap-5">
+      <div className="mb-8 grid grid-cols-2 gap-5">
         <StatCard
           label="Jobs completed"
           value={vendor.jobsCompleted.toString()}
@@ -107,11 +100,6 @@ export default async function VendorDetailPage({ params }: PageProps) {
           tone={expiringInfo.flag}
           hint={expiringInfo.hint}
           icon={<ClipboardList size={16} strokeWidth={1.5} />}
-        />
-        <StatCard
-          label="Rating"
-          value={vendor.rating > 0 ? `${vendor.rating.toFixed(1)} / 5` : 'Unrated'}
-          icon={<Star size={16} strokeWidth={1.5} />}
         />
       </div>
 

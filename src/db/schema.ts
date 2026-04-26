@@ -184,7 +184,6 @@ export const vendors = pgTable('vendors', {
   phone: text('phone'),
   email: text('email'),
   active: boolean('active').notNull().default(true),
-  rating: integer('rating').notNull().default(0),
   jobsCompleted: integer('jobs_completed').notNull().default(0),
   notes: text('notes'),
   ...timestamps,

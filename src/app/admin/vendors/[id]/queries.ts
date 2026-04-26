@@ -30,7 +30,6 @@ export interface VendorDetailRow {
   phone: string | null;
   email: string | null;
   active: boolean;
-  rating: number;
   jobsCompleted: number;
   notes: string | null;
 }
@@ -67,7 +66,6 @@ export async function getVendorDetail(vendorId: string): Promise<VendorDetailRow
       phone: vendors.phone,
       email: vendors.email,
       active: vendors.active,
-      rating: vendors.rating,
       jobsCompleted: vendors.jobsCompleted,
       notes: vendors.notes,
     })

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight, Plus, Power, Search, Star, Users } from 'lucide-react';
+import { ChevronRight, Plus, Power, Search, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
@@ -108,7 +108,6 @@ function VendorTable({ vendors }: { vendors: VendorRow[] }) {
               <Th>Name</Th>
               <Th>Category</Th>
               <Th>Contact</Th>
-              <Th>Rating</Th>
               <Th align="right">Jobs</Th>
               <Th>Status</Th>
               <Th align="right">Actions</Th>
@@ -177,9 +176,6 @@ function VendorTableRow({ vendor }: { vendor: VendorRow }) {
         {vendor.phone && <div className="text-xs text-gray-500">{vendor.phone}</div>}
         {!vendor.email && !vendor.phone && <span className="text-xs text-gray-300">—</span>}
       </td>
-      <td className="px-4 py-4 text-sm">
-        <RatingDisplay rating={vendor.rating} muted={!vendor.active} />
-      </td>
       <td className="px-4 py-4 text-right text-sm tabular-nums">{vendor.jobsCompleted}</td>
       <td className="px-4 py-4">
         <span
@@ -204,25 +200,6 @@ function VendorTableRow({ vendor }: { vendor: VendorRow }) {
         </div>
       </td>
     </tr>
-  );
-}
-
-function RatingDisplay({ rating, muted }: { rating: number; muted: boolean }) {
-  if (rating <= 0) {
-    return <span className="text-xs text-gray-300">Unrated</span>;
-  }
-  return (
-    <span className="inline-flex items-center gap-1">
-      <Star
-        size={12}
-        strokeWidth={1.5}
-        className={muted ? 'text-gray-300' : 'fill-amber-300 text-amber-400'}
-      />
-      <span className={cn('tabular-nums', muted ? 'text-gray-400' : 'text-gray-700')}>
-        {rating.toFixed(1)}
-      </span>
-      <span className="text-xs text-gray-400">/ 5</span>
-    </span>
   );
 }
 

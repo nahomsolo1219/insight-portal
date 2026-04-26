@@ -114,7 +114,6 @@ async function seed() {
       phone: '(415) 555-0200',
       email: 'service@bayair.com',
       active: true,
-      rating: 5,
       jobsCompleted: 12,
     })
     .returning();
@@ -127,7 +126,6 @@ async function seed() {
       phone: '(415) 555-0201',
       email: 'dispatch@sfplumbing.com',
       active: true,
-      rating: 4,
       jobsCompleted: 8,
     })
     .returning();
@@ -140,7 +138,6 @@ async function seed() {
       phone: '(415) 555-0202',
       email: 'jobs@bayelectric.com',
       active: true,
-      rating: 5,
       jobsCompleted: 6,
     })
     .returning();

@@ -20,8 +20,8 @@ export interface VendorInput {
 }
 
 /**
- * Create a vendor. Rating + jobsCompleted start at zero — both are
- * manually curated by David over time.
+ * Create a vendor. jobsCompleted starts at zero and ticks up as
+ * appointments are recorded.
  */
 export async function createVendor(
   input: VendorInput,
@@ -41,7 +41,6 @@ export async function createVendor(
         email: input.email?.trim() || null,
         notes: input.notes?.trim() || null,
         active: true,
-        rating: 0,
         jobsCompleted: 0,
       })
       .returning({ id: vendors.id, name: vendors.name });

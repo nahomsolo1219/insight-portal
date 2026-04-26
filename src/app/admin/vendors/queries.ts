@@ -11,7 +11,6 @@ export interface VendorRow {
   phone: string | null;
   email: string | null;
   active: boolean;
-  rating: number;
   jobsCompleted: number;
   notes: string | null;
 }
@@ -25,7 +24,6 @@ export async function listVendors(): Promise<VendorRow[]> {
       phone: vendors.phone,
       email: vendors.email,
       active: vendors.active,
-      rating: vendors.rating,
       jobsCompleted: vendors.jobsCompleted,
       notes: vendors.notes,
     })
