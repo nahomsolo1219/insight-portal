@@ -6,13 +6,29 @@ import {
   Home,
   LayoutDashboard,
   LogOut,
+  Pencil,
   Receipt,
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState, type ComponentType } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, useTransition, type ComponentType } from 'react';
+import { Field, inputClass } from '@/components/admin/Field';
+import { LoadingDots } from '@/components/admin/LoadingDots';
+import { Modal } from '@/components/admin/Modal';
+import { useToast } from '@/components/admin/ToastProvider';
+import { updateMyProfile } from '@/app/portal/actions';
 import type { CurrentUser } from '@/lib/auth/current-user';
 import { cn, initialsFrom } from '@/lib/utils';
+
+/** Snapshot of the client record passed in by the layout. Drives the user
+ *  chip's avatar + the Edit profile modal's initial values. */
+export interface PortalNavClient {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
+}
 
 interface NavLink {
   href: string;
@@ -36,6 +52,8 @@ const NAV_LINKS: readonly NavLink[] = [
 
 interface Props {
   user: CurrentUser;
+  /** May be null if the layout failed to find the linked client row. */
+  client: PortalNavClient | null;
 }
 
 /**
@@ -50,13 +68,13 @@ interface Props {
  * Both surfaces share `NAV_LINKS` and `useActiveHref` so adding a new
  * portal page is a one-place edit.
  */
-export function PortalNav({ user }: Props) {
+export function PortalNav({ user, client }: Props) {
   const pathname = usePathname();
   const isActive = useActiveHref(pathname);
 
   return (
     <>
-      <TopBar user={user} isActive={isActive} />
+      <TopBar user={user} client={client} isActive={isActive} />
       <BottomTabs isActive={isActive} />
     </>
   );
@@ -82,9 +100,11 @@ function useActiveHref(pathname: string) {
 
 function TopBar({
   user,
+  client,
   isActive,
 }: {
   user: CurrentUser;
+  client: PortalNavClient | null;
   isActive: (link: NavLink) => boolean;
 }) {
   return (
@@ -126,7 +146,7 @@ function TopBar({
           })}
         </nav>
 
-        <UserMenu user={user} />
+        <UserMenu user={user} client={client} />
       </div>
     </header>
   );
@@ -136,8 +156,15 @@ function TopBar({
 // User menu (top-right)
 // ---------------------------------------------------------------------------
 
-function UserMenu({ user }: { user: CurrentUser }) {
+function UserMenu({
+  user,
+  client,
+}: {
+  user: CurrentUser;
+  client: PortalNavClient | null;
+}) {
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   // Click-outside / Escape close pattern. Inline because this is the only
@@ -158,8 +185,12 @@ function UserMenu({ user }: { user: CurrentUser }) {
     };
   }, [open]);
 
-  const displayName = user.fullName || user.email;
+  // Prefer the client name + avatar (the household identity) over the
+  // profile fields when both exist — this is what the household sees in
+  // their own copy of the portal.
+  const displayName = client?.name || user.fullName || user.email;
   const initials = initialsFrom(displayName);
+  const avatarUrl = client?.avatarUrl ?? null;
 
   // ml-auto keeps it pushed to the right when nav links are hidden on mobile;
   // the gap-8 on the parent handles spacing on desktop.
@@ -172,9 +203,18 @@ function UserMenu({ user }: { user: CurrentUser }) {
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <span className="bg-brand-teal-500 flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white">
-          {initials || 'U'}
-        </span>
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={avatarUrl}
+            alt={displayName}
+            className="h-8 w-8 rounded-full object-cover"
+          />
+        ) : (
+          <span className="bg-brand-teal-500 flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white">
+            {initials || 'U'}
+          </span>
+        )}
         <span className="hidden text-left sm:block">
           <span className="block text-xs font-medium text-gray-900">{displayName}</span>
           <span className="block text-[10px] text-gray-500">Member</span>
@@ -185,8 +225,21 @@ function UserMenu({ user }: { user: CurrentUser }) {
       {open && (
         <div
           role="menu"
-          className="shadow-elevated absolute right-0 mt-2 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white py-1"
+          className="shadow-elevated absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-gray-100 bg-white py-1"
         >
+          {client && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                setEditOpen(true);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              <Pencil size={14} strokeWidth={1.5} className="text-gray-400" />
+              Edit profile
+            </button>
+          )}
           <form action="/logout" method="POST">
             <button
               type="submit"
@@ -198,7 +251,119 @@ function UserMenu({ user }: { user: CurrentUser }) {
           </form>
         </div>
       )}
+
+      {editOpen && client && (
+        <EditProfileModal client={client} onClose={() => setEditOpen(false)} />
+      )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Edit profile modal — client self-service
+// ---------------------------------------------------------------------------
+
+function EditProfileModal({
+  client,
+  onClose,
+}: {
+  client: PortalNavClient;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState(client.name);
+  const [email, setEmail] = useState(client.email ?? '');
+  const [phone, setPhone] = useState(client.phone ?? '');
+
+  function submit() {
+    setError(null);
+    if (!name.trim()) return setError('Name cannot be empty.');
+    if (!email.trim()) return setError('Email cannot be empty.');
+
+    startTransition(async () => {
+      const result = await updateMyProfile({ name, email, phone });
+      if (!result.success) {
+        setError(result.error);
+        showToast(result.error, 'error');
+        return;
+      }
+      showToast('Profile updated');
+      onClose();
+      router.refresh();
+    });
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Edit profile"
+      size="md"
+      locked={isPending}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isPending}
+            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={isPending}
+            className="bg-brand-teal-500 hover:bg-brand-teal-600 shadow-soft rounded-xl px-5 py-2.5 font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isPending ? (
+              <>
+                Saving
+                <LoadingDots />
+              </>
+            ) : (
+              'Save changes'
+            )}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Field label="Name" required hint="The household name shown on your invoices and reports.">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Email" required>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Phone" hint="Optional.">
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className={inputClass}
+          />
+        </Field>
+
+        {error && (
+          <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
 

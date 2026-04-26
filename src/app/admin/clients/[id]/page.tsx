@@ -4,15 +4,17 @@ import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { formatCurrency, formatDate, initialsFrom } from '@/lib/utils';
 import { AppointmentsTab } from './AppointmentsTab';
+import { ClientAvatarUploader } from './ClientAvatarUploader';
 import { ClientDetailTabs } from './ClientDetailTabs';
 import { DocumentsTab } from './DocumentsTab';
+import { InviteToPortalButton } from './InviteToPortalButton';
 import { InvoicesTab } from './InvoicesTab';
 import { PhotosTab } from './PhotosTab';
 import { ProfileTab } from './ProfileTab';
 import { ProjectsTab } from './ProjectsTab';
 import { PropertiesTab } from './PropertiesTab';
 import { ReportsTab } from './ReportsTab';
-import { getClientDetail } from './queries';
+import { getClientDetail, getClientPortalStatus } from './queries';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -23,7 +25,10 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
   await requireAdmin();
   const [{ id }, { property: propertyParam }] = await Promise.all([params, searchParams]);
 
-  const data = await getClientDetail(id);
+  const [data, portalStatus] = await Promise.all([
+    getClientDetail(id),
+    getClientPortalStatus(id),
+  ]);
   if (!data) notFound();
 
   const { client, properties, stats } = data;
@@ -88,9 +93,11 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
       </Link>
 
       <div className="mb-8 flex items-start gap-5">
-        <div className="bg-brand-teal-500 flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full text-base font-semibold text-white">
-          {initialsFrom(client.name)}
-        </div>
+        <ClientAvatarUploader
+          clientId={client.id}
+          initials={initialsFrom(client.name)}
+          currentUrl={client.avatarUrl}
+        />
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-3">
             <h1 className="font-display text-brand-teal-500 text-3xl">{client.name}</h1>
@@ -104,6 +111,12 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
                 Inactive
               </span>
             )}
+            <InviteToPortalButton
+              clientId={client.id}
+              clientName={client.name}
+              defaultEmail={client.email}
+              status={portalStatus}
+            />
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
             {client.email && <span>{client.email}</span>}

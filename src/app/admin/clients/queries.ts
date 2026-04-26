@@ -6,6 +6,7 @@
 import { and, count, eq, inArray, sql, sum } from 'drizzle-orm';
 import { db } from '@/db';
 import { clients, invoices, membershipTiers, projects, properties, staff } from '@/db/schema';
+import { getSignedUrls } from '@/lib/storage/upload';
 
 export interface ClientRow {
   id: string;
@@ -21,6 +22,8 @@ export interface ClientRow {
   assignedPmName: string | null;
   /** First property's address, for the list-row subtitle. */
   primaryAddress: string | null;
+  /** Signed URL for the client's avatar, or null when no avatar uploaded. */
+  avatarUrl: string | null;
 }
 
 export async function listClients(): Promise<ClientRow[]> {
@@ -35,6 +38,7 @@ export async function listClients(): Promise<ClientRow[]> {
       memberSince: clients.memberSince,
       tierName: membershipTiers.name,
       assignedPmName: staff.name,
+      avatarStoragePath: clients.avatarStoragePath,
     })
     .from(clients)
     .leftJoin(membershipTiers, eq(membershipTiers.id, clients.membershipTierId))
@@ -90,12 +94,27 @@ export async function listClients(): Promise<ClientRow[]> {
 
   const balanceMap = new Map(balanceAggregates.map((b) => [b.clientId, b.balanceCents ?? 0]));
 
+  // Sign every avatar in one batch — saves a round-trip per row.
+  const avatarPaths = rows
+    .map((r) => r.avatarStoragePath)
+    .filter((p): p is string => Boolean(p));
+  const avatarUrls =
+    avatarPaths.length > 0 ? await getSignedUrls(avatarPaths) : new Map<string, string>();
+
   return rows.map((r) => ({
-    ...r,
+    id: r.id,
+    name: r.name,
+    status: r.status,
+    email: r.email,
+    phone: r.phone,
+    memberSince: r.memberSince,
+    tierName: r.tierName,
+    assignedPmName: r.assignedPmName,
     propertyCount: propertyMap.get(r.id)?.count ?? 0,
     primaryAddress: propertyMap.get(r.id)?.firstAddress ?? null,
     activeProjectCount: projectMap.get(r.id) ?? 0,
     balanceCents: balanceMap.get(r.id) ?? 0,
+    avatarUrl: r.avatarStoragePath ? avatarUrls.get(r.avatarStoragePath) ?? null : null,
   }));
 }
 

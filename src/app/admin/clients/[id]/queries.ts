@@ -12,6 +12,7 @@ import {
   membershipTiers,
   milestones,
   photos,
+  profiles,
   projectTemplates,
   projects,
   properties,
@@ -20,6 +21,7 @@ import {
   templatePhases,
   vendors,
 } from '@/db/schema';
+import { getSignedUrl } from '@/lib/storage/upload';
 
 export interface ClientDetailRow {
   id: string;
@@ -32,6 +34,10 @@ export interface ClientDetailRow {
   tierId: string | null;
   assignedPmName: string | null;
   assignedPmId: string | null;
+  /** Raw storage path persisted on the row — caller signs to render. */
+  avatarStoragePath: string | null;
+  /** Signed URL ready for `<img src>`; null when no avatar uploaded. */
+  avatarUrl: string | null;
 }
 
 export interface PropertyRow {
@@ -92,7 +98,7 @@ export interface ClientDetailPayload {
  * can route to a 404 via `notFound()`.
  */
 export async function getClientDetail(clientId: string): Promise<ClientDetailPayload | null> {
-  const [client] = await db
+  const [clientRow] = await db
     .select({
       id: clients.id,
       name: clients.name,
@@ -104,6 +110,7 @@ export async function getClientDetail(clientId: string): Promise<ClientDetailPay
       tierId: membershipTiers.id,
       assignedPmName: staff.name,
       assignedPmId: staff.id,
+      avatarStoragePath: clients.avatarStoragePath,
     })
     .from(clients)
     .leftJoin(membershipTiers, eq(membershipTiers.id, clients.membershipTierId))
@@ -111,7 +118,15 @@ export async function getClientDetail(clientId: string): Promise<ClientDetailPay
     .where(eq(clients.id, clientId))
     .limit(1);
 
-  if (!client) return null;
+  if (!clientRow) return null;
+
+  // Sign the avatar at read time. Skipping when there's no path lets us
+  // fall through to the initials fallback in the UI without a wasted
+  // round-trip to Supabase storage.
+  const avatarUrl = clientRow.avatarStoragePath
+    ? await getSignedUrl(clientRow.avatarStoragePath)
+    : null;
+  const client: ClientDetailRow = { ...clientRow, avatarUrl };
 
   const clientProperties = await db
     .select({
@@ -839,4 +854,37 @@ export async function getClientPropertiesDetailed(
       projectCount: list.length,
     };
   });
+}
+
+// ---------- Portal invite status ----------
+
+export type ClientPortalStatus =
+  | { status: 'not_invited' }
+  | { status: 'invited'; email: string; invitedAt: Date };
+
+/**
+ * Has this client been invited to the portal yet, and if so when? We
+ * detect by looking for a `profiles` row with role=client linked to the
+ * client. We deliberately don't try to detect "active vs pending" via
+ * `last_sign_in_at` — that lives in the auth schema and querying it
+ * from Drizzle is awkward. Treat any linked profile as "invited" and
+ * surface a Resend action for both states.
+ */
+export async function getClientPortalStatus(clientId: string): Promise<ClientPortalStatus> {
+  const [row] = await db
+    .select({
+      id: profiles.id,
+      email: profiles.email,
+      createdAt: profiles.createdAt,
+    })
+    .from(profiles)
+    .where(and(eq(profiles.role, 'client'), eq(profiles.clientId, clientId)))
+    .limit(1);
+
+  if (!row) return { status: 'not_invited' };
+  return {
+    status: 'invited',
+    email: row.email,
+    invitedAt: row.createdAt,
+  };
 }

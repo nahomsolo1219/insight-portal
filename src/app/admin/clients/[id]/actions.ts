@@ -14,6 +14,9 @@ import {
 } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { avatarPath } from '@/lib/storage/paths';
+import { getSignedUrl, uploadFile } from '@/lib/storage/upload';
+import { getExtension, validateFile } from '@/lib/storage/validation';
 
 type ActionResult<T = undefined> =
   | { success: true; data?: T }
@@ -563,4 +566,73 @@ async function applyTemplateToProject(projectId: string, templateId: string) {
       order: tm.order,
     })),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Avatar upload
+// ---------------------------------------------------------------------------
+
+interface UploadAvatarSuccess {
+  success: true;
+  /** Fresh signed URL the caller can render immediately. */
+  url: string;
+}
+type UploadAvatarResult = UploadAvatarSuccess | { success: false; error: string };
+
+const AVATAR_MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+
+/**
+ * Upload (or replace) a client's avatar. Path layout matches the existing
+ * client storage RLS so the portal can sign + render without any new
+ * grants. We use `upsert: true` because the path is deterministic per
+ * client — re-uploading should overwrite, not stack.
+ *
+ * Returns a fresh signed URL so the caller can swap in the new image
+ * without an extra fetch round-trip.
+ */
+export async function uploadClientAvatar(
+  clientId: string,
+  formData: FormData,
+): Promise<UploadAvatarResult> {
+  const user = await requireAdmin();
+
+  const file = formData.get('avatar');
+  if (!(file instanceof File) || file.size === 0) {
+    return { success: false, error: 'No image selected.' };
+  }
+
+  const validation = validateFile(file, 'image', AVATAR_MAX_SIZE);
+  if (!validation.ok) return { success: false, error: validation.error };
+
+  const ext = getExtension(file.name) || 'jpg';
+  const path = avatarPath('client', clientId, ext);
+
+  const result = await uploadFile({
+    path,
+    file,
+    contentType: file.type || 'image/jpeg',
+    upsert: true,
+  });
+  if ('error' in result) return { success: false, error: result.error };
+
+  await db
+    .update(clients)
+    .set({ avatarStoragePath: result.path, updatedAt: new Date() })
+    .where(eq(clients.id, clientId));
+
+  await logAudit({
+    actor: user,
+    action: 'updated client',
+    targetType: 'client',
+    targetId: clientId,
+    targetLabel: 'avatar',
+    clientId,
+    metadata: { field: 'avatar' },
+  });
+
+  const signedUrl = await getSignedUrl(result.path);
+
+  revalidatePath(`/admin/clients/${clientId}`);
+  revalidatePath('/admin/clients');
+  return { success: true, url: signedUrl ?? '' };
 }

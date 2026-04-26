@@ -133,6 +133,11 @@ export const clients = pgTable('clients', {
   }),
   memberSince: date('member_since'),
   status: text('status').notNull().default('active'),
+  /** Storage path (not a URL) — sign at read time to render. The client
+   *  represents the household, so the avatar belongs on the client row
+   *  rather than on a single profile. Profile avatars (admin / staff)
+   *  live on `profiles.avatarUrl` (legacy column name; also a path). */
+  avatarStoragePath: text('avatar_storage_path'),
   ...timestamps,
 });
 

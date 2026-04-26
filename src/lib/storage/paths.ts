@@ -42,6 +42,33 @@ export function reportPath(clientId: string, reportId: string): string {
 }
 
 /**
+ * Avatar paths. Two layouts so the existing storage RLS picks up
+ * client-readable images without any policy changes:
+ *
+ * - **Client avatars**: `avatars/{clientId}/avatar.{ext}` — segment 2 is
+ *   the clientId, which matches the "Clients read own files" policy
+ *   (`(storage.foldername(name))[2] = current_user_client_id()::text`).
+ *   So a client viewing the portal can fetch their own avatar via a
+ *   signed URL with no extra grant.
+ * - **Profile avatars** (admin / staff): `avatars/profile/{userId}.{ext}`
+ *   — segment 2 is the literal `profile`, which doesn't match any
+ *   client. Admin policy covers admin reads; clients can't see these.
+ *
+ * Same path is used for upload + read. Re-uploading replaces (upsert).
+ */
+export function avatarPath(
+  entityType: 'profile' | 'client',
+  entityId: string,
+  ext: string,
+): string {
+  const safeExt = sanitizeExt(ext) || 'jpg';
+  if (entityType === 'client') {
+    return `avatars/${entityId}/avatar.${safeExt}`;
+  }
+  return `avatars/profile/${entityId}.${safeExt}`;
+}
+
+/**
  * Path for a vendor document (insurance certificate, W-9, license, etc.).
  * Vendor docs sit in their own top-level prefix because they're admin-only
  * — clients never need to see them, and the path layout keeps them

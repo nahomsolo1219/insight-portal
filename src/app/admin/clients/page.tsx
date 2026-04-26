@@ -34,9 +34,18 @@ export default async function ClientsPage() {
               className="shadow-card hover:shadow-elevated block rounded-2xl bg-white p-5 transition-shadow duration-200"
             >
               <div className="flex items-center gap-5">
-                <div className="bg-brand-teal-500 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white">
-                  {initialsFrom(client.name)}
-                </div>
+                {client.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={client.avatarUrl}
+                    alt={client.name}
+                    className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="bg-brand-teal-500 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white">
+                    {initialsFrom(client.name)}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-3">
                     <h3 className="truncate text-base font-semibold text-gray-900">
