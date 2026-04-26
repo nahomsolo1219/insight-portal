@@ -10,6 +10,7 @@ import { InvoicesTab } from './InvoicesTab';
 import { PhotosTab } from './PhotosTab';
 import { ProfileTab } from './ProfileTab';
 import { ProjectsTab } from './ProjectsTab';
+import { PropertiesTab } from './PropertiesTab';
 import { ReportsTab } from './ReportsTab';
 import { getClientDetail } from './queries';
 
@@ -67,14 +68,14 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
       properties={properties.map((p) => ({ id: p.id, name: p.name }))}
     />
   );
-  const profileSlot = (
-    <ProfileTab
-      key={activePropertyId ?? 'no-property'}
-      clientId={id}
-      propertyId={activePropertyId}
-      client={client}
-    />
+  // Properties tab isn't scoped to a single property — it lists every one
+  // for this client and uses `activePropertyId` only to auto-expand the
+  // matching card on first render. Keyed by client id so it doesn't
+  // remount on property switches.
+  const propertiesSlot = (
+    <PropertiesTab key={id} clientId={id} activePropertyId={activePropertyId} />
   );
+  const profileSlot = <ProfileTab key={id} client={client} />;
 
   return (
     <div>
@@ -131,6 +132,7 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
         properties={properties}
         activePropertyId={activePropertyId}
         projectsSlot={projectsSlot}
+        propertiesSlot={propertiesSlot}
         documentsSlot={documentsSlot}
         reportsSlot={reportsSlot}
         appointmentsSlot={appointmentsSlot}

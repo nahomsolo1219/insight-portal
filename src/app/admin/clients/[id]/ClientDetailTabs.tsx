@@ -7,6 +7,7 @@ import {
   DollarSign,
   FileBox,
   FileText,
+  Home,
   MapPin,
   User,
 } from 'lucide-react';
@@ -18,6 +19,10 @@ import type { PropertyRow } from './queries';
 
 const TABS = [
   { id: 'projects', label: 'Projects', icon: Briefcase },
+  // Properties is the central place to manage homes for a client. Lives
+  // right after Projects because most workflow questions ("where does this
+  // appointment go?", "what's the gate code?") start at a property.
+  { id: 'properties', label: 'Properties', icon: Home },
   { id: 'appointments', label: 'Appointments', icon: Calendar },
   { id: 'photos', label: 'Photos', icon: Camera },
   { id: 'reports', label: 'Reports', icon: FileText },
@@ -38,6 +43,7 @@ interface ClientDetailTabsProps {
    * cheap client interaction that just swaps which slot we render.
    */
   projectsSlot: React.ReactNode;
+  propertiesSlot: React.ReactNode;
   documentsSlot: React.ReactNode;
   reportsSlot: React.ReactNode;
   appointmentsSlot: React.ReactNode;
@@ -51,6 +57,7 @@ export function ClientDetailTabs({
   properties,
   activePropertyId,
   projectsSlot,
+  propertiesSlot,
   documentsSlot,
   reportsSlot,
   appointmentsSlot,
@@ -141,6 +148,9 @@ export function ClientDetailTabs({
           ? projectsSlot
           : <EmptyTab message="No properties yet. Add a property first." />
       )}
+      {/* Properties tab is *not* gated on activeProperty — its whole job is
+          to show every property + the empty-state CTA when there are none. */}
+      {activeTab === 'properties' && propertiesSlot}
       {activeTab === 'documents' && (
         activeProperty
           ? documentsSlot
@@ -165,6 +175,7 @@ export function ClientDetailTabs({
       {activeTab === 'invoices' && invoicesSlot}
       {activeTab === 'profile' && profileSlot}
       {activeTab !== 'projects' &&
+        activeTab !== 'properties' &&
         activeTab !== 'documents' &&
         activeTab !== 'reports' &&
         activeTab !== 'appointments' &&

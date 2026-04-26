@@ -315,6 +315,69 @@ export async function createProperty(
   }
 }
 
+/**
+ * Delete a property and everything underneath it. The DB cascade chain
+ * walks property → projects → milestones / appointments / photos /
+ * documents / reports, so a single DELETE wipes the whole subtree.
+ *
+ * Two safeguards before the DELETE runs:
+ * 1. The property must belong to the claimed client (forged URL guard).
+ * 2. The caller must echo the property's name verbatim (case-insensitive)
+ *    to confirm — same pattern used by GitHub's repo-delete dialog. This
+ *    is the only destructive admin action with no undo, so it's worth
+ *    the extra typing.
+ */
+export async function deleteProperty(
+  propertyId: string,
+  clientId: string,
+  confirmName: string,
+): Promise<ActionResult> {
+  const user = await requireAdmin();
+
+  try {
+    const [property] = await db
+      .select({
+        id: properties.id,
+        name: properties.name,
+        clientId: properties.clientId,
+      })
+      .from(properties)
+      .where(eq(properties.id, propertyId))
+      .limit(1);
+
+    if (!property) return { success: false, error: 'Property not found' };
+    if (property.clientId !== clientId) {
+      return { success: false, error: 'Property does not belong to this client' };
+    }
+    if (
+      confirmName.trim().toLowerCase() !== property.name.trim().toLowerCase()
+    ) {
+      return {
+        success: false,
+        error: 'Property name does not match. Type the exact name to confirm.',
+      };
+    }
+
+    await db.delete(properties).where(eq(properties.id, propertyId));
+
+    await logAudit({
+      actor: user,
+      action: 'deleted property',
+      targetType: 'property',
+      targetId: property.id,
+      targetLabel: property.name,
+      clientId,
+    });
+
+    revalidatePath(`/admin/clients/${clientId}`);
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (error) {
+    console.error('[deleteProperty]', error);
+    return { success: false, error: 'Failed to delete property' };
+  }
+}
+
 export interface CreateProjectInput {
   propertyId: string;
   name: string;

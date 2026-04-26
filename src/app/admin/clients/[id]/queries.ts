@@ -749,3 +749,94 @@ export async function getTemplatesForSelect(): Promise<TemplateOption[]> {
     };
   });
 }
+
+// ---------- Properties tab — full property records + per-property projects ----------
+
+export interface PropertyProjectRow {
+  id: string;
+  name: string;
+  type: 'maintenance' | 'remodel';
+  status: 'active' | 'completed' | 'on_hold';
+  progress: number;
+}
+
+export interface PropertyDetailedRow extends PropertyRow {
+  projectCount: number;
+  /** Project names + status + progress, used by the expanded card view. */
+  projects: PropertyProjectRow[];
+}
+
+/**
+ * Full property records for the Properties tab — includes everything the
+ * edit modal needs (gate code, access notes, emergency contact) plus a
+ * lightweight project list per property so the expanded card can show
+ * "Kitchen Remodel (active, 28%)" without an extra round-trip per
+ * property.
+ *
+ * Two reads:
+ *   1) all properties for the client
+ *   2) all projects whose propertyId is in that set, in one shot
+ * Then bucket the projects by propertyId in memory.
+ */
+export async function getClientPropertiesDetailed(
+  clientId: string,
+): Promise<PropertyDetailedRow[]> {
+  const propertyRows = await db
+    .select({
+      id: properties.id,
+      name: properties.name,
+      address: properties.address,
+      city: properties.city,
+      state: properties.state,
+      zipcode: properties.zipcode,
+      sqft: properties.sqft,
+      yearBuilt: properties.yearBuilt,
+      gateCode: properties.gateCode,
+      accessNotes: properties.accessNotes,
+      emergencyContact: properties.emergencyContact,
+    })
+    .from(properties)
+    .where(eq(properties.clientId, clientId))
+    .orderBy(asc(properties.name));
+
+  if (propertyRows.length === 0) return [];
+
+  const propertyIds = propertyRows.map((p) => p.id);
+  const projectRows = await db
+    .select({
+      id: projects.id,
+      name: projects.name,
+      type: projects.type,
+      status: projects.status,
+      progress: projects.progress,
+      propertyId: projects.propertyId,
+    })
+    .from(projects)
+    .where(inArray(projects.propertyId, propertyIds))
+    // Active first; within that, newest start date. Keeps the expanded
+    // card's first line useful at a glance.
+    .orderBy(asc(projects.status), desc(projects.startDate));
+
+  const projectsByProperty = new Map<string, PropertyProjectRow[]>();
+  for (const p of projectRows) {
+    const list = projectsByProperty.get(p.propertyId);
+    const row: PropertyProjectRow = {
+      id: p.id,
+      name: p.name,
+      type: p.type,
+      status: p.status,
+      progress: p.progress,
+    };
+    if (list) list.push(row);
+    else projectsByProperty.set(p.propertyId, [row]);
+  }
+
+  return propertyRows.map((p) => {
+    const list = projectsByProperty.get(p.id) ?? [];
+    return {
+      ...p,
+      projects: list,
+      projectCount: list.length,
+    };
+  });
+}
