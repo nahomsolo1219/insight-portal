@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Calendar,
   ChevronDown,
   FileText,
   Home,
@@ -46,6 +47,12 @@ interface NavLink {
 const NAV_LINKS: readonly NavLink[] = [
   { href: '/portal', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/portal/projects', label: 'Projects', prefix: '/portal/projects', icon: Home },
+  {
+    href: '/portal/appointments',
+    label: 'Appointments',
+    prefix: '/portal/appointments',
+    icon: Calendar,
+  },
   { href: '/portal/documents', label: 'Documents', prefix: '/portal/documents', icon: FileText },
   { href: '/portal/invoices', label: 'Invoices', prefix: '/portal/invoices', icon: Receipt },
 ];
@@ -382,7 +389,7 @@ function BottomTabs({ isActive }: { isActive: (link: NavLink) => boolean }) {
       className="fixed right-0 bottom-0 left-0 z-40 border-t border-gray-100 bg-white md:hidden"
       aria-label="Primary"
     >
-      <ul className="grid grid-cols-4">
+      <ul className="grid grid-cols-5">
         {NAV_LINKS.map((link) => {
           const active = isActive(link);
           const Icon = link.icon;

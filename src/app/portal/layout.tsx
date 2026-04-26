@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
+import { ToastProvider } from '@/components/admin/ToastProvider';
 import { PortalNav } from '@/components/portal/PortalNav';
 import { db } from '@/db';
 import { clients } from '@/db/schema';
@@ -48,25 +49,27 @@ export default async function PortalLayout({ children }: { children: React.React
     : null;
 
   return (
-    <div className="bg-brand-warm-100 min-h-screen text-[#444]">
-      <PortalNav
-        user={user}
-        client={
-          clientRow
-            ? {
-                id: clientRow.id,
-                name: clientRow.name,
-                email: clientRow.email,
-                phone: clientRow.phone,
-                avatarUrl,
-              }
-            : null
-        }
-      />
-      {/* pb-24 reserves room for the fixed mobile bottom tab bar so the
-          last card on the page doesn't sit underneath it. md:pb-10 drops
-          back to the original spacing once the tabs are hidden. */}
-      <main className="mx-auto max-w-[900px] px-6 pt-10 pb-24 md:pb-10">{children}</main>
-    </div>
+    <ToastProvider>
+      <div className="bg-brand-warm-100 min-h-screen text-[#444]">
+        <PortalNav
+          user={user}
+          client={
+            clientRow
+              ? {
+                  id: clientRow.id,
+                  name: clientRow.name,
+                  email: clientRow.email,
+                  phone: clientRow.phone,
+                  avatarUrl,
+                }
+              : null
+          }
+        />
+        {/* pb-24 reserves room for the fixed mobile bottom tab bar so the
+            last card on the page doesn't sit underneath it. md:pb-10 drops
+            back to the original spacing once the tabs are hidden. */}
+        <main className="mx-auto max-w-[900px] px-6 pt-10 pb-24 md:pb-10">{children}</main>
+      </div>
+    </ToastProvider>
   );
 }
