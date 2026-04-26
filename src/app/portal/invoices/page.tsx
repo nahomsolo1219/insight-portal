@@ -1,5 +1,6 @@
 import { Download, FileText, MapPin } from 'lucide-react';
 import { redirect } from 'next/navigation';
+import { PdfViewer } from '@/components/portal/PdfViewer';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import {
@@ -144,16 +145,19 @@ function InvoiceCard({ invoice }: { invoice: PortalInvoiceRow }) {
       <div className="mt-4 flex items-center justify-between gap-3">
         <StatusBadge status={invoice.status} />
         {invoice.signedUrl ? (
-          <a
-            href={invoice.signedUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            // 44px touch target on mobile.
-            className="text-brand-teal-500 hover:text-brand-teal-600 hover:bg-brand-teal-50 inline-flex h-11 items-center gap-1.5 rounded-xl px-4 text-sm font-medium transition-all"
-          >
-            <Download size={14} strokeWidth={1.75} />
-            Download
-          </a>
+          <div className="flex items-center gap-1">
+            <PdfViewer url={invoice.signedUrl} name={`Invoice #${invoice.invoiceNumber}.pdf`} />
+            <a
+              href={invoice.signedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              // 44px touch target on mobile.
+              className="text-brand-teal-500 hover:text-brand-teal-600 hover:bg-brand-teal-50 inline-flex h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-medium transition-all md:px-4"
+            >
+              <Download size={14} strokeWidth={1.75} />
+              <span className="hidden sm:inline">Download</span>
+            </a>
+          </div>
         ) : (
           <span className="text-xs text-gray-400 italic">PDF unavailable</span>
         )}

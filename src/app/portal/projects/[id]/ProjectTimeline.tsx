@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Download,
   Hammer,
   Home,
   Mail,
@@ -19,7 +20,7 @@ import { useRouter } from 'next/navigation';
 import { LoadingDots } from '@/components/admin/LoadingDots';
 import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatDate, formatTime, initialsFrom } from '@/lib/utils';
-import { respondToDecision } from './actions';
+import { downloadProjectPhotosAsZip, respondToDecision } from './actions';
 import type {
   PortalDecisionOption,
   TimelineMilestone,
@@ -58,13 +59,43 @@ export function ProjectTimeline({ payload }: Props) {
     return list;
   }, [milestones, payload.unattachedPhotos]);
 
+  // Categories pulled from whatever photos actually have on this project —
+  // empty when nothing's been categorized, hides the dropdown entirely.
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of allPhotos) {
+      if (p.category && p.category.trim()) set.add(p.category.trim());
+    }
+    return Array.from(set).sort();
+  }, [allPhotos]);
+
+  const [tagFilter, setTagFilter] = useState<TagFilter>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  // Set of visible photo IDs after applying both filters. PhotoStrip and
+  // the lightbox both honour this so navigation walks only matching shots.
+  const visibleIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const p of allPhotos) {
+      if (tagFilter !== 'all' && p.tag !== tagFilter) continue;
+      if (categoryFilter !== 'all' && p.category !== categoryFilter) continue;
+      ids.add(p.id);
+    }
+    return ids;
+  }, [allPhotos, tagFilter, categoryFilter]);
+
+  const visiblePhotos = useMemo(
+    () => allPhotos.filter((p) => visibleIds.has(p.id)),
+    [allPhotos, visibleIds],
+  );
+
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const openLightbox = useCallback(
     (photoId: string) => {
-      const idx = allPhotos.findIndex((p) => p.id === photoId);
+      const idx = visiblePhotos.findIndex((p) => p.id === photoId);
       if (idx >= 0) setLightboxIndex(idx);
     },
-    [allPhotos],
+    [visiblePhotos],
   );
 
   return (
@@ -79,7 +110,24 @@ export function ProjectTimeline({ payload }: Props) {
         totalMilestones={payload.stats.totalMilestones}
       />
 
-      <Timeline milestones={milestones} onPhotoClick={openLightbox} />
+      {allPhotos.length > 0 && (
+        <PhotoFilterBar
+          projectId={project.id}
+          tagFilter={tagFilter}
+          onTagFilter={setTagFilter}
+          categoryFilter={categoryFilter}
+          onCategoryFilter={setCategoryFilter}
+          categories={categories}
+          visibleCount={visibleIds.size}
+          totalCount={allPhotos.length}
+        />
+      )}
+
+      <Timeline
+        milestones={milestones}
+        onPhotoClick={openLightbox}
+        visibleIds={visibleIds}
+      />
 
       {nextAppointment && (
         <NextVisitCard
@@ -92,13 +140,146 @@ export function ProjectTimeline({ payload }: Props) {
 
       {lightboxIndex !== null && (
         <PhotoLightbox
-          photos={allPhotos}
+          photos={visiblePhotos}
           index={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onIndex={setLightboxIndex}
         />
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Photo filter bar
+// ---------------------------------------------------------------------------
+
+type TagFilter = 'all' | 'before' | 'during' | 'after';
+const TAG_FILTERS: readonly { value: TagFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'before', label: 'Before' },
+  { value: 'during', label: 'During' },
+  { value: 'after', label: 'After' },
+];
+
+function PhotoFilterBar({
+  projectId,
+  tagFilter,
+  onTagFilter,
+  categoryFilter,
+  onCategoryFilter,
+  categories,
+  visibleCount,
+  totalCount,
+}: {
+  projectId: string;
+  tagFilter: TagFilter;
+  onTagFilter: (value: TagFilter) => void;
+  categoryFilter: string;
+  onCategoryFilter: (value: string) => void;
+  categories: string[];
+  visibleCount: number;
+  totalCount: number;
+}) {
+  return (
+    <section className="shadow-card rounded-2xl bg-white p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Tag pills — horizontal scroll on mobile if they ever overflow.
+            -mx-1 keeps the focus ring of the leading pill from being clipped. */}
+        <div className="-mx-1 flex flex-1 items-center gap-1.5 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-initial sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden">
+          {TAG_FILTERS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onTagFilter(opt.value)}
+              aria-pressed={tagFilter === opt.value}
+              className={cn(
+                'inline-flex h-9 flex-shrink-0 items-center rounded-full px-3.5 text-xs font-medium transition-all',
+                tagFilter === opt.value
+                  ? 'bg-brand-teal-500 text-white shadow-soft'
+                  : 'border border-gray-200 bg-white text-gray-600 hover:border-brand-teal-300 hover:text-brand-teal-500',
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <DownloadAllButton projectId={projectId} disabled={visibleCount === 0} />
+      </div>
+
+      {(categories.length > 0 || visibleCount !== totalCount) && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          {categories.length > 0 ? (
+            <label className="inline-flex items-center gap-2 text-xs text-gray-600">
+              <span className="font-medium">Filter by:</span>
+              <select
+                value={categoryFilter}
+                onChange={(e) => onCategoryFilter(e.target.value)}
+                className="focus:ring-brand-teal-200 focus:border-brand-teal-300 h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:ring-2 focus:outline-none"
+              >
+                <option value="all">All categories</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <span />
+          )}
+          <span className="text-xs text-gray-400">
+            Showing {visibleCount} of {totalCount} photos
+          </span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function DownloadAllButton({
+  projectId,
+  disabled,
+}: {
+  projectId: string;
+  disabled: boolean;
+}) {
+  const { showToast } = useToast();
+  const [isPending, start] = useTransition();
+
+  function onClick() {
+    start(async () => {
+      const result = await downloadProjectPhotosAsZip(projectId);
+      if (!result.success) {
+        showToast(result.error, 'error');
+        return;
+      }
+      // Trigger a navigation that the browser interprets as a file download
+      // (Supabase tags the signed URL with a Content-Disposition header).
+      window.location.href = result.zipUrl;
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || isPending}
+      className="text-brand-teal-500 border-brand-teal-200 hover:border-brand-teal-300 hover:bg-brand-teal-50 inline-flex h-9 flex-shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {isPending ? (
+        <>
+          <LoadingDots />
+          Preparing
+        </>
+      ) : (
+        <>
+          <Download size={13} strokeWidth={1.75} />
+          Download all
+        </>
+      )}
+    </button>
   );
 }
 
@@ -184,9 +365,11 @@ function Stat({ value, label, emphasis }: { value: string; label: string; emphas
 function Timeline({
   milestones,
   onPhotoClick,
+  visibleIds,
 }: {
   milestones: TimelineMilestone[];
   onPhotoClick: (id: string) => void;
+  visibleIds: Set<string>;
 }) {
   if (milestones.length === 0) {
     return (
@@ -211,6 +394,7 @@ function Timeline({
               milestone={m}
               number={i + 1}
               onPhotoClick={onPhotoClick}
+              visibleIds={visibleIds}
             />
           ))}
         </div>
@@ -227,10 +411,12 @@ function PhaseCard({
   milestone,
   number,
   onPhotoClick,
+  visibleIds,
 }: {
   milestone: TimelineMilestone;
   number: number;
   onPhotoClick: (id: string) => void;
+  visibleIds: Set<string>;
 }) {
   const isDecision = milestone.status === 'awaiting_client';
   const hasResponse = Boolean(milestone.clientResponse);
@@ -306,7 +492,11 @@ function PhaseCard({
         )}
 
         {milestone.photos.length > 0 && (
-          <PhotoStrip photos={milestone.photos} onPhotoClick={onPhotoClick} />
+          <PhotoStrip
+            photos={milestone.photos}
+            visibleIds={visibleIds}
+            onPhotoClick={onPhotoClick}
+          />
         )}
       </div>
     </div>
@@ -639,18 +829,25 @@ function RespondedSummary({
 
 function PhotoStrip({
   photos,
+  visibleIds,
   onPhotoClick,
 }: {
   photos: TimelinePhoto[];
+  visibleIds: Set<string>;
   onPhotoClick: (id: string) => void;
 }) {
+  const visible = photos.filter((p) => visibleIds.has(p.id));
+  // When the active filter hides every photo on this phase, drop the strip
+  // entirely rather than leaving an empty section heading.
+  if (visible.length === 0) return null;
+
   return (
     <div className="mt-4">
       {/* Mobile: horizontal snap-carousel. Desktop: 3-up grid. The classes
           flip at md so you don't get a half-finished carousel showing on
           tablet. */}
       <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] md:grid md:grid-cols-3 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden">
-        {photos.map((photo) => (
+        {visible.map((photo) => (
           <button
             key={photo.id}
             type="button"
@@ -735,17 +932,20 @@ function PhotoLightbox({
       // stop propagation so they don't accidentally dismiss.
       onClick={onClose}
     >
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
-        aria-label="Close"
-        className="absolute top-4 right-4 z-10 rounded-full bg-white/10 p-2 text-white transition-all hover:bg-white/20"
+      <div
+        className="absolute top-4 right-4 z-10 flex items-center gap-2"
+        onClick={(e) => e.stopPropagation()}
       >
-        <X size={20} strokeWidth={1.5} />
-      </button>
+        <PhotoDownloadButton photo={photo} />
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="rounded-full bg-white/10 p-2 text-white transition-all hover:bg-white/20"
+        >
+          <X size={20} strokeWidth={1.5} />
+        </button>
+      </div>
 
       {photos.length > 1 && (
         <>
@@ -796,6 +996,59 @@ function PhotoLightbox({
       </div>
     </div>
   );
+}
+
+function PhotoDownloadButton({ photo }: { photo: TimelinePhoto }) {
+  const [isFetching, setIsFetching] = useState(false);
+
+  async function onClick() {
+    if (!photo.signedUrl) return;
+    // Cross-origin signed URLs ignore the <a download> attribute, so we
+    // round-trip via fetch+Blob+createObjectURL — same trick the .ics
+    // download uses on the appointments page.
+    setIsFetching(true);
+    try {
+      const res = await fetch(photo.signedUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filenameFor(photo);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      // Network failure is harmless — the lightbox still shows the image
+      // and the user can retry. Logging would just spam the console.
+    } finally {
+      setIsFetching(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!photo.signedUrl || isFetching}
+      aria-label="Download photo"
+      className="rounded-full bg-white/10 p-2 text-white transition-all hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <Download size={18} strokeWidth={1.5} />
+    </button>
+  );
+}
+
+function filenameFor(photo: TimelinePhoto): string {
+  const ext = photo.storagePath.split('.').pop()?.toLowerCase() || 'jpg';
+  const base = photo.caption?.trim()
+    ? photo.caption
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 50)
+    : 'photo';
+  return `${base || 'photo'}.${ext}`;
 }
 
 // ---------------------------------------------------------------------------

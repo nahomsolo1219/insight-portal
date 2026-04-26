@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { createElement, type ComponentType } from 'react';
+import { PdfViewer } from '@/components/portal/PdfViewer';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { cn, formatDate } from '@/lib/utils';
 import {
@@ -134,6 +135,7 @@ function DocumentCard({ doc }: { doc: PortalDocumentRow }) {
       title={doc.name}
       meta={`${prettyType(doc.type)} · ${formatDate(doc.date)}${doc.projectName ? ` · ${doc.projectName}` : ''}`}
       signedUrl={doc.signedUrl}
+      storagePath={doc.storagePath}
     />
   );
 }
@@ -151,6 +153,7 @@ function ReportCard({ report }: { report: PortalReportRow }) {
       title={report.name}
       meta={metaParts.join(' · ')}
       signedUrl={report.signedUrl}
+      storagePath={report.storagePath}
     />
   );
 }
@@ -161,11 +164,13 @@ interface FileCardProps {
   title: string;
   meta: string;
   signedUrl: string | null;
+  storagePath: string;
 }
 
-function FileCard({ icon, iconTone, title, meta, signedUrl }: FileCardProps) {
+function FileCard({ icon, iconTone, title, meta, signedUrl, storagePath }: FileCardProps) {
+  const previewable = signedUrl !== null && isPdfPath(storagePath);
   return (
-    <div className="shadow-card flex items-center gap-4 rounded-2xl bg-white p-4">
+    <div className="shadow-card flex items-center gap-3 rounded-2xl bg-white p-4">
       <div
         className={cn(
           'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl',
@@ -180,22 +185,32 @@ function FileCard({ icon, iconTone, title, meta, signedUrl }: FileCardProps) {
       </div>
 
       {signedUrl ? (
-        <a
-          href={signedUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          // 44px tall touch target on mobile; the icon-only variant scales
-          // down on md+ where space matters more.
-          className="text-brand-teal-500 hover:text-brand-teal-600 hover:bg-brand-teal-50 inline-flex h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-medium transition-all md:px-4"
-        >
-          <Download size={14} strokeWidth={1.75} />
-          <span className="hidden sm:inline">Download</span>
-        </a>
+        <div className="flex flex-shrink-0 items-center gap-1">
+          {previewable && <PdfViewer url={signedUrl} name={title} />}
+          <a
+            href={signedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            // 44px tall touch target on mobile; the icon-only variant scales
+            // down on md+ where space matters more.
+            className="text-brand-teal-500 hover:text-brand-teal-600 hover:bg-brand-teal-50 inline-flex h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-medium transition-all md:px-4"
+          >
+            <Download size={14} strokeWidth={1.75} />
+            <span className="hidden sm:inline">Download</span>
+          </a>
+        </div>
       ) : (
         <span className="text-xs text-gray-400 italic">Unavailable</span>
       )}
     </div>
   );
+}
+
+function isPdfPath(path: string): boolean {
+  // Storage path keeps the original extension; signed URL token doesn't
+  // affect the path itself, so a simple suffix check is reliable.
+  const stripped = path.split('?')[0];
+  return stripped.toLowerCase().endsWith('.pdf');
 }
 
 // ---------------------------------------------------------------------------

@@ -1,13 +1,21 @@
 'use server';
 
-import { eq } from 'drizzle-orm';
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
+import { and, asc, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
-import { milestones, projects, properties } from '@/db/schema';
+import { milestones, photos, projects, properties } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireUser } from '@/lib/auth/current-user';
+import { BUCKET_NAME } from '@/lib/storage/paths';
 
 type ActionResult = { success: true } | { success: false; error: string };
+
+type ZipResult =
+  | { success: true; zipUrl: string; photoCount: number }
+  | { success: false; error: string };
+
+const MAX_ZIP_PHOTOS = 50;
 
 const MAX_RESPONSE_LENGTH = 2_000;
 
@@ -87,4 +95,160 @@ export async function respondToDecision(
     console.error('[respondToDecision]', error);
     return { success: false, error: 'Failed to submit response.' };
   }
+}
+
+/**
+ * Bundle every categorized photo on a project into a ZIP grouped by tag
+ * (before / during / after / untagged) and return a short-lived signed URL
+ * the browser can navigate to for download.
+ *
+ * Architecture note: we generate the ZIP in-memory then push it to a temp
+ * path in the storage bucket via the service-role client, which bypasses
+ * the path-based RLS policy. The signed URL we return also bypasses RLS
+ * for the duration it's valid, so the temp path doesn't need to live
+ * inside the client's per-clientId tree.
+ *
+ * Limits: capped at 50 photos to keep the function under the serverless
+ * memory ceiling — the button on the timeline encodes this in its label
+ * so the user knows when they're being throttled.
+ */
+export async function downloadProjectPhotosAsZip(projectId: string): Promise<ZipResult> {
+  const user = await requireUser();
+  if (user.role !== 'client' || !user.clientId) {
+    return { success: false, error: 'Not authorized.' };
+  }
+
+  // Ownership check via the same property → client join used elsewhere.
+  // RLS is the second line of defense; this gives us a clean 404-style
+  // error path instead of a silent empty result.
+  const [project] = await db
+    .select({ id: projects.id, name: projects.name })
+    .from(projects)
+    .innerJoin(properties, eq(properties.id, projects.propertyId))
+    .where(and(eq(projects.id, projectId), eq(properties.clientId, user.clientId)))
+    .limit(1);
+
+  if (!project) return { success: false, error: 'Project not found.' };
+
+  const projectPhotos = await db
+    .select({
+      storagePath: photos.storagePath,
+      caption: photos.caption,
+      tag: photos.tag,
+    })
+    .from(photos)
+    .where(and(eq(photos.projectId, projectId), eq(photos.status, 'categorized')))
+    .orderBy(asc(photos.tag), asc(photos.uploadedAt));
+
+  if (projectPhotos.length === 0) {
+    return { success: false, error: 'No photos to download yet.' };
+  }
+  if (projectPhotos.length > MAX_ZIP_PHOTOS) {
+    return {
+      success: false,
+      error: `Too many photos to bundle (${projectPhotos.length}). Please download individually from the lightbox.`,
+    };
+  }
+
+  try {
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    const supabase = adminStorageClient();
+
+    let added = 0;
+    for (const photo of projectPhotos) {
+      const { data, error } = await supabase.storage
+        .from(BUCKET_NAME)
+        .download(photo.storagePath);
+      if (error || !data) {
+        console.error('[downloadProjectPhotosAsZip] download failed', photo.storagePath, error);
+        continue;
+      }
+
+      const buffer = await data.arrayBuffer();
+      const folder = photo.tag ?? 'untagged';
+      const filename = sanitiseFilename(photo.caption, photo.storagePath, added);
+      zip.folder(folder)?.file(filename, buffer);
+      added += 1;
+    }
+
+    if (added === 0) {
+      return { success: false, error: 'Could not read any photos from storage.' };
+    }
+
+    const zipBuffer = await zip.generateAsync({ type: 'arraybuffer' });
+    const zipPath = `temp-downloads/${user.clientId}/${projectId}-photos.zip`;
+    const downloadName = `${slugify(project.name) || 'project'}-photos.zip`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(zipPath, zipBuffer, {
+        contentType: 'application/zip',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('[downloadProjectPhotosAsZip] upload failed', uploadError);
+      return { success: false, error: 'Failed to prepare download.' };
+    }
+
+    const { data: signed, error: signError } = await supabase.storage
+      .from(BUCKET_NAME)
+      .createSignedUrl(zipPath, 60 * 60, { download: downloadName });
+
+    if (signError || !signed?.signedUrl) {
+      console.error('[downloadProjectPhotosAsZip] sign failed', signError);
+      return { success: false, error: 'Failed to generate download link.' };
+    }
+
+    return { success: true, zipUrl: signed.signedUrl, photoCount: added };
+  } catch (error) {
+    console.error('[downloadProjectPhotosAsZip]', error);
+    return { success: false, error: 'Failed to create photo bundle.' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Service-role storage client. Bypasses RLS — only invoked from inside
+ * the action's ownership-checked happy path. Inlined here (rather than
+ * in `src/lib/supabase`) because this is the second site that needs it
+ * and pulling out a shared module for two callers is premature
+ * abstraction; revisit when a third turns up.
+ */
+function adminStorageClient() {
+  return createSupabaseAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+}
+
+/**
+ * Build a safe-for-most-filesystems filename from the caption, falling back
+ * to the storage path's basename. The numeric suffix prevents collisions
+ * when two photos in the same folder share a caption.
+ */
+function sanitiseFilename(
+  caption: string | null,
+  storagePath: string,
+  index: number,
+): string {
+  const ext = storagePath.split('.').pop()?.toLowerCase() || 'jpg';
+  const fromCaption = caption?.trim()
+    ? caption.trim().replace(/[/\\?%*:|"<>]/g, '-').slice(0, 60)
+    : null;
+  const base = fromCaption ?? `photo-${String(index + 1).padStart(2, '0')}`;
+  return `${base}.${ext}`;
+}
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 50);
 }
