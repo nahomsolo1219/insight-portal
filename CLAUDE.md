@@ -65,6 +65,13 @@ Invoices are admin-uploaded PDFs with fields, NOT synced from QuickBooks.
 Milestones with status 'awaiting-client' are "Decisions" (aggregated in their own page).
 See `src/lib/types.ts` for complete interfaces.
 
+## Vendor documents
+
+- `vendor_documents` table with type enum (insurance, w9, license, contract, certificate, other). Admin-only RLS policy.
+- Storage path: `vendor-documents/{vendorId}/{documentId}.{ext}` — admin-only, sits outside the per-client tree.
+- Expiration tracking: insurance + license docs carry `expiration_date`. UI buckets each doc into `valid` (>30 days), `expiring` (0-30 days), `expired` (<0 days), or `none` (no date). Stat card on the detail page flags expired (red) > expiring (amber) > default.
+- Vendor detail lives at `/admin/vendors/[id]` — clicking a row from the list navigates here. Edit-vendor modal moved to the detail page header so the row stays a pure navigation target.
+
 ## Client portal
 
 - Route group: `src/app/portal/` — separate from admin.

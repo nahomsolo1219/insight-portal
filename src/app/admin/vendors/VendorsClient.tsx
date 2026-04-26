@@ -1,13 +1,14 @@
 'use client';
 
-import { Pencil, Plus, Power, Search, Star, Users } from 'lucide-react';
+import { ChevronRight, Plus, Power, Search, Star, Users } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import { Field, inputClass, textareaClass } from '@/components/admin/Field';
 import { Modal } from '@/components/admin/Modal';
 import { useToast } from '@/components/admin/ToastProvider';
 import { cn } from '@/lib/utils';
-import { createVendor, toggleVendorActive, updateVendor } from './actions';
+import { createVendor, toggleVendorActive } from './actions';
 import type { VendorRow } from './queries';
 
 /**
@@ -41,7 +42,6 @@ interface VendorsClientProps {
 export function VendorsClient({ vendors }: VendorsClientProps) {
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<VendorRow | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -88,26 +88,17 @@ export function VendorsClient({ vendors }: VendorsClientProps) {
           No vendors match &ldquo;{search}&rdquo;.
         </div>
       ) : (
-        <VendorTable vendors={filtered} onEdit={setEditTarget} />
+        <VendorTable vendors={filtered} />
       )}
 
       {createOpen && <CreateVendorModal onClose={() => setCreateOpen(false)} />}
-      {editTarget && (
-        <EditVendorModal vendor={editTarget} onClose={() => setEditTarget(null)} />
-      )}
     </div>
   );
 }
 
 // ---------- table ----------
 
-function VendorTable({
-  vendors,
-  onEdit,
-}: {
-  vendors: VendorRow[];
-  onEdit: (v: VendorRow) => void;
-}) {
+function VendorTable({ vendors }: { vendors: VendorRow[] }) {
   return (
     <div className="shadow-card overflow-hidden rounded-2xl bg-white">
       <div className="overflow-x-auto">
@@ -125,7 +116,7 @@ function VendorTable({
           </thead>
           <tbody>
             {vendors.map((v) => (
-              <VendorTableRow key={v.id} vendor={v} onEdit={() => onEdit(v)} />
+              <VendorTableRow key={v.id} vendor={v} />
             ))}
           </tbody>
         </table>
@@ -147,7 +138,10 @@ function Th({ children, align = 'left' }: { children: React.ReactNode; align?: '
   );
 }
 
-function VendorTableRow({ vendor, onEdit }: { vendor: VendorRow; onEdit: () => void }) {
+function VendorTableRow({ vendor }: { vendor: VendorRow }) {
+  // Wrap the name in a Link so it's the obvious tap target on a touch device
+  // and exposes the URL on hover for desktop. The whole row navigates via the
+  // chevron button at the end too — both lead to the same detail page.
   return (
     <tr
       className={cn(
@@ -156,7 +150,15 @@ function VendorTableRow({ vendor, onEdit }: { vendor: VendorRow; onEdit: () => v
       )}
     >
       <td className="px-4 py-4 text-sm font-medium">
-        <div className={vendor.active ? 'text-gray-900' : 'text-gray-500'}>{vendor.name}</div>
+        <Link
+          href={`/admin/vendors/${vendor.id}`}
+          className={cn(
+            'hover:text-brand-teal-500 transition-colors',
+            vendor.active ? 'text-gray-900' : 'text-gray-500',
+          )}
+        >
+          {vendor.name}
+        </Link>
       </td>
       <td className="px-4 py-4 text-sm">
         <span
@@ -191,15 +193,14 @@ function VendorTableRow({ vendor, onEdit }: { vendor: VendorRow; onEdit: () => v
       </td>
       <td className="px-4 py-4">
         <div className="flex items-center justify-end gap-1">
-          <button
-            type="button"
-            onClick={onEdit}
-            aria-label={`Edit ${vendor.name}`}
-            className="hover:text-brand-teal-500 rounded-lg p-1.5 text-gray-400 transition-all hover:bg-brand-warm-50"
-          >
-            <Pencil size={14} strokeWidth={1.5} />
-          </button>
           <ToggleActiveButton vendor={vendor} />
+          <Link
+            href={`/admin/vendors/${vendor.id}`}
+            aria-label={`View ${vendor.name}`}
+            className="hover:text-brand-teal-500 hover:bg-brand-warm-50 rounded-lg p-1.5 text-gray-400 transition-all"
+          >
+            <ChevronRight size={14} strokeWidth={1.75} />
+          </Link>
         </div>
       </td>
     </tr>
@@ -353,62 +354,9 @@ function CreateVendorModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function EditVendorModal({ vendor, onClose }: { vendor: VendorRow; onClose: () => void }) {
-  const router = useRouter();
-  const { showToast } = useToast();
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState<VendorFormState>({
-    name: vendor.name,
-    category: vendor.category,
-    phone: vendor.phone ?? '',
-    email: vendor.email ?? '',
-    notes: vendor.notes ?? '',
-  });
-
-  function submit() {
-    setError(null);
-    if (!form.name.trim()) {
-      setError('Vendor name is required.');
-      return;
-    }
-    if (!form.category.trim()) {
-      setError('Category is required.');
-      return;
-    }
-    startTransition(async () => {
-      const result = await updateVendor(vendor.id, {
-        name: form.name.trim(),
-        category: form.category.trim(),
-        phone: form.phone.trim() || null,
-        email: form.email.trim() || null,
-        notes: form.notes.trim() || null,
-      });
-      if (!result.success) {
-        setError(result.error);
-        showToast(result.error, 'error');
-        return;
-      }
-      showToast('Vendor updated');
-      onClose();
-      router.refresh();
-    });
-  }
-
-  return (
-    <VendorFormModal
-      title={`Edit ${vendor.name}`}
-      form={form}
-      setForm={setForm}
-      error={error}
-      isPending={isPending}
-      onClose={onClose}
-      onSubmit={submit}
-      submitLabel="Save changes"
-      submittingLabel="Saving..."
-    />
-  );
-}
+// EditVendorModal moved to /admin/vendors/[id]/VendorEditButton.tsx — the
+// edit flow now lives on the detail page so the row stays a pure
+// navigation target.
 
 interface VendorFormModalProps {
   title: string;

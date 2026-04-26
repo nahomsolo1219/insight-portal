@@ -73,6 +73,14 @@ export const staffRoleEnum = pgEnum('staff_role', [
   'admin_assistant',
 ]);
 export const staffStatusEnum = pgEnum('staff_status', ['active', 'pending', 'inactive']);
+export const vendorDocumentTypeEnum = pgEnum('vendor_document_type', [
+  'insurance',
+  'w9',
+  'license',
+  'contract',
+  'certificate',
+  'other',
+]);
 
 // ---------- Shared timestamp columns ----------
 
@@ -173,6 +181,25 @@ export const vendors = pgTable('vendors', {
   active: boolean('active').notNull().default(true),
   rating: integer('rating').notNull().default(0),
   jobsCompleted: integer('jobs_completed').notNull().default(0),
+  notes: text('notes'),
+  ...timestamps,
+});
+
+// vendor_documents — admin-uploaded paperwork (insurance, W-9, licenses)
+// per vendor. Cascades on vendor delete so we don't strand orphan rows;
+// the storage objects themselves stay until the cleanup helper runs.
+export const vendorDocuments = pgTable('vendor_documents', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  vendorId: uuid('vendor_id')
+    .notNull()
+    .references(() => vendors.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  type: vendorDocumentTypeEnum('type').notNull(),
+  storagePath: text('storage_path').notNull(),
+  /** Insurance + license docs expire — populated for those types, null
+   *  for W-9 / contract / certificate / other. UI surfaces a colour-coded
+   *  status badge derived from this date. */
+  expirationDate: date('expiration_date'),
   notes: text('notes'),
   ...timestamps,
 });
@@ -491,6 +518,14 @@ export const vendorsRelations = relations(vendors, ({ many }) => ({
   milestones: many(milestones),
   appointments: many(appointments),
   reports: many(reports),
+  documents: many(vendorDocuments),
+}));
+
+export const vendorDocumentsRelations = relations(vendorDocuments, ({ one }) => ({
+  vendor: one(vendors, {
+    fields: [vendorDocuments.vendorId],
+    references: [vendors.id],
+  }),
 }));
 
 export const projectTemplatesRelations = relations(projectTemplates, ({ many }) => ({

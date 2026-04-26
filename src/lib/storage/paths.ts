@@ -42,6 +42,20 @@ export function reportPath(clientId: string, reportId: string): string {
 }
 
 /**
+ * Path for a vendor document (insurance certificate, W-9, license, etc.).
+ * Vendor docs sit in their own top-level prefix because they're admin-only
+ * — clients never need to see them, and the path layout keeps them
+ * outside the per-client tree the storage RLS uses for client visibility.
+ */
+export function vendorDocumentPath(
+  vendorId: string,
+  documentId: string,
+  ext: string,
+): string {
+  return `vendor-documents/${vendorId}/${documentId}.${sanitizeExt(ext) || 'pdf'}`;
+}
+
+/**
  * Path for a decision-option thumbnail in a project template.
  *
  * Decision options live outside the per-client hierarchy because templates
