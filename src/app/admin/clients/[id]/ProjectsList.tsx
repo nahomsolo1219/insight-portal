@@ -1,28 +1,36 @@
 'use client';
 
-import {
-  Briefcase,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Hammer,
-  Plus,
-} from 'lucide-react';
+import { Briefcase, Check, ChevronDown, ChevronRight, Hammer } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useOptimistic, useState, useTransition } from 'react';
 import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatCurrency, formatShortDate } from '@/lib/utils';
 import { toggleMilestoneComplete } from './actions';
-import type { MilestoneRow, ProjectWithMilestones } from './queries';
+import { NewProjectButton } from './NewProjectButton';
+import type {
+  MilestoneRow,
+  ProjectWithMilestones,
+  PropertyRow,
+  TemplateOption,
+} from './queries';
 
 type MilestoneStatus = MilestoneRow['status'];
 
 interface ProjectsListProps {
   clientId: string;
   projects: ProjectWithMilestones[];
+  properties: PropertyRow[];
+  templates: TemplateOption[];
+  activePropertyId: string | null;
 }
 
-export function ProjectsList({ clientId, projects }: ProjectsListProps) {
+export function ProjectsList({
+  clientId,
+  projects,
+  properties,
+  templates,
+  activePropertyId,
+}: ProjectsListProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const [, startTransition] = useTransition();
@@ -97,7 +105,14 @@ export function ProjectsList({ clientId, projects }: ProjectsListProps) {
         <p className="mx-auto mt-2 max-w-sm text-sm text-gray-500">
           Create a maintenance plan or remodel to start tracking work for this property.
         </p>
-        <DisabledNewProjectButton className="mt-5" />
+        <div className="mt-5 flex justify-center">
+          <NewProjectButton
+            clientId={clientId}
+            properties={properties}
+            templates={templates}
+            activePropertyId={activePropertyId}
+          />
+        </div>
       </div>
     );
   }
@@ -105,7 +120,12 @@ export function ProjectsList({ clientId, projects }: ProjectsListProps) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <DisabledNewProjectButton />
+        <NewProjectButton
+          clientId={clientId}
+          properties={properties}
+          templates={templates}
+          activePropertyId={activePropertyId}
+        />
       </div>
 
       {optimisticProjects.map((p) => (
@@ -333,19 +353,3 @@ function MilestoneRowCard({
   );
 }
 
-function DisabledNewProjectButton({ className }: { className?: string }) {
-  return (
-    <button
-      type="button"
-      disabled
-      title="Create project flow coming in a follow-up session"
-      className={cn(
-        'bg-brand-gold-400 inline-flex cursor-not-allowed items-center gap-2 rounded-xl px-5 py-2.5 font-medium text-white opacity-60',
-        className,
-      )}
-    >
-      <Plus size={16} />
-      New Project
-    </button>
-  );
-}

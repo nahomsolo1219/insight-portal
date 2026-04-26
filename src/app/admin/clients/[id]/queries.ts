@@ -12,10 +12,12 @@ import {
   membershipTiers,
   milestones,
   photos,
+  projectTemplates,
   projects,
   properties,
   reports,
   staff,
+  templatePhases,
   vendors,
 } from '@/db/schema';
 
@@ -671,4 +673,79 @@ export async function getPhotoStats(propertyId: string): Promise<PhotoStats> {
     if (row.status === 'rejected') stats.rejected = c;
   }
   return stats;
+}
+
+// ---------- Templates (for the Create-Project modal) ----------
+
+export interface TemplateOption {
+  id: string;
+  name: string;
+  type: 'maintenance' | 'remodel';
+  description: string | null;
+  duration: string | null;
+  usesPhases: boolean;
+  /** Sum of all phase `estimated_days` for phased templates; null for flat. */
+  totalEstimatedDays: number | null;
+  /** Phase count; null for flat templates. */
+  phaseCount: number | null;
+}
+
+/**
+ * Templates listed in the Create-Project modal. We attach a precomputed
+ * total-days estimate for phase-based templates so the UI can auto-fill
+ * the new project's end date when David picks a template, without an
+ * extra round-trip per selection.
+ */
+export async function getTemplatesForSelect(): Promise<TemplateOption[]> {
+  const templates = await db
+    .select({
+      id: projectTemplates.id,
+      name: projectTemplates.name,
+      type: projectTemplates.type,
+      description: projectTemplates.description,
+      duration: projectTemplates.duration,
+      usesPhases: projectTemplates.usesPhases,
+    })
+    .from(projectTemplates)
+    .orderBy(asc(projectTemplates.name));
+
+  if (templates.length === 0) return [];
+
+  // Aggregate phase counts + estimated_day totals in a single grouped
+  // round-trip rather than N queries (one per template).
+  const phasedTemplateIds = templates.filter((t) => t.usesPhases).map((t) => t.id);
+  const totalsByTemplate = new Map<string, { count: number; days: number }>();
+
+  if (phasedTemplateIds.length > 0) {
+    const phaseRows = await db
+      .select({
+        templateId: templatePhases.templateId,
+        estimatedDays: templatePhases.estimatedDays,
+      })
+      .from(templatePhases)
+      .where(inArray(templatePhases.templateId, phasedTemplateIds));
+
+    for (const row of phaseRows) {
+      const entry = totalsByTemplate.get(row.templateId) ?? { count: 0, days: 0 };
+      entry.count += 1;
+      entry.days += row.estimatedDays ?? 0;
+      totalsByTemplate.set(row.templateId, entry);
+    }
+  }
+
+  return templates.map((t) => {
+    if (!t.usesPhases) {
+      return {
+        ...t,
+        totalEstimatedDays: null,
+        phaseCount: null,
+      };
+    }
+    const totals = totalsByTemplate.get(t.id);
+    return {
+      ...t,
+      totalEstimatedDays: totals && totals.days > 0 ? totals.days : null,
+      phaseCount: totals?.count ?? 0,
+    };
+  });
 }

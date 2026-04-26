@@ -4,7 +4,7 @@
 // Every admin page follows this same pattern. See CLAUDE.md → "Page query
 // pattern" for details.
 
-import { and, count, desc, eq, gte, inArray, sum } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, sum } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   appointments,
@@ -208,4 +208,38 @@ export async function getRecentActivity(limit = 6): Promise<ActivityRow[]> {
     .leftJoin(clients, eq(clients.id, auditLog.clientId))
     .orderBy(desc(auditLog.createdAt))
     .limit(limit);
+}
+
+export interface ClientPickerRow {
+  id: string;
+  name: string;
+  /** Number of properties — clients with 0 land directly on the empty-property
+   *  CTA when chosen, so the picker can flag them as needing setup first. */
+  propertyCount: number;
+}
+
+/**
+ * Active clients list for the dashboard "+ New Project" client picker.
+ * Pre-counts properties per client so the picker can route a 0-property
+ * pick to the property setup flow without an extra round-trip after
+ * selection.
+ */
+export async function getActiveClientsForProjectPicker(): Promise<ClientPickerRow[]> {
+  const rows = await db
+    .select({
+      id: clients.id,
+      name: clients.name,
+      propertyCount: count(properties.id),
+    })
+    .from(clients)
+    .leftJoin(properties, eq(properties.clientId, clients.id))
+    .where(eq(clients.status, 'active'))
+    .groupBy(clients.id, clients.name)
+    .orderBy(asc(clients.name));
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    propertyCount: Number(r.propertyCount),
+  }));
 }

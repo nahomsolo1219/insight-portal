@@ -9,6 +9,7 @@ import { Modal } from '@/components/admin/Modal';
 import { useToast } from '@/components/admin/ToastProvider';
 import { cn, formatDate } from '@/lib/utils';
 import { archiveClient } from '../actions';
+import { AddPropertyButton } from './AddPropertyButton';
 import { updateClient, updateProperty } from './actions';
 import type { ProfileTabPm, ProfileTabTier } from './ProfileTab';
 import type { ClientDetailRow, PropertyRow } from './queries';
@@ -60,42 +61,46 @@ export function ProfileTabClient({ client, property, tiers, pms }: ProfileTabCli
         </div>
       </div>
 
-      {/* Property info card */}
+      {/* Property info card. When no property is selected we surface the
+          first-property CTA so a freshly created client can act here too,
+          not just from the property switcher above. */}
       {property ? (
-        <div className="shadow-card rounded-2xl bg-white p-6">
-          <div className="mb-5 flex items-start justify-between">
-            <h3 className="text-base font-semibold text-gray-900">Property Details</h3>
-            <button
-              type="button"
-              onClick={() => setEditPropertyOpen(true)}
-              className="text-brand-teal-500 hover:text-brand-teal-600 hover:bg-brand-teal-50 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all"
-            >
-              <Pencil size={14} strokeWidth={1.5} />
-              Edit
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-            <InfoRow label="Property name" value={property.name} />
-            <InfoRow label="Address" value={formatFullAddress(property)} />
-            <InfoRow
-              label="Square footage"
-              value={property.sqft != null ? property.sqft.toLocaleString() : null}
-            />
-            <InfoRow
-              label="Year built"
-              value={property.yearBuilt != null ? property.yearBuilt.toString() : null}
-            />
-            <InfoRow label="Gate code" value={property.gateCode} mono />
-            <InfoRow label="Emergency contact" value={property.emergencyContact} />
-            <div className="col-span-2">
-              <InfoRow label="Access notes" value={property.accessNotes} multiline />
+        <>
+          <div className="shadow-card rounded-2xl bg-white p-6">
+            <div className="mb-5 flex items-start justify-between">
+              <h3 className="text-base font-semibold text-gray-900">Property Details</h3>
+              <button
+                type="button"
+                onClick={() => setEditPropertyOpen(true)}
+                className="text-brand-teal-500 hover:text-brand-teal-600 hover:bg-brand-teal-50 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all"
+              >
+                <Pencil size={14} strokeWidth={1.5} />
+                Edit
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <InfoRow label="Property name" value={property.name} />
+              <InfoRow label="Address" value={formatFullAddress(property)} />
+              <InfoRow
+                label="Square footage"
+                value={property.sqft != null ? property.sqft.toLocaleString() : null}
+              />
+              <InfoRow
+                label="Year built"
+                value={property.yearBuilt != null ? property.yearBuilt.toString() : null}
+              />
+              <InfoRow label="Gate code" value={property.gateCode} mono />
+              <InfoRow label="Emergency contact" value={property.emergencyContact} />
+              <div className="col-span-2">
+                <InfoRow label="Access notes" value={property.accessNotes} multiline />
+              </div>
             </div>
           </div>
-        </div>
+
+          <AddPropertyButton clientId={client.id} variant="subtle" />
+        </>
       ) : (
-        <div className="shadow-card rounded-2xl bg-white p-6 text-center text-sm text-gray-400">
-          No property selected
-        </div>
+        <AddPropertyButton clientId={client.id} variant="cta" />
       )}
 
       {/* Danger zone — archiving is irreversible-ish, so it sits alone. */}

@@ -4,8 +4,10 @@ import { StatCard } from '@/components/admin/StatCard';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { formatCurrency, initialsFrom } from '@/lib/utils';
+import { DashboardNewProjectButton } from './DashboardNewProjectButton';
 import {
   getActiveClientsCount,
+  getActiveClientsForProjectPicker,
   getActiveProjectsCount,
   getNewClientsThisMonthCount,
   getOutstandingInvoices,
@@ -31,6 +33,7 @@ export default async function DashboardPage() {
     pendingPhotos,
     unpaidInvoices,
     activity,
+    projectPickerClients,
   ] = await Promise.all([
     getActiveClientsCount(),
     getNewClientsThisMonthCount(),
@@ -42,6 +45,7 @@ export default async function DashboardPage() {
     getPendingPhotosCount(),
     getUnpaidInvoicesForAlerts(),
     getRecentActivity(),
+    getActiveClientsForProjectPicker(),
   ]);
 
   const today = new Date().toLocaleDateString('en-US', {
@@ -70,13 +74,7 @@ export default async function DashboardPage() {
             <Plus size={16} strokeWidth={2} />
             New Client
           </Link>
-          <Link
-            href="/admin/clients"
-            className="border-brand-teal-200 text-brand-teal-500 hover:bg-brand-teal-50 inline-flex items-center gap-2 rounded-xl border px-5 py-2.5 font-medium transition-all"
-          >
-            <Plus size={16} strokeWidth={2} />
-            New Project
-          </Link>
+          <DashboardNewProjectButton clients={projectPickerClients} />
         </div>
       </div>
 

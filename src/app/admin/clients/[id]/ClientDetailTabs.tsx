@@ -13,6 +13,7 @@ import {
 import Link from 'next/link';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { AddPropertyButton } from './AddPropertyButton';
 import type { PropertyRow } from './queries';
 
 const TABS = [
@@ -65,8 +66,27 @@ export function ClientDetailTabs({
 
   return (
     <div>
-      {/* Property switcher */}
-      {properties.length > 1 ? (
+      {/* Property switcher / first-property CTA. Three branches:
+          - 0 properties → prominent "Add your first property" CTA card.
+            Tabs that need a property show their own "add a property first"
+            empty state below; Profile + Invoices still render normally.
+          - 1 property → address line + small "+ Add property" pill.
+          - 2+ properties → tab pills + small "+ Add property" pill at end. */}
+      {properties.length === 0 ? (
+        <div className="mb-6">
+          <AddPropertyButton clientId={clientId} variant="cta" />
+        </div>
+      ) : properties.length === 1 ? (
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <MapPin size={16} strokeWidth={1.5} className="text-gray-400" />
+            {[activeProperty?.address, activeProperty?.city, activeProperty?.state]
+              .filter(Boolean)
+              .join(', ')}
+          </div>
+          <AddPropertyButton clientId={clientId} variant="inline" />
+        </div>
+      ) : (
         <div className="mb-6 flex items-center gap-2 overflow-x-auto">
           <MapPin size={16} strokeWidth={1.5} className="flex-shrink-0 text-gray-400" />
           {properties.map((p) => {
@@ -87,18 +107,7 @@ export function ClientDetailTabs({
               </Link>
             );
           })}
-        </div>
-      ) : activeProperty ? (
-        <div className="mb-6 flex items-center gap-2 text-sm text-gray-500">
-          <MapPin size={16} strokeWidth={1.5} className="text-gray-400" />
-          {[activeProperty.address, activeProperty.city, activeProperty.state]
-            .filter(Boolean)
-            .join(', ')}
-        </div>
-      ) : (
-        <div className="mb-6 flex items-center gap-2 text-sm text-amber-600">
-          <MapPin size={16} strokeWidth={1.5} />
-          No properties yet — add one to start scheduling work
+          <AddPropertyButton clientId={clientId} variant="inline" />
         </div>
       )}
 

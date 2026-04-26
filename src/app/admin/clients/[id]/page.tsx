@@ -39,7 +39,12 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
   // has its content. Slots get rebuilt on every navigation; keying by the
   // active property id means switching properties remounts a fresh subtree.
   const projectsSlot = activePropertyId ? (
-    <ProjectsTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
+    <ProjectsTab
+      key={activePropertyId}
+      clientId={id}
+      propertyId={activePropertyId}
+      properties={properties}
+    />
   ) : null;
   const documentsSlot = activePropertyId ? (
     <DocumentsTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
