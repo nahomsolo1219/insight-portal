@@ -13,6 +13,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // bounces home without firing admin-only counts under client RLS.
   const user = await getCurrentUser();
   if (!user) redirect('/login');
+  // Send each non-admin role straight to its home so the wrong-area URL
+  // doesn't pay an extra round-trip through `/`.
+  if (user.role === 'client') redirect('/portal');
+  if (user.role === 'field_staff') redirect('/field');
   if (user.role !== 'admin') redirect('/');
   const sidebarCounts = await getSidebarCounts();
 

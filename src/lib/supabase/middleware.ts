@@ -36,7 +36,10 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
-  const isProtectedRoute = pathname.startsWith('/admin') || pathname.startsWith('/portal');
+  const isProtectedRoute =
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/portal') ||
+    pathname.startsWith('/field');
   const isAuthInfra = pathname.startsWith('/auth') || pathname === '/login' || pathname === '/logout';
 
   // Unauthenticated access to a protected route → bounce to /login with the

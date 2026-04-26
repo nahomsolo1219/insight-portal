@@ -24,6 +24,10 @@ import { getSignedUrl } from '@/lib/storage/upload';
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
+  // Direct shortcuts to the right area for non-client roles so a typed
+  // `/portal` URL doesn't bounce through `/`.
+  if (user.role === 'admin') redirect('/admin');
+  if (user.role === 'field_staff') redirect('/field');
   if (user.role !== 'client' || !user.clientId) redirect('/');
 
   const [clientRow] = await db

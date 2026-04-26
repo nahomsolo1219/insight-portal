@@ -188,3 +188,14 @@ nav button:active {
   border: none !important;
   padding: 0 !important;
 }
+
+/* iOS safe-area helpers used by the field staff layout. The header sits
+ * under the notch on iPhone without these. Mobile Safari only — desktop
+ * falls back to 0 since the env() vars are undefined. */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}

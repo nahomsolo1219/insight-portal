@@ -65,6 +65,18 @@ Invoices are admin-uploaded PDFs with fields, NOT synced from QuickBooks.
 Milestones with status 'awaiting-client' are "Decisions" (aggregated in their own page).
 See `src/lib/types.ts` for complete interfaces.
 
+## Field staff app
+
+- Route group: `src/app/field/` — mobile-first, full-bleed, no sidebar, no bottom tabs.
+- Layout: teal header band with logo + sign-out, content area scrolls. iOS safe-area insets via `.safe-area-top` / `.safe-area-bottom` utilities (added to globals.css).
+- Auth: requires `role = 'field_staff'`. Admins are explicitly allowed for testing. Clients get bounced to `/portal`.
+- Pages:
+  - `/field` — today's schedule (every active client; field staff are dispatched anywhere), big "Upload to any property" CTA, recent uploads strip with status dots (pending = amber, categorized = emerald, rejected = red).
+  - `/field/upload` — property + project pickers, optional caption, camera/file input with `capture="environment"` (rear camera default on mobile), thumbnail strip, gold upload CTA, success card.
+- Upload action: `uploadFieldPhotos` always lands rows as `status = 'pending'` so the admin Photo Queue stays the single source of truth for client visibility. Per-file isolation — one bad image doesn't fail the whole batch. Audits the batch as one entry.
+- Project picker: `getPropertyProjectsAction` server action refreshes the project list when the technician changes the property dropdown — avoids passing the full property→projects map up front.
+- Storage: uses the existing `photoPath` helper + `'photos/'` prefix so the existing "Field staff upload photos" RLS policy gates inserts. No new policies.
+
 ## Vendor documents
 
 - `vendor_documents` table with type enum (insurance, w9, license, contract, certificate, other). Admin-only RLS policy.

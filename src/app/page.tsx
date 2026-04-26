@@ -15,9 +15,11 @@ export default async function RootPage() {
       redirect('/admin');
     case 'client':
       redirect('/portal');
+    case 'field_staff':
+      redirect('/field');
     default:
-      // field_staff has no portal yet — bounce to login with a flag so we
-      // can show "no access" copy once we wire up the field experience.
-      redirect('/login?error=no_portal');
+      // Defensive fallback for an unknown role — shouldn't happen since
+      // the user_role enum is exhaustive, but TypeScript wants the case.
+      redirect('/login?error=unknown_role');
   }
 }
