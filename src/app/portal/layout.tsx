@@ -21,7 +21,10 @@ export default async function PortalLayout({ children }: { children: React.React
   return (
     <div className="bg-brand-warm-100 min-h-screen text-[#444]">
       <PortalNav user={user} />
-      <main className="mx-auto max-w-[900px] px-6 py-10">{children}</main>
+      {/* pb-24 reserves room for the fixed mobile bottom tab bar so the
+          last card on the page doesn't sit underneath it. md:pb-10 drops
+          back to the original spacing once the tabs are hidden. */}
+      <main className="mx-auto max-w-[900px] px-6 pt-10 pb-24 md:pb-10">{children}</main>
     </div>
   );
 }
