@@ -2,11 +2,15 @@ import {
   ArrowRight,
   Briefcase,
   Calendar,
+  Camera,
+  CheckCircle2,
   ClipboardList,
   Clock,
+  FileText,
   Hammer,
   Home,
   MapPin,
+  Receipt,
   Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -16,8 +20,10 @@ import { cn, formatDate, formatTime, initialsFrom } from '@/lib/utils';
 import {
   getClientActiveProjects,
   getClientDashboardStats,
+  getClientRecentActivity,
   getClientUpcomingAppointments,
   getMyClientProfile,
+  type ActivityItem,
   type ClientProfile,
   type ClientProjectRow,
   type UpcomingAppointmentRow,
@@ -30,11 +36,12 @@ export default async function PortalDashboardPage() {
   if (!user || user.role !== 'client' || !user.clientId) redirect('/');
 
   const clientId = user.clientId;
-  const [profile, stats, upcoming, activeProjects] = await Promise.all([
+  const [profile, stats, upcoming, activeProjects, activity] = await Promise.all([
     getMyClientProfile(clientId),
     getClientDashboardStats(clientId),
     getClientUpcomingAppointments(clientId, 3),
     getClientActiveProjects(clientId),
+    getClientRecentActivity(clientId, 8),
   ]);
 
   const firstName = pickFirstName(user.fullName, profile?.name);
@@ -60,9 +67,93 @@ export default async function PortalDashboardPage() {
 
       <UpcomingVisitsSection appointments={upcoming} />
 
+      <RecentActivitySection items={activity} />
+
       {profile && <ProjectManagerCard profile={profile} />}
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Recent activity
+// ---------------------------------------------------------------------------
+
+function RecentActivitySection({ items }: { items: ActivityItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <section>
+      <SectionHeader title="Recent activity" />
+      <div className="shadow-card overflow-hidden rounded-2xl bg-white">
+        {items.map((item, i) => (
+          <ActivityRow key={i} item={item} isLast={i === items.length - 1} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ActivityRow({ item, isLast }: { item: ActivityItem; isLast: boolean }) {
+  const meta = ACTIVITY_META[item.type];
+  return (
+    <div
+      className={cn(
+        'flex items-start gap-4 px-5 py-4',
+        !isLast && 'border-b border-gray-50',
+      )}
+    >
+      <span
+        className={cn(
+          'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl',
+          meta.tone,
+        )}
+      >
+        {meta.icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium text-gray-900">{item.title}</div>
+        <div className="mt-0.5 truncate text-xs text-gray-500">
+          {item.subtitle && <span>{item.subtitle} · </span>}
+          <span>{relativeDate(item.date)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ACTIVITY_META: Record<
+  ActivityItem['type'],
+  { icon: React.ReactNode; tone: string }
+> = {
+  milestone: {
+    icon: <CheckCircle2 size={16} strokeWidth={1.75} />,
+    tone: 'bg-emerald-50 text-emerald-600',
+  },
+  photo: {
+    icon: <Camera size={16} strokeWidth={1.75} />,
+    tone: 'bg-brand-teal-50 text-brand-teal-500',
+  },
+  report: {
+    icon: <FileText size={16} strokeWidth={1.75} />,
+    tone: 'bg-blue-50 text-blue-600',
+  },
+  invoice: {
+    icon: <Receipt size={16} strokeWidth={1.75} />,
+    tone: 'bg-brand-gold-50 text-brand-gold-500',
+  },
+};
+
+/** "2h ago" / "3 days ago" / "Apr 22". Switches to absolute after a week. */
+function relativeDate(iso: string): string {
+  const then = new Date(iso);
+  const diffMs = Date.now() - then.getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 1) return 'Just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 7) return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
+  return formatDate(iso.slice(0, 10));
 }
 
 // ---------------------------------------------------------------------------

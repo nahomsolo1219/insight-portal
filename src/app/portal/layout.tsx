@@ -1,11 +1,13 @@
 import { eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { ToastProvider } from '@/components/admin/ToastProvider';
+import { ContactFab } from '@/components/portal/ContactFab';
 import { PortalNav } from '@/components/portal/PortalNav';
 import { db } from '@/db';
 import { clients } from '@/db/schema';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { getSignedUrl } from '@/lib/storage/upload';
+import { getMyClientProfile, getPortalBadgeCounts } from './queries';
 
 /**
  * Wrapping layout for the client portal. Every nested page inherits the
@@ -31,17 +33,24 @@ export default async function PortalLayout({ children }: { children: React.React
   if (user.role === 'field_staff') redirect('/field');
   if (user.role !== 'client' || !user.clientId) redirect('/');
 
-  const [clientRow] = await db
-    .select({
-      id: clients.id,
-      name: clients.name,
-      email: clients.email,
-      phone: clients.phone,
-      avatarStoragePath: clients.avatarStoragePath,
-    })
-    .from(clients)
-    .where(eq(clients.id, user.clientId))
-    .limit(1);
+  // Three parallel reads: the client header chip, the PM contact card for
+  // the FAB, and the unread/unpaid/pending counts for the nav badges.
+  const [clientRow, profile, badges] = await Promise.all([
+    db
+      .select({
+        id: clients.id,
+        name: clients.name,
+        email: clients.email,
+        phone: clients.phone,
+        avatarStoragePath: clients.avatarStoragePath,
+      })
+      .from(clients)
+      .where(eq(clients.id, user.clientId))
+      .limit(1)
+      .then((rows) => rows[0] ?? null),
+    getMyClientProfile(user.clientId),
+    getPortalBadgeCounts(user.clientId),
+  ]);
 
   // Sign the avatar at read time so the URL stays fresh on each render.
   const avatarUrl = clientRow?.avatarStoragePath
@@ -64,11 +73,17 @@ export default async function PortalLayout({ children }: { children: React.React
                 }
               : null
           }
+          badges={badges}
         />
         {/* pb-24 reserves room for the fixed mobile bottom tab bar so the
             last card on the page doesn't sit underneath it. md:pb-10 drops
             back to the original spacing once the tabs are hidden. */}
         <main className="mx-auto max-w-[900px] px-6 pt-10 pb-24 md:pb-10">{children}</main>
+        <ContactFab
+          pmName={profile?.assignedPmName ?? null}
+          pmEmail={profile?.assignedPmEmail ?? null}
+          pmPhone={profile?.assignedPmPhone ?? null}
+        />
       </div>
     </ToastProvider>
   );

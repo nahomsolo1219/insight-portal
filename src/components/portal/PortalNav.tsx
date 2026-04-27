@@ -18,6 +18,7 @@ import { LoadingDots } from '@/components/admin/LoadingDots';
 import { Modal } from '@/components/admin/Modal';
 import { useToast } from '@/components/admin/ToastProvider';
 import { updateMyProfile } from '@/app/portal/actions';
+import type { PortalBadgeCounts } from '@/app/portal/queries';
 import type { CurrentUser } from '@/lib/auth/current-user';
 import { cn, initialsFrom } from '@/lib/utils';
 
@@ -31,12 +32,16 @@ export interface PortalNavClient {
   avatarUrl: string | null;
 }
 
+type BadgeKey = keyof PortalBadgeCounts;
+
 interface NavLink {
   href: string;
   label: string;
   /** Match nested routes (e.g. /portal/projects/[id] keeps Projects active). */
   prefix?: string;
   icon: ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+  /** Which badge count drives the red dot for this link, if any. */
+  badge?: BadgeKey;
 }
 
 /**
@@ -46,21 +51,40 @@ interface NavLink {
  */
 const NAV_LINKS: readonly NavLink[] = [
   { href: '/portal', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/portal/projects', label: 'Projects', prefix: '/portal/projects', icon: Home },
+  {
+    href: '/portal/projects',
+    label: 'Projects',
+    prefix: '/portal/projects',
+    icon: Home,
+    badge: 'pendingDecisions',
+  },
   {
     href: '/portal/appointments',
     label: 'Appointments',
     prefix: '/portal/appointments',
     icon: Calendar,
   },
-  { href: '/portal/documents', label: 'Documents', prefix: '/portal/documents', icon: FileText },
-  { href: '/portal/invoices', label: 'Invoices', prefix: '/portal/invoices', icon: Receipt },
+  {
+    href: '/portal/documents',
+    label: 'Documents',
+    prefix: '/portal/documents',
+    icon: FileText,
+    badge: 'newDocuments',
+  },
+  {
+    href: '/portal/invoices',
+    label: 'Invoices',
+    prefix: '/portal/invoices',
+    icon: Receipt,
+    badge: 'unpaidInvoices',
+  },
 ];
 
 interface Props {
   user: CurrentUser;
   /** May be null if the layout failed to find the linked client row. */
   client: PortalNavClient | null;
+  badges: PortalBadgeCounts;
 }
 
 /**
@@ -75,15 +99,43 @@ interface Props {
  * Both surfaces share `NAV_LINKS` and `useActiveHref` so adding a new
  * portal page is a one-place edit.
  */
-export function PortalNav({ user, client }: Props) {
+export function PortalNav({ user, client, badges }: Props) {
   const pathname = usePathname();
   const isActive = useActiveHref(pathname);
 
   return (
     <>
-      <TopBar user={user} client={client} isActive={isActive} />
-      <BottomTabs isActive={isActive} />
+      <TopBar user={user} client={client} isActive={isActive} badges={badges} />
+      <BottomTabs isActive={isActive} badges={badges} />
     </>
+  );
+}
+
+function badgeCount(badges: PortalBadgeCounts, key: BadgeKey | undefined): number {
+  return key ? badges[key] : 0;
+}
+
+/**
+ * Small red dot with a number, capped at 9+. Returns null when count is 0
+ * so callers can drop it into JSX unconditionally.
+ */
+function BadgeDot({ count, position }: { count: number; position: 'top' | 'icon' }) {
+  if (count <= 0) return null;
+  const display = count > 9 ? '9+' : String(count);
+  return (
+    <span
+      aria-label={`${count} unread`}
+      className={cn(
+        'pointer-events-none inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white',
+        // Top-bar pills sit inline next to the label; mobile-tab badges
+        // float on the corner of the icon so the icon stays centred.
+        position === 'top'
+          ? 'ml-1.5 align-middle'
+          : 'absolute -top-0.5 -right-1 ring-2 ring-white',
+      )}
+    >
+      {display}
+    </span>
   );
 }
 
@@ -109,10 +161,12 @@ function TopBar({
   user,
   client,
   isActive,
+  badges,
 }: {
   user: CurrentUser;
   client: PortalNavClient | null;
   isActive: (link: NavLink) => boolean;
+  badges: PortalBadgeCounts;
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-gray-100 bg-white">
@@ -133,6 +187,7 @@ function TopBar({
         <nav className="hidden flex-1 items-center gap-1 md:flex">
           {NAV_LINKS.map((link) => {
             const active = isActive(link);
+            const count = badgeCount(badges, link.badge);
             return (
               <Link
                 key={link.href}
@@ -145,6 +200,7 @@ function TopBar({
                 )}
               >
                 {link.label}
+                <BadgeDot count={count} position="top" />
                 {active && (
                   <span className="bg-brand-teal-500 absolute right-3 -bottom-3 left-3 h-0.5 rounded-full" />
                 )}
@@ -378,7 +434,13 @@ function EditProfileModal({
 // Bottom tab bar (mobile only)
 // ---------------------------------------------------------------------------
 
-function BottomTabs({ isActive }: { isActive: (link: NavLink) => boolean }) {
+function BottomTabs({
+  isActive,
+  badges,
+}: {
+  isActive: (link: NavLink) => boolean;
+  badges: PortalBadgeCounts;
+}) {
   return (
     <nav
       // Fixed to the viewport bottom on mobile. md:hidden so it disappears
@@ -392,6 +454,7 @@ function BottomTabs({ isActive }: { isActive: (link: NavLink) => boolean }) {
       <ul className="grid grid-cols-5">
         {NAV_LINKS.map((link) => {
           const active = isActive(link);
+          const count = badgeCount(badges, link.badge);
           const Icon = link.icon;
           return (
             <li key={link.href}>
@@ -405,7 +468,10 @@ function BottomTabs({ isActive }: { isActive: (link: NavLink) => boolean }) {
                 )}
                 aria-current={active ? 'page' : undefined}
               >
-                <Icon size={20} strokeWidth={1.5} />
+                <span className="relative">
+                  <Icon size={20} strokeWidth={1.5} />
+                  <BadgeDot count={count} position="icon" />
+                </span>
                 <span className={cn('text-[10px]', active ? 'font-semibold' : 'font-medium')}>
                   {link.label}
                 </span>

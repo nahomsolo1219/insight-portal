@@ -14,12 +14,16 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { useMemo, useOptimistic, useState, useTransition } from 'react';
+import { useEffect, useMemo, useOptimistic, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Field, inputClass, textareaClass } from '@/components/admin/Field';
 import { FileUpload, type FileUploadItem } from '@/components/admin/FileUpload';
 import { LoadingDots } from '@/components/admin/LoadingDots';
 import { Modal } from '@/components/admin/Modal';
+import {
+  PhotoReviewPanel,
+  type ReviewablePhoto,
+} from '@/components/admin/PhotoReviewPanel';
 import { useToast } from '@/components/admin/ToastProvider';
 import { cn } from '@/lib/utils';
 import {
@@ -96,8 +100,9 @@ export function PhotosTabClient({
   const [, startTransition] = useTransition();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const isDesktop = useIsDesktop();
   const [bulkCatOpen, setBulkCatOpen] = useState(false);
   const [bulkRejectOpen, setBulkRejectOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -158,9 +163,53 @@ export function PhotosTabClient({
     });
   }, [optimisticPhotos, statusFilter, projectFilter, tagFilter]);
 
-  const detailPhoto = detailId
-    ? optimisticPhotos.find((p) => p.id === detailId) ?? null
+  // Suggestions for the side-panel category autocomplete — pulled from the
+  // categories already in use on this property so David doesn't have to
+  // re-type the same value across a 30-photo batch.
+  const categorySuggestions = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of optimisticPhotos) {
+      if (p.category && p.category.trim()) set.add(p.category.trim());
+    }
+    return Array.from(set).sort();
+  }, [optimisticPhotos]);
+
+  // Derived effective selection — see PhotoQueueClient for the full
+  // rationale; same three-tier rule (explicit pick → desktop fallback to
+  // first visible → null on mobile / empty).
+  const activeIdEffective = useMemo(() => {
+    if (activeId && filtered.some((p) => p.id === activeId)) return activeId;
+    if (isDesktop && filtered.length > 0) return filtered[0].id;
+    return null;
+  }, [activeId, filtered, isDesktop]);
+
+  const detailPhoto = activeIdEffective
+    ? optimisticPhotos.find((p) => p.id === activeIdEffective) ?? null
     : null;
+
+  // Map the filtered photo list into the panel shape. Walking only the
+  // filtered set keeps the "next pending" lookup honest — clicking through
+  // a "Pending" filter walks pending only.
+  const panelPhotos = useMemo<ReviewablePhoto[]>(
+    () =>
+      filtered.map((p) => ({
+        id: p.id,
+        caption: p.caption,
+        signedUrl: p.signedUrl,
+        uploadedAt: p.uploadedAt,
+        uploadedByName: p.uploadedByName,
+        status: p.status,
+        tag: p.tag,
+        category: p.category,
+        projectId: p.projectId,
+        propertyName: null,
+        projectName: p.projectName,
+        milestoneTitle: p.milestoneTitle,
+        gpsLat: p.gpsLat,
+        gpsLng: p.gpsLng,
+      })),
+    [filtered],
+  );
 
   function handleCategorize(
     ids: string[],
@@ -243,12 +292,34 @@ export function PhotosTabClient({
       ) : filtered.length === 0 ? (
         <FilteredEmptyState />
       ) : (
-        <PhotoGrid
-          photos={filtered}
-          selectedIds={selectedIds}
-          onToggleSelect={toggleSelect}
-          onCardClick={setDetailId}
-        />
+        <div className="md:grid md:grid-cols-[1fr_380px] md:gap-6">
+          <PhotoGrid
+            photos={filtered}
+            selectedIds={selectedIds}
+            activeId={activeIdEffective}
+            onToggleSelect={toggleSelect}
+            onCardClick={setActiveId}
+          />
+          <PhotoReviewPanel
+            photos={panelPhotos}
+            selectedId={activeIdEffective}
+            onSelect={setActiveId}
+            onApprove={(p, data) =>
+              handleCategorize([p.id], {
+                tag: data.tag,
+                category: data.category,
+                projectId: data.projectId,
+              })
+            }
+            onReject={(p) => handleReject([p.id])}
+            onDelete={(p) => {
+              const target = optimisticPhotos.find((q) => q.id === p.id);
+              if (target) setDeleteSingleTarget(target);
+            }}
+            projects={projects}
+            categorySuggestions={categorySuggestions}
+          />
+        </div>
       )}
 
       {selectedIds.size > 0 && (
@@ -263,15 +334,17 @@ export function PhotosTabClient({
         />
       )}
 
-      {detailPhoto && (
+      {/* Modal stays mounted only on mobile — desktop drives review through
+          the side panel above and skips opening the modal entirely. */}
+      {detailPhoto && !isDesktop && (
         <PhotoDetailModal
           photo={detailPhoto}
           projects={projects}
-          onClose={() => setDetailId(null)}
+          onClose={() => setActiveId(null)}
           onCategorize={handleCategorize}
           onReject={handleReject}
           onRequestDelete={() => {
-            setDetailId(null);
+            setActiveId(null);
             setDeleteSingleTarget(detailPhoto);
           }}
         />
@@ -479,18 +552,20 @@ function ToggleGroup<V extends string>({
 interface PhotoGridProps {
   photos: PhotoRowWithUrl[];
   selectedIds: Set<string>;
+  activeId: string | null;
   onToggleSelect: (id: string) => void;
   onCardClick: (id: string) => void;
 }
 
-function PhotoGrid({ photos, selectedIds, onToggleSelect, onCardClick }: PhotoGridProps) {
+function PhotoGrid({ photos, selectedIds, activeId, onToggleSelect, onCardClick }: PhotoGridProps) {
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-2 lg:grid-cols-3">
       {photos.map((photo) => (
         <PhotoCard
           key={photo.id}
           photo={photo}
           selected={selectedIds.has(photo.id)}
+          isActive={activeId === photo.id}
           onToggleSelect={() => onToggleSelect(photo.id)}
           onOpen={() => onCardClick(photo.id)}
         />
@@ -502,11 +577,12 @@ function PhotoGrid({ photos, selectedIds, onToggleSelect, onCardClick }: PhotoGr
 interface PhotoCardProps {
   photo: PhotoRowWithUrl;
   selected: boolean;
+  isActive: boolean;
   onToggleSelect: () => void;
   onOpen: () => void;
 }
 
-function PhotoCard({ photo, selected, onToggleSelect, onOpen }: PhotoCardProps) {
+function PhotoCard({ photo, selected, isActive, onToggleSelect, onOpen }: PhotoCardProps) {
   const tag = tagMeta(photo.tag);
   const isPending = photo.status === 'pending';
   const isRejected = photo.status === 'rejected';
@@ -516,7 +592,10 @@ function PhotoCard({ photo, selected, onToggleSelect, onOpen }: PhotoCardProps) 
       className={cn(
         'shadow-card group relative overflow-hidden rounded-2xl bg-white transition-all',
         isPending && 'ring-2 ring-amber-300',
-        selected && 'ring-brand-teal-500 ring-2',
+        // Both the bulk-select checkbox and the side-panel selection share
+        // the teal ring; they overwrite each other but resolve to the same
+        // visual either way.
+        (selected || isActive) && 'ring-brand-teal-500 ring-2',
       )}
     >
       <button
@@ -1499,6 +1578,25 @@ function SingleDeleteModal({ photo, clientId, onClose }: SingleDeleteModalProps)
 }
 
 // ---------- helpers ----------
+
+/**
+ * Returns whether the viewport is currently >= md (768px). Reads matchMedia
+ * synchronously on first client render so the side-panel layout doesn't
+ * flash in after hydration.
+ */
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(min-width: 768px)').matches;
+  });
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const update = () => setIsDesktop(mq.matches);
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  return isDesktop;
+}
 
 /**
  * Format a photo's upload timestamp. Same date/time as the card and the

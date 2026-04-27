@@ -3,9 +3,13 @@
 import { CheckCheck, CheckSquare, ImageOff, MapPin, Square, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useOptimistic, useState, useTransition } from 'react';
+import { useEffect, useMemo, useOptimistic, useState, useTransition } from 'react';
 import { Field, inputClass } from '@/components/admin/Field';
 import { Modal } from '@/components/admin/Modal';
+import {
+  PhotoReviewPanel,
+  type ReviewablePhoto,
+} from '@/components/admin/PhotoReviewPanel';
 import { useToast } from '@/components/admin/ToastProvider';
 import { cn } from '@/lib/utils';
 import {
@@ -33,8 +37,9 @@ export function PhotoQueueClient({ photos }: PhotoQueueClientProps) {
   const { showToast } = useToast();
   const [, startTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [bulkRejectOpen, setBulkRejectOpen] = useState(false);
+  const isDesktop = useIsDesktop();
 
   // The queue only shows pending photos, so approving or rejecting removes
   // them from the grid. The reducer filters out resolved ids — on success
@@ -112,9 +117,54 @@ export function PhotoQueueClient({ photos }: PhotoQueueClientProps) {
     return Array.from(map.entries());
   }, [optimisticPhotos]);
 
-  const detailPhoto = detailId
-    ? optimisticPhotos.find((p) => p.id === detailId) ?? null
+  // Derived effective selection. Three rules in priority order:
+  //   1. If the user explicitly selected a photo and it's still in the
+  //      list, honour it.
+  //   2. Otherwise on desktop, fall back to the first photo so the panel
+  //      always has content (and slides forward after an approve drops
+  //      the previous selection).
+  //   3. Otherwise (mobile / empty list), null — the panel hides itself
+  //      via its `hidden md:flex` class so this is moot, and the modal
+  //      gate also reads null and stays closed.
+  // Computing this synchronously instead of via useEffect avoids cascading
+  // renders and the React 19 set-state-in-effect lint warning.
+  const activeIdEffective = useMemo(() => {
+    if (activeId && optimisticPhotos.some((p) => p.id === activeId)) return activeId;
+    if (isDesktop && optimisticPhotos.length > 0) return optimisticPhotos[0].id;
+    return null;
+  }, [activeId, optimisticPhotos, isDesktop]);
+
+  const activePhoto = activeIdEffective
+    ? optimisticPhotos.find((p) => p.id === activeIdEffective) ?? null
     : null;
+
+  // Map every queue photo into the panel's ReviewablePhoto shape. Memoized
+  // so the panel only re-derives when the underlying list changes.
+  const panelPhotos = useMemo<ReviewablePhoto[]>(
+    () =>
+      optimisticPhotos.map((p) => ({
+        id: p.id,
+        caption: p.caption,
+        signedUrl: p.signedUrl,
+        uploadedAt: p.uploadedAt,
+        uploadedByName: p.uploadedByName,
+        status: 'pending',
+        tag: null,
+        category: null,
+        projectId: p.projectId,
+        clientName: p.clientName,
+        clientId: p.clientId,
+        propertyName: p.propertyName,
+        projectName: p.projectName,
+        gpsLat: p.gpsLat,
+        gpsLng: p.gpsLng,
+      })),
+    [optimisticPhotos],
+  );
+
+  function handleCardClick(id: string) {
+    setActiveId(id);
+  }
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -153,43 +203,60 @@ export function PhotoQueueClient({ photos }: PhotoQueueClientProps) {
 
   return (
     <div className="pb-24">
-      <div className="space-y-8">
-        {byClient.map(([clientId, group]) => (
-          <section key={clientId}>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Link
-                  href={`/admin/clients/${clientId}`}
-                  className="hover:text-brand-teal-500 text-sm font-semibold text-gray-900 transition-colors"
+      <div className="md:grid md:grid-cols-[1fr_380px] md:gap-6">
+        <div className="space-y-8">
+          {byClient.map(([clientId, group]) => (
+            <section key={clientId}>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/admin/clients/${clientId}`}
+                    className="hover:text-brand-teal-500 text-sm font-semibold text-gray-900 transition-colors"
+                  >
+                    {group.clientName}
+                  </Link>
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
+                    {group.photos.length}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => selectAllFromClient(group.photos)}
+                  className="hover:text-brand-teal-500 text-xs font-medium text-gray-500 transition-colors"
                 >
-                  {group.clientName}
-                </Link>
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
-                  {group.photos.length}
-                </span>
+                  Select all
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => selectAllFromClient(group.photos)}
-                className="hover:text-brand-teal-500 text-xs font-medium text-gray-500 transition-colors"
-              >
-                Select all
-              </button>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {group.photos.map((photo) => (
-                <QueuePhotoCard
-                  key={photo.id}
-                  photo={photo}
-                  selected={selectedIds.has(photo.id)}
-                  onToggleSelect={() => toggleSelect(photo.id)}
-                  onOpen={() => setDetailId(photo.id)}
-                />
-              ))}
-            </div>
-          </section>
-        ))}
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {group.photos.map((photo) => (
+                  <QueuePhotoCard
+                    key={photo.id}
+                    photo={photo}
+                    selected={selectedIds.has(photo.id)}
+                    isActive={activeIdEffective === photo.id}
+                    onToggleSelect={() => toggleSelect(photo.id)}
+                    onOpen={() => handleCardClick(photo.id)}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+
+        <PhotoReviewPanel
+          photos={panelPhotos}
+          selectedId={activeIdEffective}
+          onSelect={setActiveId}
+          onApprove={(p, data) =>
+            handleApprove(p.id, p.clientId ?? '', {
+              tag: data.tag,
+              category: data.category,
+              projectId: data.projectId,
+            })
+          }
+          onReject={(p) => handleReject(p.id, p.clientId ?? '')}
+        />
       </div>
 
       {selectedIds.size > 0 && (
@@ -200,10 +267,12 @@ export function PhotoQueueClient({ photos }: PhotoQueueClientProps) {
         />
       )}
 
-      {detailPhoto && (
+      {/* Modal stays mounted only on mobile — desktop drives review through
+          the side panel above and skips opening the modal entirely. */}
+      {activePhoto && !isDesktop && (
         <PhotoReviewModal
-          photo={detailPhoto}
-          onClose={() => setDetailId(null)}
+          photo={activePhoto}
+          onClose={() => setActiveId(null)}
           onApprove={handleApprove}
           onReject={handleReject}
         />
@@ -228,16 +297,19 @@ export function PhotoQueueClient({ photos }: PhotoQueueClientProps) {
 interface QueuePhotoCardProps {
   photo: QueuePhotoWithUrl;
   selected: boolean;
+  isActive: boolean;
   onToggleSelect: () => void;
   onOpen: () => void;
 }
 
-function QueuePhotoCard({ photo, selected, onToggleSelect, onOpen }: QueuePhotoCardProps) {
+function QueuePhotoCard({ photo, selected, isActive, onToggleSelect, onOpen }: QueuePhotoCardProps) {
   return (
     <div
       className={cn(
         'shadow-card group relative overflow-hidden rounded-2xl bg-white transition-all ring-2 ring-amber-300',
-        selected && 'ring-brand-teal-500',
+        // Selection (checkbox) ring trumps the active panel ring — both
+        // resolve to the same teal so the visual is consistent either way.
+        (selected || isActive) && 'ring-brand-teal-500',
       )}
     >
       <button
@@ -566,6 +638,26 @@ function EmptyState() {
 }
 
 // ---------- helpers ----------
+
+/**
+ * Returns whether the viewport is currently >= md (768px). Reads the
+ * matchMedia synchronously on the client so the first paint already
+ * matches the destination layout — keeps the side-panel from briefly
+ * popping in after hydration.
+ */
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(min-width: 768px)').matches;
+  });
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const update = () => setIsDesktop(mq.matches);
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  return isDesktop;
+}
 
 function formatUploadedAt(d: Date): string {
   const diffMs = Date.now() - d.getTime();

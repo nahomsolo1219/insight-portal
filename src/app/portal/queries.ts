@@ -8,10 +8,13 @@ import { db } from '@/db';
 import {
   appointments,
   clients,
+  documents,
   invoices,
   milestones,
+  photos,
   projects,
   properties,
+  reports,
   staff,
 } from '@/db/schema';
 
@@ -225,4 +228,265 @@ export async function getClientActiveProjects(
     .innerJoin(properties, eq(properties.id, projects.propertyId))
     .where(and(eq(properties.clientId, clientId), eq(projects.status, 'active')))
     .orderBy(desc(projects.startDate));
+}
+
+// ---------------------------------------------------------------------------
+// Recent activity (dashboard feed) + portal nav badge counts
+// ---------------------------------------------------------------------------
+
+export type ActivityType = 'milestone' | 'photo' | 'report' | 'invoice';
+
+export interface ActivityItem {
+  type: ActivityType;
+  title: string;
+  subtitle: string;
+  /** ISO timestamp; the UI sorts on this and renders relative time. */
+  date: string;
+}
+
+/**
+ * Unified activity feed combining recent completed milestones, categorized
+ * photo uploads, reports, and invoices. Each source contributes its top-N
+ * candidates; we merge, sort by date desc, and slice.
+ *
+ * Note on milestone timestamps: the `milestones` table doesn't have a
+ * dedicated `completedAt` column — `updatedAt` is the closest signal we
+ * have for "when this flipped to complete". Acceptable while the only
+ * thing that changes a complete milestone's row is, in practice, the
+ * status flip itself.
+ */
+export async function getClientRecentActivity(
+  clientId: string,
+  limit = 8,
+): Promise<ActivityItem[]> {
+  const clientProperties = await db
+    .select({ id: properties.id })
+    .from(properties)
+    .where(eq(properties.clientId, clientId));
+
+  const propertyIds = clientProperties.map((p) => p.id);
+
+  const items: ActivityItem[] = [];
+
+  if (propertyIds.length > 0) {
+    const projectRows = await db
+      .select({ id: projects.id, name: projects.name })
+      .from(projects)
+      .where(inArray(projects.propertyId, propertyIds));
+    const projectIds = projectRows.map((p) => p.id);
+
+    const [milestoneRows, photoRows, reportRows] = await Promise.all([
+      projectIds.length === 0
+        ? []
+        : db
+            .select({
+              title: milestones.title,
+              updatedAt: milestones.updatedAt,
+              projectName: projects.name,
+            })
+            .from(milestones)
+            .innerJoin(projects, eq(projects.id, milestones.projectId))
+            .where(
+              and(
+                inArray(milestones.projectId, projectIds),
+                eq(milestones.status, 'complete'),
+              ),
+            )
+            .orderBy(desc(milestones.updatedAt))
+            .limit(limit),
+      db
+        .select({
+          uploadedAt: photos.uploadedAt,
+          propertyName: properties.name,
+        })
+        .from(photos)
+        .innerJoin(properties, eq(properties.id, photos.propertyId))
+        .where(
+          and(
+            inArray(photos.propertyId, propertyIds),
+            eq(photos.status, 'categorized'),
+          ),
+        )
+        .orderBy(desc(photos.uploadedAt))
+        .limit(20),
+      db
+        .select({
+          name: reports.name,
+          createdAt: reports.createdAt,
+          propertyName: properties.name,
+        })
+        .from(reports)
+        .innerJoin(properties, eq(properties.id, reports.propertyId))
+        .where(inArray(reports.propertyId, propertyIds))
+        .orderBy(desc(reports.createdAt))
+        .limit(limit),
+    ]);
+
+    for (const m of milestoneRows) {
+      items.push({
+        type: 'milestone',
+        title: `${m.title} completed`,
+        subtitle: m.projectName,
+        date: m.updatedAt.toISOString(),
+      });
+    }
+
+    // Photos collapse into "N new photos at <Property> on <day>" so the
+    // feed doesn't drown when field staff drops 12 shots at once.
+    const photoBuckets = new Map<string, { count: number; latest: Date }>();
+    for (const p of photoRows) {
+      const day = p.uploadedAt.toISOString().slice(0, 10);
+      const key = `${day}__${p.propertyName}`;
+      const entry = photoBuckets.get(key);
+      if (entry) {
+        entry.count += 1;
+        if (p.uploadedAt > entry.latest) entry.latest = p.uploadedAt;
+      } else {
+        photoBuckets.set(key, { count: 1, latest: p.uploadedAt });
+      }
+    }
+    for (const [key, entry] of photoBuckets) {
+      const propertyName = key.split('__')[1] ?? '';
+      items.push({
+        type: 'photo',
+        title:
+          entry.count === 1
+            ? '1 new photo added'
+            : `${entry.count} new photos added`,
+        subtitle: propertyName,
+        date: entry.latest.toISOString(),
+      });
+    }
+
+    for (const r of reportRows) {
+      items.push({
+        type: 'report',
+        title: `${r.name} added`,
+        subtitle: r.propertyName,
+        date: r.createdAt.toISOString(),
+      });
+    }
+  }
+
+  const recentInvoices = await db
+    .select({
+      number: invoices.invoiceNumber,
+      description: invoices.description,
+      invoiceDate: invoices.invoiceDate,
+      createdAt: invoices.createdAt,
+      amountCents: invoices.amountCents,
+    })
+    .from(invoices)
+    .where(eq(invoices.clientId, clientId))
+    .orderBy(desc(invoices.createdAt))
+    .limit(limit);
+
+  for (const inv of recentInvoices) {
+    const dollars = (inv.amountCents ?? 0) / 100;
+    items.push({
+      type: 'invoice',
+      title: `Invoice #${inv.number} issued`,
+      subtitle: `$${dollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${inv.description ? ` · ${inv.description}` : ''}`,
+      date: inv.createdAt.toISOString(),
+    });
+  }
+
+  items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return items.slice(0, limit);
+}
+
+export interface PortalBadgeCounts {
+  pendingDecisions: number;
+  unpaidInvoices: number;
+  newDocuments: number;
+}
+
+/**
+ * Counts driving the red-dot badges on the portal nav. Three signals:
+ *  - decisions awaiting client response (Projects tab)
+ *  - documents/reports added in the last 7 days (Documents tab)
+ *  - unpaid + partial invoices (Invoices tab)
+ *
+ * Cheap because it's all `count()` aggregates — runs once per portal
+ * request via the layout, threaded into PortalNav as a prop.
+ */
+export async function getPortalBadgeCounts(
+  clientId: string,
+): Promise<PortalBadgeCounts> {
+  const clientProperties = await db
+    .select({ id: properties.id })
+    .from(properties)
+    .where(eq(properties.clientId, clientId));
+
+  const propertyIds = clientProperties.map((p) => p.id);
+
+  // Run unpaid invoices in parallel with everything else — it doesn't need
+  // the property/project lookup, so it can race ahead.
+  const unpaidPromise = db
+    .select({ count: count() })
+    .from(invoices)
+    .where(
+      and(
+        eq(invoices.clientId, clientId),
+        inArray(invoices.status, ['unpaid', 'partial']),
+      ),
+    )
+    .then((rows) => Number(rows[0]?.count ?? 0));
+
+  if (propertyIds.length === 0) {
+    const unpaidInvoices = await unpaidPromise;
+    return { pendingDecisions: 0, unpaidInvoices, newDocuments: 0 };
+  }
+
+  const projectRows = await db
+    .select({ id: projects.id })
+    .from(projects)
+    .where(inArray(projects.propertyId, propertyIds));
+  const projectIds = projectRows.map((p) => p.id);
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const [decisionRow, docRow, reportRow, unpaidInvoices] = await Promise.all([
+    projectIds.length === 0
+      ? Promise.resolve(0)
+      : db
+          .select({ count: count() })
+          .from(milestones)
+          .where(
+            and(
+              inArray(milestones.projectId, projectIds),
+              eq(milestones.status, 'awaiting_client'),
+            ),
+          )
+          .then((rows) => Number(rows[0]?.count ?? 0)),
+    projectIds.length === 0
+      ? Promise.resolve(0)
+      : db
+          .select({ count: count() })
+          .from(documents)
+          .where(
+            and(
+              inArray(documents.projectId, projectIds),
+              gte(documents.createdAt, sevenDaysAgo),
+            ),
+          )
+          .then((rows) => Number(rows[0]?.count ?? 0)),
+    db
+      .select({ count: count() })
+      .from(reports)
+      .where(
+        and(
+          inArray(reports.propertyId, propertyIds),
+          gte(reports.createdAt, sevenDaysAgo),
+        ),
+      )
+      .then((rows) => Number(rows[0]?.count ?? 0)),
+    unpaidPromise,
+  ]);
+
+  return {
+    pendingDecisions: decisionRow,
+    unpaidInvoices,
+    newDocuments: docRow + reportRow,
+  };
 }
