@@ -50,6 +50,13 @@
       "when": 1777270934940,
       "tag": "0006_previous_wallflower",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777273608294,
+      "tag": "0007_charming_crusher_hogan",
+      "breakpoints": true
     }
   ]
 }

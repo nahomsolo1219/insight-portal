@@ -98,7 +98,7 @@ async function seed() {
     .insert(staff)
     .values({
       name: 'Mike Torres',
-      role: 'field_lead',
+      role: 'field_staff',
       email: 'mike@insighthm.com',
       phone: '(415) 555-0102',
       status: 'active',

@@ -18,11 +18,13 @@ import {
   boolean,
   date,
   integer,
+  index,
   jsonb,
   numeric,
   pgEnum,
   pgSchema,
   pgTable,
+  primaryKey,
   text,
   time,
   timestamp,
@@ -65,11 +67,14 @@ export const questionTypeEnum = pgEnum('question_type', [
   'open',
   'acknowledge',
 ]);
+// `field_lead` and `field_tech` were collapsed to a single `field_staff`
+// HR role in migration 0007 — the auth role enum already only had one
+// `field_staff` value, so the distinction was generating noise without a
+// payoff. Old rows are migrated in the same migration.
 export const staffRoleEnum = pgEnum('staff_role', [
   'founder',
   'project_manager',
-  'field_lead',
-  'field_tech',
+  'field_staff',
   'admin_assistant',
 ]);
 export const staffStatusEnum = pgEnum('staff_status', ['active', 'pending', 'inactive']);
@@ -302,6 +307,28 @@ export const projects = pgTable('projects', {
   paidCents: integer('paid_cents').notNull().default(0),
   ...timestamps,
 });
+
+// project_assignments — many-to-many between projects and field-staff
+// users (profiles.id == auth.users.id). Drives what each technician can
+// see in the field app: properties surface only when they have at least
+// one assigned project on them. Composite PK prevents duplicate
+// assignments; index on userId speeds the field-side scoping queries.
+export const projectAssignments = pgTable(
+  'project_assignments',
+  {
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.userId] }),
+    index('project_assignments_user_id_idx').on(t.userId),
+  ],
+);
 
 // milestones
 export const milestones = pgTable('milestones', {

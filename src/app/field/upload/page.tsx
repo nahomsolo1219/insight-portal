@@ -1,10 +1,10 @@
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import {
-  getAllActiveProperties,
-  getPropertyProjects,
+  getAssignedProperties,
+  getAssignedPropertyProjects,
   type FieldProjectOption,
 } from '../queries';
 import { MobilePhotoCapture } from './MobilePhotoCapture';
@@ -18,6 +18,10 @@ interface PageProps {
  * options + (when a property is pre-selected via the URL) the matching
  * project list. The MobilePhotoCapture client component owns all the
  * interactive state.
+ *
+ * If the user has zero project assignments, we render a "no projects
+ * yet" empty state instead of the picker UI — see CLAUDE.md /
+ * PORTAL_FIELD_INVENTORY for the cold-start design.
  */
 export default async function FieldUploadPage({ searchParams }: PageProps) {
   const user = await getCurrentUser();
@@ -27,13 +31,14 @@ export default async function FieldUploadPage({ searchParams }: PageProps) {
   const initialPropertyId = params.propertyId ?? null;
   const initialProjectId = params.projectId ?? null;
 
-  // Two parallel reads: the property list (for the dropdown) and — when
-  // the URL pinned a property — its active projects so the project
-  // picker can render with the right options on first paint.
+  // Two parallel reads: the property list scoped to this user's
+  // assignments, and — when the URL pinned a property — its assigned
+  // projects so the project picker renders with the right options on
+  // first paint.
   const [propertyList, initialProjects] = await Promise.all([
-    getAllActiveProperties(),
+    getAssignedProperties(user.id),
     initialPropertyId
-      ? getPropertyProjects(initialPropertyId)
+      ? getAssignedPropertyProjects(initialPropertyId, user.id)
       : (Promise.resolve([]) as Promise<FieldProjectOption[]>),
   ]);
 
@@ -54,12 +59,38 @@ export default async function FieldUploadPage({ searchParams }: PageProps) {
         </p>
       </header>
 
-      <MobilePhotoCapture
-        properties={propertyList}
-        initialPropertyId={initialPropertyId}
-        initialProjectId={initialProjectId}
-        initialProjects={initialProjects}
-      />
+      {propertyList.length === 0 ? (
+        <NoAssignmentsState />
+      ) : (
+        <MobilePhotoCapture
+          properties={propertyList}
+          initialPropertyId={initialPropertyId}
+          initialProjectId={initialProjectId}
+          initialProjects={initialProjects}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Cold-start UI for any field user who hasn't been added to a project
+ * yet. Mirrors the existing "no schedule today" card style — same
+ * shadow, radius, icon-in-circle pattern — instead of inventing a new
+ * empty-state primitive (that's polish-list work).
+ */
+function NoAssignmentsState() {
+  return (
+    <div className="shadow-card flex items-start gap-3 rounded-2xl bg-white p-5">
+      <span className="bg-brand-warm-200 inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-gray-400">
+        <MapPin size={18} strokeWidth={1.5} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 className="text-sm font-semibold text-gray-900">No projects assigned yet.</h2>
+        <p className="mt-1 text-sm text-gray-600">
+          Contact your admin to get added to a project.
+        </p>
+      </div>
     </div>
   );
 }

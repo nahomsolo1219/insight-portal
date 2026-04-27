@@ -9,8 +9,7 @@ import { staff } from '@/db/schema';
 export type StaffRole =
   | 'founder'
   | 'project_manager'
-  | 'field_lead'
-  | 'field_tech'
+  | 'field_staff'
   | 'admin_assistant';
 
 export type StaffStatus = 'active' | 'pending' | 'inactive';

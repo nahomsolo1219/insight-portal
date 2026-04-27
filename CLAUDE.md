@@ -75,12 +75,13 @@ See `src/lib/types.ts` for complete interfaces.
 - Route group: `src/app/field/` — mobile-first, full-bleed, no sidebar, no bottom tabs.
 - Layout: teal header band with logo + sign-out, content area scrolls. iOS safe-area insets via `.safe-area-top` / `.safe-area-bottom` utilities (added to globals.css).
 - Auth: requires `role = 'field_staff'`. Admins are explicitly allowed for testing. Clients get bounced to `/portal`.
+- **Scoping (post-0007):** field staff see only properties / projects / appointments tied to a `project_assignments` row matching their `auth.uid()`. A user with zero assignments lands on a "No projects assigned yet — contact your admin" empty state on `/field/upload`. Admins bypass the scope (testing). Admins manage assignments via the admin project surface (Part 2 of this work — not yet built).
 - Pages:
-  - `/field` — today's schedule (every active client; field staff are dispatched anywhere), big "Upload to any property" CTA, recent uploads strip with status dots (pending = amber, categorized = emerald, rejected = red).
-  - `/field/upload` — property + project pickers, optional caption, camera/file input with `capture="environment"` (rear camera default on mobile), thumbnail strip, gold upload CTA, success card.
-- Upload action: `uploadFieldPhotos` always lands rows as `status = 'pending'` so the admin Photo Queue stays the single source of truth for client visibility. Per-file isolation — one bad image doesn't fail the whole batch. Audits the batch as one entry.
+  - `/field` — today's schedule, scoped to assignments; big "Upload to any property" CTA; recent uploads strip with status dots (pending = amber, categorized = emerald, rejected = red).
+  - `/field/upload` — property + project pickers (assignment-scoped), optional caption, camera/file input with `capture="environment"` (rear camera default on mobile), thumbnail strip, gold upload CTA, GPS prefetch + status row, success card.
+- Upload action: `uploadFieldPhotos` always lands rows as `status = 'pending'` so the admin Photo Queue stays the single source of truth for client visibility. Per-file isolation — one bad image doesn't fail the whole batch. Audits the batch as one entry. Server-side check rejects uploads against unassigned properties / projects (RLS is the safety net).
 - Project picker: `getPropertyProjectsAction` server action refreshes the project list when the technician changes the property dropdown — avoids passing the full property→projects map up front.
-- Storage: uses the existing `photoPath` helper + `'photos/'` prefix so the existing "Field staff upload photos" RLS policy gates inserts. No new policies.
+- Storage: uses the existing `photoPath` helper + `'photos/'` prefix so the existing "Field staff upload photos" RLS policy gates inserts. The policy was tightened in 0007 to also require an assigned project (or NULL `project_id`).
 
 ## Vendor documents
 

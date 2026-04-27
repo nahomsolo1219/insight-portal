@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { and, asc, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
-import { photos, projects, properties } from '@/db/schema';
+import { photos, projectAssignments, projects, properties } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireUser } from '@/lib/auth/current-user';
 import { photoPath } from '@/lib/storage/paths';
@@ -107,6 +107,44 @@ export async function uploadFieldPhotos(
 
   if (!property) return { success: false, error: 'Property not found.' };
 
+  // Defense-in-depth assignment checks. RLS on `photos.INSERT` and on
+  // SELECT for projects/properties is the safety net; these explicit
+  // checks give a clean error message and document the contract.
+  // Admins bypass since they may upload during testing or one-off
+  // ops without an assignment row.
+  if (user.role === 'field_staff') {
+    const propertyAssigned = await db
+      .select({ id: projectAssignments.projectId })
+      .from(projectAssignments)
+      .innerJoin(projects, eq(projects.id, projectAssignments.projectId))
+      .where(
+        and(
+          eq(projectAssignments.userId, user.id),
+          eq(projects.propertyId, propertyId),
+        ),
+      )
+      .limit(1);
+    if (propertyAssigned.length === 0) {
+      return { success: false, error: 'Not authorized to upload to this property.' };
+    }
+
+    if (input.projectId) {
+      const projectAssigned = await db
+        .select({ id: projectAssignments.projectId })
+        .from(projectAssignments)
+        .where(
+          and(
+            eq(projectAssignments.userId, user.id),
+            eq(projectAssignments.projectId, input.projectId),
+          ),
+        )
+        .limit(1);
+      if (projectAssigned.length === 0) {
+        return { success: false, error: 'Not authorized to upload to this project.' };
+      }
+    }
+  }
+
   const files = formData
     .getAll('photos')
     .filter((f): f is File => f instanceof File && f.size > 0);
@@ -201,20 +239,31 @@ export async function uploadFieldPhotos(
 }
 
 /**
- * Lookup projects for a property, callable from the client component
- * when the technician changes the property dropdown. Wraps the read in a
- * server action because the page needs to refresh the project picker
- * without a full navigation. Auth re-checked here — RLS would also
- * gate but the role check keeps the contract obvious.
+ * Lookup the user's assigned projects for a property, callable from the
+ * client component when the technician changes the property dropdown.
+ * Wraps the read in a server action because the page needs to refresh
+ * the project picker without a full navigation. Field staff get only
+ * their assigned projects; admins see every project on the property
+ * (testing convenience).
  */
 export async function getPropertyProjectsAction(
   propertyId: string,
 ): Promise<FieldProjectOption[]> {
   const user = await requireUser();
-  if (user.role !== 'field_staff' && user.role !== 'admin') return [];
+  if (user.role === 'admin') {
+    return db
+      .select({ id: projects.id, name: projects.name })
+      .from(projects)
+      .where(eq(projects.propertyId, propertyId))
+      .orderBy(asc(projects.name));
+  }
+  if (user.role !== 'field_staff') return [];
   return db
     .select({ id: projects.id, name: projects.name })
     .from(projects)
-    .where(and(eq(projects.propertyId, propertyId), eq(projects.status, 'active')))
+    .innerJoin(projectAssignments, eq(projectAssignments.projectId, projects.id))
+    .where(
+      and(eq(projects.propertyId, propertyId), eq(projectAssignments.userId, user.id)),
+    )
     .orderBy(asc(projects.name));
 }

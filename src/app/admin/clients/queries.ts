@@ -126,7 +126,7 @@ export interface TierOption {
 export interface PmOption {
   id: string;
   name: string;
-  role: 'founder' | 'project_manager' | 'field_lead' | 'field_tech' | 'admin_assistant';
+  role: 'founder' | 'project_manager' | 'field_staff' | 'admin_assistant';
 }
 
 export interface ClientFormOptions {

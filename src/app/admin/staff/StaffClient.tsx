@@ -18,8 +18,7 @@ const ROLE_OPTIONS: { id: StaffRole; label: string; badge: string }[] = [
     label: 'Project Manager',
     badge: 'bg-brand-teal-50 text-brand-teal-500',
   },
-  { id: 'field_lead', label: 'Field Lead', badge: 'bg-blue-50 text-blue-700' },
-  { id: 'field_tech', label: 'Field Technician', badge: 'bg-purple-50 text-purple-700' },
+  { id: 'field_staff', label: 'Field Staff', badge: 'bg-blue-50 text-blue-700' },
   { id: 'admin_assistant', label: 'Admin Assistant', badge: 'bg-gray-100 text-gray-600' },
 ];
 

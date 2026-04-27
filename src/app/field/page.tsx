@@ -22,7 +22,7 @@ export default async function FieldHomePage() {
   if (!user) redirect('/login');
 
   const [schedule, recent] = await Promise.all([
-    getTodaysFieldSchedule(),
+    getTodaysFieldSchedule(user.id),
     getMyRecentUploads(user.id, 12),
   ]);
 

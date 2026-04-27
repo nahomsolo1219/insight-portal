@@ -15,8 +15,7 @@ type ActionResult<T = undefined> =
 export type StaffRole =
   | 'founder'
   | 'project_manager'
-  | 'field_lead'
-  | 'field_tech'
+  | 'field_staff'
   | 'admin_assistant';
 
 export type StaffStatus = 'active' | 'pending' | 'inactive';
@@ -157,8 +156,11 @@ export async function createStaffMember(
     let inviteSent = false;
     let inviteError: string | undefined;
     if (input.sendInvite) {
-      const inviteRole: InviteRole =
-        input.role === 'field_lead' || input.role === 'field_tech' ? 'field_staff' : 'admin';
+      // Auth roles are coarser than HR roles: every founder /
+      // project_manager / admin_assistant gets `admin` access; field
+      // staff get `field_staff`. Now that the staff_role enum has a
+      // single field value, the mapping is a direct equality.
+      const inviteRole: InviteRole = input.role === 'field_staff' ? 'field_staff' : 'admin';
       const result = await inviteUser({
         email: input.email.trim(),
         fullName: input.name.trim(),

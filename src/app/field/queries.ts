@@ -1,11 +1,19 @@
-// Reads for the field staff app. Field staff can be dispatched to any
-// active client, so these queries deliberately ignore "ownership" — the
-// security model is RLS + the role check at the layout level, not data
-// scoping per technician.
+// Reads for the field staff app. Every list scopes to the signed-in
+// technician's project assignments via the `project_assignments` table —
+// a tech who isn't on a project doesn't see its property or schedule.
+// Cold start: every user lands with zero assignments until an admin adds
+// them, by design.
 
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, inArray } from 'drizzle-orm';
 import { db } from '@/db';
-import { appointments, clients, photos, projects, properties } from '@/db/schema';
+import {
+  appointments,
+  clients,
+  photos,
+  projectAssignments,
+  projects,
+  properties,
+} from '@/db/schema';
 import { getSignedUrls } from '@/lib/storage/upload';
 
 export interface FieldScheduleRow {
@@ -26,11 +34,14 @@ export interface FieldScheduleRow {
 }
 
 /**
- * Today's appointments across every active client. Field staff use this
- * as the day's punch list — pick a stop, upload photos, move on. Sorted
- * earliest-first by start time.
+ * Today's appointments scoped to the signed-in tech's assignments. An
+ * appointment surfaces only if the tech is assigned to at least one
+ * project on its property — that covers both the "tagged to project X"
+ * case (where they're explicitly on it) and the property-only walk-in
+ * case (where they're on *some* project at the address). Returns empty
+ * for users with no assignments.
  */
-export async function getTodaysFieldSchedule(): Promise<FieldScheduleRow[]> {
+export async function getTodaysFieldSchedule(userId: string): Promise<FieldScheduleRow[]> {
   const today = new Date().toISOString().slice(0, 10);
   return db
     .select({
@@ -57,6 +68,18 @@ export async function getTodaysFieldSchedule(): Promise<FieldScheduleRow[]> {
       and(
         eq(appointments.date, today),
         inArray(appointments.status, ['scheduled', 'confirmed']),
+        exists(
+          db
+            .select({ one: projectAssignments.projectId })
+            .from(projectAssignments)
+            .innerJoin(projects, eq(projects.id, projectAssignments.projectId))
+            .where(
+              and(
+                eq(projectAssignments.userId, userId),
+                eq(projects.propertyId, appointments.propertyId),
+              ),
+            ),
+        ),
       ),
     )
     .orderBy(asc(appointments.startTime));
@@ -72,13 +95,15 @@ export interface FieldPropertyRow {
 }
 
 /**
- * Every property under an active client — drives the property dropdown
- * on the upload screen for ad-hoc visits that aren't on today's schedule.
- * Sorted by client then property name so the dropdown groups intuitively.
+ * Properties the signed-in tech can shoot photos at — every property
+ * with at least one project they're assigned to. All-time: completed
+ * projects still surface their property so the tech can return for
+ * follow-up shots. DISTINCT prevents one property appearing N times
+ * when the user is assigned to N projects on it.
  */
-export async function getAllActiveProperties(): Promise<FieldPropertyRow[]> {
+export async function getAssignedProperties(userId: string): Promise<FieldPropertyRow[]> {
   return db
-    .select({
+    .selectDistinct({
       id: properties.id,
       name: properties.name,
       address: properties.address,
@@ -86,9 +111,11 @@ export async function getAllActiveProperties(): Promise<FieldPropertyRow[]> {
       clientId: clients.id,
       clientName: clients.name,
     })
-    .from(properties)
+    .from(projectAssignments)
+    .innerJoin(projects, eq(projects.id, projectAssignments.projectId))
+    .innerJoin(properties, eq(properties.id, projects.propertyId))
     .innerJoin(clients, eq(clients.id, properties.clientId))
-    .where(eq(clients.status, 'active'))
+    .where(eq(projectAssignments.userId, userId))
     .orderBy(asc(clients.name), asc(properties.name));
 }
 
@@ -98,15 +125,21 @@ export interface FieldProjectOption {
 }
 
 /**
- * Active projects on a property — populates the optional project picker
- * on the upload screen. Inactive projects are filtered out so the
- * picker doesn't show stale options.
+ * Projects on a property that the user is assigned to — populates the
+ * project picker on the upload screen. All statuses included; a tech
+ * may be tagging photos for a finished remodel after the fact.
  */
-export async function getPropertyProjects(propertyId: string): Promise<FieldProjectOption[]> {
+export async function getAssignedPropertyProjects(
+  propertyId: string,
+  userId: string,
+): Promise<FieldProjectOption[]> {
   return db
     .select({ id: projects.id, name: projects.name })
     .from(projects)
-    .where(and(eq(projects.propertyId, propertyId), eq(projects.status, 'active')))
+    .innerJoin(projectAssignments, eq(projectAssignments.projectId, projects.id))
+    .where(
+      and(eq(projects.propertyId, propertyId), eq(projectAssignments.userId, userId)),
+    )
     .orderBy(asc(projects.name));
 }
 
@@ -125,6 +158,8 @@ export interface FieldRecentUpload {
  * The signed-in user's last N uploads with thumbnail URLs. Powers the
  * "My recent uploads" strip on the home page so the technician can see
  * what they shipped that morning + which photos the office has reviewed.
+ * Unscoped by assignment — historical uploads stay visible even if the
+ * tech was later removed from the project.
  */
 export async function getMyRecentUploads(
   userId: string,
