@@ -19,6 +19,8 @@ export type AuditAction =
   | 'created property'
   | 'updated property'
   | 'deleted property'
+  | 'uploaded property cover photo'
+  | 'removed property cover photo'
   | 'created project'
   | 'updated project'
   | 'completed project'

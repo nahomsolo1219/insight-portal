@@ -166,6 +166,76 @@ See `src/db/migrations/README.md` for the current list.
 
 ---
 
+## Storage bucket setup
+
+Two buckets currently exist on this project:
+
+### `insight-files` (private)
+
+Originally created via the Supabase Dashboard. Holds photos,
+documents, invoices, reports, vendor docs, decision-option
+images, avatars, and `temp-downloads/` for ZIP exports.
+Path scheme is `{fileType}/{clientId}/...`. RLS policies live in
+`src/db/migrations/manual_storage_rls.sql`.
+
+If you ever need to recreate this from scratch on a fresh Supabase
+project:
+
+1. Open Supabase Dashboard → Storage → New bucket.
+2. Name: `insight-files`. Public: **off**.
+3. File size limit: 25 MB (matches `next.config.ts` body limit).
+4. Allowed MIME types: leave open (`image/*`, `application/pdf`,
+   `text/*` — vendor docs include various types).
+5. Apply the policies:
+   ```bash
+   npx tsx scripts/apply-manual-sql.ts manual_storage_rls.sql
+   ```
+
+### `property-covers` (public)
+
+Used by Phase 1 onward of the client portal redesign. Each
+property's optional editorial cover photo lives at
+`property-covers/{propertyId}.{ext}` — UUID-based, non-enumerable,
+overwritten on replace so cache busting via the
+`?v={uploaded_at}` query string just works.
+
+Setup (idempotent — re-running is safe):
+
+```bash
+npx tsx scripts/apply-manual-sql.ts manual_property_covers_storage.sql
+```
+
+That single file does both the bucket creation
+(`INSERT INTO storage.buckets ... ON CONFLICT DO UPDATE`) and the
+RLS policies on `storage.objects`. The bucket is **public read**
+because the URL is non-enumerable and editorial covers aren't
+sensitive; **admin write only** so clients and field staff can't
+upload through this surface.
+
+Policy SQL applied (also visible in the manual file):
+
+```sql
+-- public SELECT
+CREATE POLICY "Property covers public read"
+ON storage.objects FOR SELECT TO authenticated, anon
+USING (bucket_id = 'property-covers');
+
+-- admin INSERT / UPDATE / DELETE
+CREATE POLICY "Admin upload property covers"
+ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (
+  bucket_id = 'property-covers'
+  AND public.current_user_role() = 'admin'
+);
+-- ... matching UPDATE + DELETE policies — see the manual file.
+```
+
+To verify the bucket landed: connect via `DIRECT_URL` and run
+`SELECT id, public FROM storage.buckets;` — should list both
+`insight-files` (public=false) and `property-covers` (public=true).
+
+---
+
 ## October 2026 incident
 
 What happened:

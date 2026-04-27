@@ -8,6 +8,19 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '25mb',
     },
   },
+  // Allow Next/Image to optimize images served from Supabase Storage's
+  // public-bucket endpoint. We constrain by pathname to `/public/**` so
+  // signed URLs from private buckets (which change per request) don't
+  // get matched here — they'd fail Next/Image's deduplication anyway.
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
+  },
 };
 
 export default nextConfig;

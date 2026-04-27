@@ -178,6 +178,16 @@ export const properties = pgTable('properties', {
   gateCode: text('gate_code'),
   accessNotes: text('access_notes'),
   emergencyContact: text('emergency_contact'),
+  // Optional editorial cover photo for the redesigned client portal.
+  // The URL points at the public `property-covers` bucket; the
+  // uploaded-at timestamp is appended to the URL as a `?v=` query
+  // string at render time so browser caches drop the old version
+  // when admin replaces the file.
+  coverPhotoUrl: text('cover_photo_url'),
+  coverPhotoUploadedAt: timestamp('cover_photo_uploaded_at', { withTimezone: true }),
+  coverPhotoUploadedBy: uuid('cover_photo_uploaded_by').references(() => profiles.id, {
+    onDelete: 'set null',
+  }),
   ...timestamps,
 });
 

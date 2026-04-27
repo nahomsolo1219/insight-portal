@@ -1,5 +1,6 @@
 'use server';
 
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
@@ -658,4 +659,192 @@ export async function uploadClientAvatar(
   revalidatePath(`/admin/clients/${clientId}`);
   revalidatePath('/admin/clients');
   return { success: true, url: signedUrl ?? '' };
+}
+
+// ---------------------------------------------------------------------------
+// Property cover photos (Phase 1 of the client portal redesign)
+// ---------------------------------------------------------------------------
+
+const COVER_BUCKET = 'property-covers';
+const COVER_MAX_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Service-role client. Same inline pattern as `staff/actions.ts` and
+ * `portal/projects/[id]/actions.ts` — third occurrence; worth extracting
+ * into `src/lib/supabase/admin.ts` once the polish-list session lands.
+ * The cover photo upload uses service role so we can write to the public
+ * `property-covers` bucket regardless of which auth context is active
+ * (the row-level checks happen at the action boundary via requireAdmin).
+ */
+function adminStorageClient() {
+  return createSupabaseAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+}
+
+/**
+ * Pull the file extension off a filename. Falls back to a sensible
+ * default if the filename has no dot — happens with mobile-camera
+ * uploads on certain Android browsers that strip extensions.
+ */
+function pickCoverExtension(file: File): string {
+  const fromName = file.name.includes('.')
+    ? file.name.split('.').pop()!.toLowerCase().slice(0, 5)
+    : '';
+  if (fromName && /^[a-z0-9]+$/.test(fromName)) return fromName;
+  // Fall back to MIME — `image/jpeg` → `jpeg`, `image/webp` → `webp`.
+  const mimeExt = file.type.split('/')[1];
+  return mimeExt && /^[a-z0-9]+$/.test(mimeExt) ? mimeExt : 'jpg';
+}
+
+export async function uploadPropertyCoverPhoto(
+  propertyId: string,
+  formData: FormData,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const user = await requireAdmin();
+
+  const [property] = await db
+    .select({
+      id: properties.id,
+      name: properties.name,
+      clientId: properties.clientId,
+    })
+    .from(properties)
+    .where(eq(properties.id, propertyId))
+    .limit(1);
+  if (!property) return { ok: false, error: 'Property not found.' };
+
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: 'No file selected.' };
+  }
+  if (!file.type.startsWith('image/')) {
+    return { ok: false, error: 'Cover photo must be an image.' };
+  }
+  if (file.size > COVER_MAX_BYTES) {
+    return { ok: false, error: 'Cover photo must be 8 MB or smaller.' };
+  }
+
+  const ext = pickCoverExtension(file);
+  const path = `${propertyId}.${ext}`;
+  const supabase = adminStorageClient();
+
+  // Overwrite-on-conflict so admin replacing a cover never accumulates
+  // stale objects under different extensions. The cache-bust query
+  // string on the read path picks up the new file.
+  const { error: uploadError } = await supabase.storage
+    .from(COVER_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: true });
+  if (uploadError) {
+    console.error('[uploadPropertyCoverPhoto] upload failed', uploadError);
+    return { ok: false, error: 'Failed to upload cover photo.' };
+  }
+
+  // If admin previously uploaded with a *different* extension (e.g.
+  // .jpg → .png), the old object is now an orphan at the old path.
+  // Clean it up if the URL on file points at a different extension.
+  if (property /* always truthy here, kept for null-safety */) {
+    // Read the prior URL so we can detect and delete the stale object.
+    const [prior] = await db
+      .select({ coverPhotoUrl: properties.coverPhotoUrl })
+      .from(properties)
+      .where(eq(properties.id, propertyId))
+      .limit(1);
+    if (prior?.coverPhotoUrl) {
+      const priorPath = prior.coverPhotoUrl.split('/').pop()?.split('?')[0];
+      if (priorPath && priorPath !== `${propertyId}.${ext}`) {
+        await supabase.storage
+          .from(COVER_BUCKET)
+          .remove([priorPath])
+          .catch((err: unknown) =>
+            console.error('[uploadPropertyCoverPhoto] orphan cleanup failed', err),
+          );
+      }
+    }
+  }
+
+  const { data: urlData } = supabase.storage.from(COVER_BUCKET).getPublicUrl(path);
+  const url = urlData.publicUrl;
+
+  const now = new Date();
+  await db
+    .update(properties)
+    .set({
+      coverPhotoUrl: url,
+      coverPhotoUploadedAt: now,
+      coverPhotoUploadedBy: user.id,
+      updatedAt: now,
+    })
+    .where(eq(properties.id, propertyId));
+
+  await logAudit({
+    actor: user,
+    action: 'uploaded property cover photo',
+    targetType: 'property',
+    targetId: propertyId,
+    targetLabel: property.name,
+    clientId: property.clientId,
+  });
+
+  revalidatePath(`/admin/clients/${property.clientId}`);
+  return { ok: true, url };
+}
+
+export async function removePropertyCoverPhoto(
+  propertyId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireAdmin();
+
+  const [property] = await db
+    .select({
+      id: properties.id,
+      name: properties.name,
+      clientId: properties.clientId,
+      coverPhotoUrl: properties.coverPhotoUrl,
+    })
+    .from(properties)
+    .where(eq(properties.id, propertyId))
+    .limit(1);
+  if (!property) return { ok: false, error: 'Property not found.' };
+
+  // Best-effort storage delete — if the file is already gone (manual
+  // removal, prior failed upload), still null out the row so the UI
+  // and downstream consumers stop showing a broken cover.
+  if (property.coverPhotoUrl) {
+    const priorPath = property.coverPhotoUrl.split('/').pop()?.split('?')[0];
+    if (priorPath) {
+      const supabase = adminStorageClient();
+      await supabase.storage
+        .from(COVER_BUCKET)
+        .remove([priorPath])
+        .catch((err: unknown) =>
+          console.error('[removePropertyCoverPhoto] storage delete failed', err),
+        );
+    }
+  }
+
+  const now = new Date();
+  await db
+    .update(properties)
+    .set({
+      coverPhotoUrl: null,
+      coverPhotoUploadedAt: null,
+      coverPhotoUploadedBy: null,
+      updatedAt: now,
+    })
+    .where(eq(properties.id, propertyId));
+
+  await logAudit({
+    actor: user,
+    action: 'removed property cover photo',
+    targetType: 'property',
+    targetId: propertyId,
+    targetLabel: property.name,
+    clientId: property.clientId,
+  });
+
+  revalidatePath(`/admin/clients/${property.clientId}`);
+  return { ok: true };
 }

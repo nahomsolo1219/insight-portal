@@ -5,19 +5,30 @@ import {
   ChevronDown,
   ChevronRight,
   Home,
+  Image as ImageIcon,
   Pencil,
   Trash2,
+  Upload,
+  X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
+import { PropertyCover } from '@/components/portal/PropertyCover';
 import { Field, inputClass, textareaClass } from '@/components/admin/Field';
 import { LoadingDots } from '@/components/admin/LoadingDots';
 import { Modal } from '@/components/admin/Modal';
 import { useToast } from '@/components/admin/ToastProvider';
 import { cn } from '@/lib/utils';
 import { AddPropertyButton } from './AddPropertyButton';
-import { deleteProperty, updateProperty } from './actions';
+import {
+  deleteProperty,
+  removePropertyCoverPhoto,
+  updateProperty,
+  uploadPropertyCoverPhoto,
+} from './actions';
 import type { PropertyDetailedRow, PropertyProjectRow } from './queries';
+
+const COVER_MAX_BYTES = 8 * 1024 * 1024;
 
 interface Props {
   clientId: string;
@@ -394,6 +405,8 @@ function EditPropertyModal({
       }
     >
       <div className="space-y-5">
+        <CoverPhotoSection property={property} />
+
         <Field label="Property name" required>
           <input
             type="text"
@@ -494,6 +507,249 @@ function EditPropertyModal({
         )}
       </div>
     </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cover photo section — sits at the top of the EditPropertyModal body.
+// First UI surface built on the Phase 0 client-portal tokens (cream,
+// line, ink-*) so the editorial aesthetic gets a real-world test.
+// ---------------------------------------------------------------------------
+
+function CoverPhotoSection({ property }: { property: PropertyDetailedRow }) {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [isUploading, startUpload] = useTransition();
+  const [isRemoving, startRemove] = useTransition();
+
+  // Revoke the local Object URL on unmount or when the pending file
+  // is replaced — leaks here add up across many open/close cycles.
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  function pickFile(file: File | null) {
+    setError(null);
+    if (!file) {
+      setPending(null);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setError('Cover photo must be an image.');
+      return;
+    }
+    if (file.size > COVER_MAX_BYTES) {
+      setError('Cover photo must be 8 MB or smaller.');
+      return;
+    }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPending(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0] ?? null;
+    pickFile(file);
+  }
+
+  function commit() {
+    if (!pending) return;
+    const formData = new FormData();
+    formData.append('file', pending);
+    startUpload(async () => {
+      const result = await uploadPropertyCoverPhoto(property.id, formData);
+      if (!result.ok) {
+        setError(result.error);
+        showToast(result.error, 'error');
+        return;
+      }
+      showToast('Cover photo updated');
+      // Drop the local preview — the server-rendered preview will pick
+      // up the new URL on the next refresh.
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPending(null);
+      setPreviewUrl(null);
+      router.refresh();
+    });
+  }
+
+  function remove() {
+    startRemove(async () => {
+      const result = await removePropertyCoverPhoto(property.id);
+      if (!result.ok) {
+        showToast(result.error, 'error');
+        return;
+      }
+      showToast('Cover photo removed');
+      router.refresh();
+    });
+  }
+
+  // ---- Render branches ----
+
+  // Local-preview state (a file is staged but not yet uploaded).
+  if (pending && previewUrl) {
+    return (
+      <div className="border-line space-y-3 rounded-2xl border bg-cream p-4">
+        <SectionHeader />
+        <div className="bg-paper border-line-2 relative aspect-[16/9] overflow-hidden rounded-2xl border">
+          {/* Local preview — plain <img> is correct here (Object URL,
+              not a remote URL Next/Image can optimize). */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewUrl}
+            alt={`Selected cover for ${property.name}`}
+            className="h-full w-full object-cover"
+          />
+        </div>
+        {error && (
+          <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-600">
+            {error}
+          </p>
+        )}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => pickFile(null)}
+            disabled={isUploading}
+            className="text-ink-700 inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-paper disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={commit}
+            disabled={isUploading}
+            className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isUploading ? (
+              <>
+                Uploading
+                <LoadingDots />
+              </>
+            ) : (
+              <>
+                <Upload size={14} strokeWidth={1.75} />
+                Upload
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Existing-cover state (a real cover lives on the property).
+  if (property.coverPhotoUrl) {
+    return (
+      <div className="border-line space-y-3 rounded-2xl border bg-cream p-4">
+        <SectionHeader />
+        <PropertyCover
+          propertyId={property.id}
+          coverPhotoUrl={property.coverPhotoUrl}
+          uploadedAt={property.coverPhotoUploadedAt}
+          alt={`Cover photo for ${property.name}`}
+          className="border-line-2 relative aspect-[16/9] overflow-hidden rounded-2xl border"
+        />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={remove}
+            disabled={isRemoving || isUploading}
+            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+          >
+            <X size={14} strokeWidth={1.75} />
+            {isRemoving ? 'Removing…' : 'Remove'}
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isRemoving || isUploading}
+            className="text-ink-700 border-line hover:border-ink-400 inline-flex items-center gap-1.5 rounded-xl border bg-paper px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            <Upload size={14} strokeWidth={1.75} />
+            Replace
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Empty-state drop zone.
+  return (
+    <div className="space-y-2">
+      <SectionHeader />
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
+        className={cn(
+          'flex aspect-[16/9] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed bg-cream p-6 text-center transition-all',
+          dragOver
+            ? 'border-ink-700 bg-ivory'
+            : 'border-line hover:border-ink-400 hover:bg-ivory',
+        )}
+      >
+        <span className="bg-paper text-ink-500 inline-flex h-10 w-10 items-center justify-center rounded-full">
+          <ImageIcon size={18} strokeWidth={1.5} />
+        </span>
+        <p className="text-ink-700 text-sm font-medium">
+          Drop a photo here, or click to browse
+        </p>
+        <p className="text-ink-500 text-xs">JPEG, PNG, or WebP — up to 8 MB</p>
+      </div>
+      {error && (
+        <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-600">
+          {error}
+        </p>
+      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+      />
+    </div>
+  );
+}
+
+function SectionHeader() {
+  return (
+    <div className="flex items-baseline justify-between">
+      <h3 className="eyebrow">Cover photo</h3>
+      <span className="text-ink-400 text-[11px]">Optional</span>
+    </div>
   );
 }
 

@@ -52,6 +52,8 @@ export interface PropertyRow {
   gateCode: string | null;
   accessNotes: string | null;
   emergencyContact: string | null;
+  coverPhotoUrl: string | null;
+  coverPhotoUploadedAt: Date | null;
 }
 
 export interface ClientDetailStats {
@@ -78,6 +80,8 @@ export async function getPropertyDetail(propertyId: string): Promise<PropertyRow
       gateCode: properties.gateCode,
       accessNotes: properties.accessNotes,
       emergencyContact: properties.emergencyContact,
+      coverPhotoUrl: properties.coverPhotoUrl,
+      coverPhotoUploadedAt: properties.coverPhotoUploadedAt,
     })
     .from(properties)
     .where(eq(properties.id, propertyId))
@@ -141,6 +145,8 @@ export async function getClientDetail(clientId: string): Promise<ClientDetailPay
       gateCode: properties.gateCode,
       accessNotes: properties.accessNotes,
       emergencyContact: properties.emergencyContact,
+      coverPhotoUrl: properties.coverPhotoUrl,
+      coverPhotoUploadedAt: properties.coverPhotoUploadedAt,
     })
     .from(properties)
     .where(eq(properties.clientId, clientId))
@@ -809,6 +815,8 @@ export async function getClientPropertiesDetailed(
       gateCode: properties.gateCode,
       accessNotes: properties.accessNotes,
       emergencyContact: properties.emergencyContact,
+      coverPhotoUrl: properties.coverPhotoUrl,
+      coverPhotoUploadedAt: properties.coverPhotoUploadedAt,
     })
     .from(properties)
     .where(eq(properties.clientId, clientId))
