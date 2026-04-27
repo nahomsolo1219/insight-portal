@@ -1,6 +1,7 @@
 'use client';
 
-import { Briefcase, Check, ChevronDown, ChevronRight, Hammer } from 'lucide-react';
+import { ArrowRight, Briefcase, Check, ChevronDown, ChevronRight, Hammer } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useOptimistic, useState, useTransition } from 'react';
 import { useToast } from '@/components/admin/ToastProvider';
@@ -242,9 +243,18 @@ function ProjectCard({
           )}
 
           <div>
-            <h4 className="mb-3 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-              Milestones
-            </h4>
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-xs font-semibold tracking-wider text-gray-500 uppercase">
+                Milestones
+              </h4>
+              <Link
+                href={`/admin/projects/${project.id}`}
+                className="text-brand-teal-500 hover:text-brand-teal-600 inline-flex items-center gap-1 text-xs font-medium transition-colors"
+              >
+                View details
+                <ArrowRight size={11} strokeWidth={2} />
+              </Link>
+            </div>
             {project.milestones.length === 0 ? (
               <p className="py-4 text-sm text-gray-400">No milestones yet.</p>
             ) : (
