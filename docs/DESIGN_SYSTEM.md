@@ -921,6 +921,16 @@ Extract to `src/lib/hooks/useIsDesktop.ts`. (Per CLAUDE.md "three similar lines 
 
 No `: any` or `as any` violations found in `.tsx` files — compliant with CLAUDE.md.
 
+### No dedicated `/admin/properties/[id]` page
+
+Properties currently exist only as expandable cards inside `EditPropertyModal`
+under client detail. There's no canonical admin URL to deep-link to a property,
+and operations that span multiple tabs (cover photo, projects, photos,
+appointments, documents) all happen in the modal. As the redesign matures,
+consider extracting a `/admin/properties/[id]` page with its own tabs so
+property-scoped work stops competing with client-scoped work for the same
+modal real estate.
+
 ---
 
 ## Adding new components

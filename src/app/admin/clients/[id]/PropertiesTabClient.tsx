@@ -524,6 +524,7 @@ function CoverPhotoSection({ property }: { property: PropertyDetailedRow }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
   const [isUploading, startUpload] = useTransition();
   const [isRemoving, startRemove] = useTransition();
 
@@ -592,6 +593,7 @@ function CoverPhotoSection({ property }: { property: PropertyDetailedRow }) {
         return;
       }
       showToast('Cover photo removed');
+      setConfirmRemoveOpen(false);
       router.refresh();
     });
   }
@@ -653,43 +655,83 @@ function CoverPhotoSection({ property }: { property: PropertyDetailedRow }) {
   // Existing-cover state (a real cover lives on the property).
   if (property.coverPhotoUrl) {
     return (
-      <div className="border-line space-y-3 rounded-2xl border bg-cream p-4">
-        <SectionHeader />
-        <PropertyCover
-          propertyId={property.id}
-          coverPhotoUrl={property.coverPhotoUrl}
-          uploadedAt={property.coverPhotoUploadedAt}
-          alt={`Cover photo for ${property.name}`}
-          className="border-line-2 relative aspect-[16/9] overflow-hidden rounded-2xl border"
-        />
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={remove}
-            disabled={isRemoving || isUploading}
-            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
-          >
-            <X size={14} strokeWidth={1.75} />
-            {isRemoving ? 'Removing…' : 'Remove'}
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isRemoving || isUploading}
-            className="text-ink-700 border-line hover:border-ink-400 inline-flex items-center gap-1.5 rounded-xl border bg-paper px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-          >
-            <Upload size={14} strokeWidth={1.75} />
-            Replace
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+      <>
+        <div className="border-line space-y-3 rounded-2xl border bg-cream p-4">
+          <SectionHeader />
+          <PropertyCover
+            propertyId={property.id}
+            coverPhotoUrl={property.coverPhotoUrl}
+            uploadedAt={property.coverPhotoUploadedAt}
+            alt={`Cover photo for ${property.name}`}
+            className="border-line-2 relative aspect-[16/9] overflow-hidden rounded-2xl border"
           />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmRemoveOpen(true)}
+              disabled={isRemoving || isUploading}
+              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+            >
+              <X size={14} strokeWidth={1.75} />
+              Remove
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isRemoving || isUploading}
+              className="text-ink-700 border-line hover:border-ink-400 inline-flex items-center gap-1.5 rounded-xl border bg-paper px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              <Upload size={14} strokeWidth={1.75} />
+              Replace
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+            />
+          </div>
         </div>
-      </div>
+        <Modal
+          open={confirmRemoveOpen}
+          onClose={() => setConfirmRemoveOpen(false)}
+          title="Remove this cover photo?"
+          size="sm"
+          locked={isRemoving}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setConfirmRemoveOpen(false)}
+                disabled={isRemoving}
+                className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={remove}
+                disabled={isRemoving}
+                className="shadow-soft inline-flex items-center gap-2 rounded-xl bg-red-500 px-5 py-2.5 font-medium text-white transition-all hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isRemoving ? (
+                  <>
+                    Removing
+                    <LoadingDots />
+                  </>
+                ) : (
+                  'Remove'
+                )}
+              </button>
+            </>
+          }
+        >
+          <p className="text-sm text-gray-600">
+            Remove this cover photo? You can re-upload at any time.
+          </p>
+        </Modal>
+      </>
     );
   }
 

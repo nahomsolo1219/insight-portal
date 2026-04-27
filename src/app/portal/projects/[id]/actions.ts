@@ -1,12 +1,12 @@
 'use server';
 
-import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { and, asc, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
 import { milestones, photos, projects, properties } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireUser } from '@/lib/auth/current-user';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { BUCKET_NAME } from '@/lib/storage/paths';
 
 type ActionResult = { success: true } | { success: false; error: string };
@@ -153,7 +153,7 @@ export async function downloadProjectPhotosAsZip(projectId: string): Promise<Zip
   try {
     const JSZip = (await import('jszip')).default;
     const zip = new JSZip();
-    const supabase = adminStorageClient();
+    const supabase = createAdminClient();
 
     let added = 0;
     for (const photo of projectPhotos) {
@@ -211,21 +211,6 @@ export async function downloadProjectPhotosAsZip(projectId: string): Promise<Zip
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Service-role storage client. Bypasses RLS — only invoked from inside
- * the action's ownership-checked happy path. Inlined here (rather than
- * in `src/lib/supabase`) because this is the second site that needs it
- * and pulling out a shared module for two callers is premature
- * abstraction; revisit when a third turns up.
- */
-function adminStorageClient() {
-  return createSupabaseAdmin(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-}
 
 /**
  * Build a safe-for-most-filesystems filename from the caption, falling back

@@ -1,6 +1,5 @@
 'use server';
 
-import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
@@ -16,6 +15,7 @@ import {
 } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { avatarPath } from '@/lib/storage/paths';
 import { getSignedUrl, uploadFile } from '@/lib/storage/upload';
 import { getExtension, validateFile } from '@/lib/storage/validation';
@@ -668,21 +668,6 @@ export async function uploadClientAvatar(
 const COVER_BUCKET = 'property-covers';
 const COVER_MAX_BYTES = 8 * 1024 * 1024;
 
-/**
- * Service-role client. Same inline pattern as `staff/actions.ts` and
- * `portal/projects/[id]/actions.ts` — third occurrence; worth extracting
- * into `src/lib/supabase/admin.ts` once the polish-list session lands.
- * The cover photo upload uses service role so we can write to the public
- * `property-covers` bucket regardless of which auth context is active
- * (the row-level checks happen at the action boundary via requireAdmin).
- */
-function adminStorageClient() {
-  return createSupabaseAdmin(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-}
 
 /**
  * Pull the file extension off a filename. Falls back to a sensible
@@ -729,7 +714,7 @@ export async function uploadPropertyCoverPhoto(
 
   const ext = pickCoverExtension(file);
   const path = `${propertyId}.${ext}`;
-  const supabase = adminStorageClient();
+  const supabase = createAdminClient();
 
   // Overwrite-on-conflict so admin replacing a cover never accumulates
   // stale objects under different extensions. The cache-bust query
@@ -815,7 +800,7 @@ export async function removePropertyCoverPhoto(
   if (property.coverPhotoUrl) {
     const priorPath = property.coverPhotoUrl.split('/').pop()?.split('?')[0];
     if (priorPath) {
-      const supabase = adminStorageClient();
+      const supabase = createAdminClient();
       await supabase.storage
         .from(COVER_BUCKET)
         .remove([priorPath])

@@ -1,12 +1,12 @@
 'use server';
 
-import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
 import { profiles, staff } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 type ActionResult<T = undefined> =
   | { success: true; data?: T }
@@ -20,15 +20,6 @@ export type StaffRole =
 
 export type StaffStatus = 'active' | 'pending' | 'inactive';
 
-// Service-role client. Bypasses RLS — only use from admin-gated Server Actions,
-// and never expose the service role key to the browser.
-function adminClient() {
-  return createSupabaseAdmin(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-}
 
 export type InviteRole = 'admin' | 'client' | 'field_staff';
 
@@ -65,7 +56,7 @@ export async function inviteUser(params: InviteUserParams): Promise<InviteUserRe
     return { success: false, error: 'clientId is required when inviting a client user.' };
   }
 
-  const admin = adminClient();
+  const admin = createAdminClient();
   // Invitees land on the password-setup page so their first action is
   // choosing a credential — after which they can use email+password
   // for subsequent sign-ins without always going through magic links.
