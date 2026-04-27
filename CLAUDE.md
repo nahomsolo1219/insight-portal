@@ -121,8 +121,12 @@ See `src/lib/types.ts` for complete interfaces.
 
 ## Drizzle commands
 
-- `npx drizzle-kit generate` — generate migration from schema changes
-- `npx drizzle-kit migrate` — apply pending migrations
+> **Database migrations: see [docs/MIGRATIONS.md](docs/MIGRATIONS.md).** Use `npm run db:migrate` (which chains `drizzle-kit migrate` with the post-migration verifier) instead of `npx drizzle-kit migrate` directly — the verifier catches the silent-failure mode we hit in October 2026.
+
+- `npm run db:generate` — generate migration from schema changes (alias for `drizzle-kit generate`)
+- `npm run db:migrate` — apply pending migrations + run the verifier
+- `npm run db:migrate:verify` — re-run just the verifier (no apply)
+- `npm run db:migrate:manual <file>` — fallback applier when a migration trips Supabase's statement_timeout
 - `npx drizzle-kit studio` — visual DB browser at localhost:4983
 - `npx tsx scripts/verify-db.ts` — one-off sanity check of tables / RLS / policies / enums
 - `npm run db:seed` — idempotent seed of test data (clears + re-inserts; leaves profiles alone)
