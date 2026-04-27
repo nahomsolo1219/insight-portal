@@ -47,6 +47,11 @@ Admin portal for Insight Home Maintenance, a luxury home maintenance and remodel
 
 ## Design rules — IMPORTANT
 
+> **Design system: see [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) — all UI work (admin, client, field staff) must conform.** The summary below stays as a quick reference; the full doc has token tables, primitive APIs, layout patterns, and a polish list.
+>
+> **Portal + field inventory: see [docs/PORTAL_FIELD_INVENTORY.md](docs/PORTAL_FIELD_INVENTORY.md) — per-page breakdown of `/portal` and `/field`, auth/RLS posture, server actions, and gaps against the original scope.**
+
+
 - Sidebar: teal header band with white logo, white body below for nav
 - Active nav: light teal tint (#F4F8F9) with subtle border, NO left border accent
 - Cards: white bg, rounded-2xl, shadow only (no visible borders), p-6 minimum
