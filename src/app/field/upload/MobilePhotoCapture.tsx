@@ -1,8 +1,9 @@
 'use client';
 
-import { Camera, Check, Loader2, X } from 'lucide-react';
+import { Camera, Check, Loader2, MapPin, RefreshCw, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
+import { useGeolocation, type GeolocationState } from '@/lib/hooks/useGeolocation';
 import { cn } from '@/lib/utils';
 import { getPropertyProjectsAction, uploadFieldPhotos } from '../actions';
 import type { FieldProjectOption, FieldPropertyRow } from '../queries';
@@ -66,6 +67,12 @@ export function MobilePhotoCapture({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<SuccessState | null>(null);
 
+  // Prefetch a position fix on mount so coordinates are usually ready by
+  // the time the technician finishes selecting photos. Only `granted`
+  // counts as "use these coords" — `low_accuracy` photos still upload
+  // with NULL coords (a bad pin is worse than no pin).
+  const geo = useGeolocation();
+
   // Revoke object URLs when picks are dropped — prevents an event-loop
   // memory leak across repeated upload cycles on the same screen.
   useEffect(() => {
@@ -127,9 +134,21 @@ export function MobilePhotoCapture({
       const formData = new FormData();
       for (const p of picks) formData.append('photos', p.file);
 
+      // Only attach coords when the fix is good. `low_accuracy` and the
+      // failure states all map to "send no coords" so the office never
+      // sees a misleading pin.
+      const coordsToSend =
+        geo.status === 'granted' && geo.coords
+          ? {
+              gpsLat: geo.coords.lat,
+              gpsLng: geo.coords.lng,
+              gpsAccuracy: geo.coords.accuracy,
+            }
+          : {};
+
       const result = await uploadFieldPhotos(
         propertyId,
-        { projectId, caption },
+        { projectId, caption, ...coordsToSend },
         formData,
       );
 
@@ -242,6 +261,8 @@ export function MobilePhotoCapture({
           {error}
         </div>
       )}
+
+      <GpsStatusRow geo={geo} disabled={isUploading} />
 
       <button
         type="button"
@@ -424,6 +445,64 @@ function SuccessCard({
           Back to home
         </Link>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// GPS status row — sits above the upload CTA so the technician sees what
+// will (or won't) be attached to the batch.
+// ---------------------------------------------------------------------------
+
+function GpsStatusRow({ geo, disabled }: { geo: GeolocationState; disabled: boolean }) {
+  // Match the existing inline-feedback pattern (rounded-xl, bordered, tinted
+  // background, body-sized text). Tones come straight from the design system:
+  // emerald for the happy path, amber for "still uploadable but missing
+  // metadata", neutral for the in-flight prompt.
+  if (geo.status === 'idle' || geo.status === 'requesting') {
+    return (
+      <div className="inline-flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+        <Loader2 size={12} strokeWidth={1.75} className="animate-spin" />
+        Getting location…
+      </div>
+    );
+  }
+
+  if (geo.status === 'granted') {
+    return (
+      <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+        <Check size={12} strokeWidth={2.5} />
+        Location ready
+      </div>
+    );
+  }
+
+  // Everything else falls through here: low_accuracy, denied, unavailable, error.
+  // All of them mean "upload will succeed but coords will be NULL", with a
+  // retry affordance for the cases where another attempt could change the
+  // outcome.
+  const message =
+    geo.status === 'low_accuracy'
+      ? 'Location signal weak — photos will upload without coordinates.'
+      : geo.status === 'denied'
+        ? 'Location permission denied — photos will upload without coordinates.'
+        : 'Location unavailable — photos will upload without coordinates.';
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+      <span className="inline-flex items-center gap-2">
+        <MapPin size={12} strokeWidth={1.75} />
+        {message}
+      </span>
+      <button
+        type="button"
+        onClick={geo.retry}
+        disabled={disabled}
+        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <RefreshCw size={11} strokeWidth={1.75} />
+        Try again
+      </button>
     </div>
   );
 }

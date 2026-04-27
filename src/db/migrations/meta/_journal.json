@@ -43,6 +43,13 @@
       "when": 1777206290293,
       "tag": "0005_yellow_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777270934940,
+      "tag": "0006_previous_wallflower",
+      "breakpoints": true
     }
   ]
 }

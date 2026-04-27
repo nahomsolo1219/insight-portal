@@ -23,6 +23,49 @@ type UploadFieldPhotosResult = UploadFieldPhotosSuccess | { success: false; erro
 export interface UploadFieldPhotosInput {
   projectId?: string | null;
   caption?: string;
+  /** WGS-84 coords captured at submit time. Optional — undefined or
+   *  invalid values are dropped silently and the row stores NULL. */
+  gpsLat?: number;
+  gpsLng?: number;
+  /** Reading accuracy in meters reported by the browser. */
+  gpsAccuracy?: number;
+}
+
+/**
+ * Validate + normalise GPS fields from the upload input. Returns strings
+ * (Drizzle's numeric column expects string-shaped input) or nulls.
+ *
+ * Rules:
+ *  - Both lat AND lng must be present and in valid ranges; otherwise both
+ *    become NULL (no half-coordinates).
+ *  - Accuracy is independent — if it's missing or invalid we keep coords
+ *    but drop accuracy.
+ *  - Any malformed value is rejected silently rather than failing the
+ *    upload — a missing pin is acceptable, a failed batch is not.
+ */
+function normaliseGps(input: UploadFieldPhotosInput): {
+  gpsLat: string | null;
+  gpsLng: string | null;
+  gpsAccuracy: string | null;
+} {
+  const { gpsLat, gpsLng, gpsAccuracy } = input;
+  const hasLat = typeof gpsLat === 'number' && Number.isFinite(gpsLat);
+  const hasLng = typeof gpsLng === 'number' && Number.isFinite(gpsLng);
+  const latOk = hasLat && gpsLat >= -90 && gpsLat <= 90;
+  const lngOk = hasLng && gpsLng >= -180 && gpsLng <= 180;
+
+  if (!latOk || !lngOk) {
+    return { gpsLat: null, gpsLng: null, gpsAccuracy: null };
+  }
+
+  const accOk =
+    typeof gpsAccuracy === 'number' && Number.isFinite(gpsAccuracy) && gpsAccuracy >= 0;
+
+  return {
+    gpsLat: gpsLat.toFixed(6),
+    gpsLng: gpsLng.toFixed(6),
+    gpsAccuracy: accOk ? gpsAccuracy.toFixed(2) : null,
+  };
 }
 
 /**
@@ -77,6 +120,10 @@ export async function uploadFieldPhotos(
   // staff land with full_name from user_metadata, but be safe).
   const uploadedByName = user.fullName || user.email;
 
+  // One coord per batch — every photo in this submission shares it. Invalid
+  // input collapses to NULLs without rejecting the upload.
+  const gps = normaliseGps(input);
+
   let uploadedCount = 0;
   let failedCount = 0;
   const errors: { name: string; error: string }[] = [];
@@ -118,6 +165,9 @@ export async function uploadFieldPhotos(
         caption: trimmedCaption || file.name,
         status: 'pending',
         storagePath: uploadResult.path,
+        gpsLat: gps.gpsLat,
+        gpsLng: gps.gpsLng,
+        gpsAccuracy: gps.gpsAccuracy,
       });
       uploadedCount += 1;
     } catch (error) {

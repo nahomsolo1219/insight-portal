@@ -1,0 +1,1 @@
+ALTER TABLE "photos" ADD COLUMN "gps_accuracy" numeric(8, 2);

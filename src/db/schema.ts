@@ -366,6 +366,10 @@ export const photos = pgTable('photos', {
   uploadedAt: timestamp('uploaded_at', { withTimezone: true }).defaultNow().notNull(),
   gpsLat: numeric('gps_lat'),
   gpsLng: numeric('gps_lng'),
+  // Reading accuracy in meters at the moment of capture. Stored alongside
+  // the coords so we can later debug bad pins without re-shooting them.
+  // Field upload writes this when a fix arrives with accuracy ≤ 100m.
+  gpsAccuracy: numeric('gps_accuracy', { precision: 8, scale: 2 }),
   tag: photoTagEnum('tag'),
   category: text('category'),
   caption: text('caption'),
