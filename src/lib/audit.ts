@@ -23,6 +23,8 @@ export type AuditAction =
   | 'updated project'
   | 'completed project'
   | 'deleted project'
+  | 'assigned staff to project'
+  | 'unassigned staff from project'
   | 'added milestone'
   | 'marked milestone complete'
   | 'updated milestone'

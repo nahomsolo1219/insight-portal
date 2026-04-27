@@ -1,11 +1,13 @@
-import { Briefcase, ChevronLeft, Hammer } from 'lucide-react';
+import { Briefcase, ChevronLeft, Hammer, Users } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { ProjectDetailClient } from './ProjectDetailClient';
 import {
+  getActiveFieldStaffForPicker,
   getActiveVendors,
+  getProjectAssignments,
   getProjectDetail,
   getProjectMilestones,
   getProjectPhotos,
@@ -20,15 +22,18 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   await requireAdmin();
   const { id } = await params;
 
-  // Five parallel reads — each is independent of the others, so the page
+  // Seven parallel reads — each is independent of the others, so the page
   // resolves in one round-trip's worth of latency.
-  const [project, milestones, photos, stats, vendors] = await Promise.all([
-    getProjectDetail(id),
-    getProjectMilestones(id),
-    getProjectPhotos(id),
-    getProjectStats(id),
-    getActiveVendors(),
-  ]);
+  const [project, milestones, photos, stats, vendors, assignments, staffPickerOptions] =
+    await Promise.all([
+      getProjectDetail(id),
+      getProjectMilestones(id),
+      getProjectPhotos(id),
+      getProjectStats(id),
+      getActiveVendors(),
+      getProjectAssignments(id),
+      getActiveFieldStaffForPicker(),
+    ]);
 
   if (!project) notFound();
 
@@ -90,6 +95,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
                 : 'No start date'}
               {project.endDate && ` · Est. completion ${formatDate(project.endDate)}`}
             </p>
+            <TeamLine names={assignments.map((a) => a.name)} />
           </div>
         </div>
       </header>
@@ -142,8 +148,39 @@ export default async function ProjectDetailPage({ params }: PageProps) {
         milestones={milestones}
         photos={photos}
         vendors={vendors}
+        assignments={assignments}
+        staffPickerOptions={staffPickerOptions}
       />
     </div>
+  );
+}
+
+/**
+ * Compact "Team:" line for the project header. Shows up to three names
+ * inline; collapses to "+N more" beyond that. Renders a muted "No staff
+ * assigned" when empty so admins notice the gap from the page header
+ * without opening the Team tab.
+ */
+function TeamLine({ names }: { names: string[] }) {
+  if (names.length === 0) {
+    return (
+      <p className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-gray-400">
+        <Users size={11} strokeWidth={1.5} />
+        No staff assigned
+      </p>
+    );
+  }
+  const visible = names.slice(0, 3);
+  const overflow = names.length - visible.length;
+  const label =
+    overflow > 0
+      ? `${visible.join(', ')}, +${overflow} more`
+      : visible.join(', ');
+  return (
+    <p className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-gray-500">
+      <Users size={11} strokeWidth={1.5} className="text-brand-teal-500" />
+      <span className="font-medium text-gray-700">Team:</span> {label}
+    </p>
   );
 }
 

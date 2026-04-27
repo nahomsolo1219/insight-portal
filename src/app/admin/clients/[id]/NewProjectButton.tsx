@@ -1,6 +1,6 @@
 'use client';
 
-import { Layers, Plus, Sparkles } from 'lucide-react';
+import { Layers, Plus, Sparkles, Users } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import { Field, inputClass, textareaClass } from '@/components/admin/Field';
@@ -10,6 +10,7 @@ import { useToast } from '@/components/admin/ToastProvider';
 import { cn } from '@/lib/utils';
 import { createProject } from './actions';
 import type { TemplateOption } from './queries';
+import type { FieldStaffPickerRow } from '../../projects/[id]/queries';
 
 interface PropertyOption {
   id: string;
@@ -20,6 +21,7 @@ interface Props {
   clientId: string;
   properties: PropertyOption[];
   templates: TemplateOption[];
+  fieldStaff: FieldStaffPickerRow[];
   /** Active property in the URL — used as the default when multiple exist. */
   activePropertyId: string | null;
 }
@@ -35,6 +37,8 @@ interface FormState {
   description: string;
   /** Free-text dollars input — parsed to cents at submit. */
   contractInput: string;
+  /** Profile ids of field staff to assign at create time. */
+  assignedStaffIds: string[];
 }
 
 function emptyForm(activePropertyId: string | null, fallbackPropertyId: string): FormState {
@@ -48,6 +52,7 @@ function emptyForm(activePropertyId: string | null, fallbackPropertyId: string):
     endDate: '',
     description: '',
     contractInput: '',
+    assignedStaffIds: [],
   };
 }
 
@@ -90,6 +95,7 @@ export function NewProjectButton({
   clientId,
   properties,
   templates,
+  fieldStaff,
   activePropertyId,
 }: Props) {
   const router = useRouter();
@@ -179,6 +185,7 @@ export function NewProjectButton({
         description: form.description || null,
         contractCents,
         templateId: form.useTemplate && form.templateId ? form.templateId : null,
+        assignedStaffIds: form.assignedStaffIds,
       });
 
       if (!result.success) {
@@ -392,6 +399,21 @@ export function NewProjectButton({
             </Field>
           )}
 
+          <Field
+            label="Field staff"
+            hint={
+              fieldStaff.length === 0
+                ? 'No active field staff yet. Invite one from the Staff page first.'
+                : 'Optional. Add now or via the project’s Team tab later.'
+            }
+          >
+            <StaffMultiSelect
+              options={fieldStaff}
+              selectedIds={form.assignedStaffIds}
+              onChange={(ids) => setForm({ ...form, assignedStaffIds: ids })}
+            />
+          </Field>
+
           <Field label="Description" hint="Optional. Internal — clients see this on their portal.">
             <textarea
               value={form.description}
@@ -410,6 +432,74 @@ export function NewProjectButton({
         </div>
       </Modal>
     </>
+  );
+}
+
+/**
+ * Multi-select for the "Field staff" Field. Plain checkbox list inside a
+ * scrollable bordered container — matches the existing form aesthetic
+ * (no chip-input pattern exists in the codebase, no need to invent one
+ * for a 3-staff team list). Each row shows the active project count
+ * alongside the name as secondary metadata.
+ */
+function StaffMultiSelect({
+  options,
+  selectedIds,
+  onChange,
+}: {
+  options: FieldStaffPickerRow[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  if (options.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-gray-200 bg-brand-warm-50 px-4 py-3 text-xs text-gray-500">
+        <Users size={12} strokeWidth={1.5} className="mr-1.5 inline" />
+        No active field staff to assign.
+      </div>
+    );
+  }
+
+  function toggle(id: string) {
+    onChange(
+      selectedIds.includes(id)
+        ? selectedIds.filter((existing) => existing !== id)
+        : [...selectedIds, id],
+    );
+  }
+
+  return (
+    <div className="max-h-44 overflow-y-auto rounded-xl border border-gray-200 bg-white">
+      <ul className="divide-y divide-gray-50">
+        {options.map((staff) => {
+          const checked = selectedIds.includes(staff.profileId);
+          return (
+            <li key={staff.profileId}>
+              <label className="hover:bg-brand-warm-50 flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggle(staff.profileId)}
+                  className="text-brand-teal-500 focus:ring-brand-teal-200 h-4 w-4 rounded border-gray-300"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-gray-900">
+                    {staff.name}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {staff.currentAssignmentCount === 0
+                      ? 'No current projects'
+                      : staff.currentAssignmentCount === 1
+                        ? '1 current project'
+                        : `${staff.currentAssignmentCount} current projects`}
+                  </div>
+                </div>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

@@ -2,15 +2,18 @@
 // its UUID; every query joins through `properties` so we can return the
 // owning client + property in the header without a second round-trip.
 
-import { asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   appointments,
   clients,
   milestones,
   photos,
+  profiles,
+  projectAssignments,
   projects,
   properties,
+  staff,
   vendors,
 } from '@/db/schema';
 import { getSignedUrls } from '@/lib/storage/upload';
@@ -227,3 +230,99 @@ export async function getActiveVendors(): Promise<VendorOption[]> {
     .where(eq(vendors.active, true))
     .orderBy(asc(vendors.name));
 }
+
+// ---------------------------------------------------------------------------
+// Field-staff project assignments — admin UI data
+// ---------------------------------------------------------------------------
+
+export interface ProjectAssignmentRow {
+  profileId: string;
+  name: string;
+  assignedAt: Date;
+}
+
+/**
+ * Currently-assigned staff for this project, oldest-assignment-first.
+ * The earliest row tends to read as "the lead" but no formal lead role
+ * exists yet — David curates assignment order if it matters. Joins
+ * profiles → staff so the display name comes from the staff record
+ * (staff.name is the canonical HR name; profiles.fullName may be stale
+ * if the user invited themselves with a different display name).
+ */
+export async function getProjectAssignments(
+  projectId: string,
+): Promise<ProjectAssignmentRow[]> {
+  return db
+    .select({
+      profileId: projectAssignments.userId,
+      name: staff.name,
+      assignedAt: projectAssignments.assignedAt,
+    })
+    .from(projectAssignments)
+    .innerJoin(profiles, eq(profiles.id, projectAssignments.userId))
+    .innerJoin(staff, eq(staff.id, profiles.staffId))
+    .where(eq(projectAssignments.projectId, projectId))
+    .orderBy(asc(projectAssignments.assignedAt));
+}
+
+export interface FieldStaffPickerRow {
+  profileId: string;
+  name: string;
+  /** Number of currently-active or on-hold projects this person is on.
+   *  Excludes completed projects so the picker shows current load,
+   *  not lifetime work. */
+  currentAssignmentCount: number;
+}
+
+/**
+ * All active field staff with a linked profile, plus a count of their
+ * "current" project load. Drives the Add staff modal on the Team tab
+ * AND the multi-select on the New Project form. Field staff without a
+ * profile (no portal account yet) are excluded — `project_assignments`
+ * FKs to `profiles.id`, so they can't be assigned anyway.
+ */
+export async function getActiveFieldStaffForPicker(): Promise<FieldStaffPickerRow[]> {
+  // One query: staff → profile → LEFT JOIN ON-status assignments. The
+  // count() is filtered by project status via FILTER (...) which
+  // tracks active+on_hold projects (treating "current load" as
+  // anything not-completed). Drizzle's `count()` aggregate plus a
+  // raw SQL filter clause keeps this to a single round-trip.
+  const rows = await db
+    .select({
+      profileId: profiles.id,
+      name: staff.name,
+      currentAssignmentCount: sql<number>`
+        COUNT(${projectAssignments.projectId}) FILTER (
+          WHERE ${projects.status} IN ('active', 'on_hold')
+        )::int
+      `,
+    })
+    .from(staff)
+    .innerJoin(profiles, eq(profiles.staffId, staff.id))
+    .leftJoin(projectAssignments, eq(projectAssignments.userId, profiles.id))
+    .leftJoin(projects, eq(projects.id, projectAssignments.projectId))
+    .where(and(eq(staff.role, 'field_staff'), eq(staff.status, 'active')))
+    .groupBy(profiles.id, staff.name)
+    .orderBy(asc(staff.name));
+
+  return rows;
+}
+
+/**
+ * Just the assigned staff names for a project, in oldest-first order.
+ * Used by the project header's "Team:" indicator — separated from
+ * `getProjectAssignments` so the page header can fetch only the names
+ * (no assignedAt overhead) without dragging in the full Team tab
+ * payload.
+ */
+export async function getProjectAssignedNames(projectId: string): Promise<string[]> {
+  const rows = await db
+    .select({ name: staff.name })
+    .from(projectAssignments)
+    .innerJoin(profiles, eq(profiles.id, projectAssignments.userId))
+    .innerJoin(staff, eq(staff.id, profiles.staffId))
+    .where(eq(projectAssignments.projectId, projectId))
+    .orderBy(asc(projectAssignments.assignedAt));
+  return rows.map((r) => r.name);
+}
+

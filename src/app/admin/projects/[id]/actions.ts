@@ -3,7 +3,14 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
-import { milestones, projects, properties } from '@/db/schema';
+import {
+  milestones,
+  profiles,
+  projectAssignments,
+  projects,
+  properties,
+  staff,
+} from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
 
@@ -389,5 +396,127 @@ export async function markDecisionAwaitingClient(
   } catch (error) {
     console.error('[markDecisionAwaitingClient]', error);
     return { success: false, error: 'Failed to send decision.' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Field-staff project assignments
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve a profile id to a staff name + role + active flag. Used by
+ * the assign/unassign actions to verify the target is actually an
+ * active field-staff member before recording the assignment, and to
+ * grab a name for the audit row.
+ */
+async function profileAsField(profileId: string): Promise<{
+  ok: true;
+  name: string;
+} | {
+  ok: false;
+  error: string;
+}> {
+  const [row] = await db
+    .select({
+      role: staff.role,
+      status: staff.status,
+      name: staff.name,
+    })
+    .from(profiles)
+    .innerJoin(staff, eq(staff.id, profiles.staffId))
+    .where(eq(profiles.id, profileId))
+    .limit(1);
+  if (!row) return { ok: false, error: 'Staff profile not found.' };
+  if (row.role !== 'field_staff') {
+    return { ok: false, error: 'Only field staff can be assigned to projects.' };
+  }
+  if (row.status !== 'active') {
+    return { ok: false, error: 'That staff member is not active.' };
+  }
+  return { ok: true, name: row.name };
+}
+
+export async function assignStaffToProject(
+  projectId: string,
+  profileId: string,
+): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const owner = await projectOwnership(projectId);
+  if (!owner) return { success: false, error: 'Project not found.' };
+
+  const target = await profileAsField(profileId);
+  if (!target.ok) return { success: false, error: target.error };
+
+  try {
+    // Composite PK on (project_id, user_id) makes the insert idempotent —
+    // ON CONFLICT DO NOTHING means re-clicking Add doesn't error.
+    await db
+      .insert(projectAssignments)
+      .values({ projectId, userId: profileId })
+      .onConflictDoNothing();
+
+    await logAudit({
+      actor: user,
+      action: 'assigned staff to project',
+      targetType: 'project',
+      targetId: projectId,
+      targetLabel: `${target.name} → ${owner.name}`,
+      clientId: owner.clientId,
+      metadata: { profileId },
+    });
+
+    revalidatePath(`/admin/projects/${projectId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('[assignStaffToProject]', error);
+    return { success: false, error: 'Failed to assign staff.' };
+  }
+}
+
+export async function unassignStaffFromProject(
+  projectId: string,
+  profileId: string,
+): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const owner = await projectOwnership(projectId);
+  if (!owner) return { success: false, error: 'Project not found.' };
+
+  // We don't gate on `profileAsField` here — even if the staff member
+  // has been deactivated since being assigned, an admin should still
+  // be able to clean up the orphan row. Only the audit name lookup
+  // matters, and we can fall back to the profile id.
+  const [row] = await db
+    .select({ name: staff.name })
+    .from(profiles)
+    .leftJoin(staff, eq(staff.id, profiles.staffId))
+    .where(eq(profiles.id, profileId))
+    .limit(1);
+  const targetName = row?.name ?? profileId.slice(0, 8);
+
+  try {
+    await db
+      .delete(projectAssignments)
+      .where(
+        and(
+          eq(projectAssignments.projectId, projectId),
+          eq(projectAssignments.userId, profileId),
+        ),
+      );
+
+    await logAudit({
+      actor: user,
+      action: 'unassigned staff from project',
+      targetType: 'project',
+      targetId: projectId,
+      targetLabel: `${targetName} ✕ ${owner.name}`,
+      clientId: owner.clientId,
+      metadata: { profileId },
+    });
+
+    revalidatePath(`/admin/projects/${projectId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('[unassignStaffFromProject]', error);
+    return { success: false, error: 'Failed to remove staff.' };
   }
 }

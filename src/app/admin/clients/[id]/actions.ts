@@ -6,6 +6,7 @@ import { db } from '@/db';
 import {
   clients,
   milestones,
+  projectAssignments,
   projectTemplates,
   projects,
   properties,
@@ -392,6 +393,8 @@ export interface CreateProjectInput {
   description?: string | null;
   contractCents?: number | null;
   templateId?: string | null;
+  /** Optional: profile ids of field staff to assign at create time. */
+  assignedStaffIds?: string[];
 }
 
 /**
@@ -444,6 +447,26 @@ export async function createProject(
 
     if (input.templateId) {
       await applyTemplateToProject(project.id, input.templateId);
+    }
+
+    // Best-effort initial assignments. The Team tab on the project
+    // detail page is the recoverable home for this — a failed insert
+    // here just means the admin re-adds the missing staff there. We
+    // dedupe by Set in case the form somehow submitted the same id
+    // twice; the composite PK would also stop the dup at write time.
+    if (input.assignedStaffIds?.length) {
+      const uniqueIds = Array.from(new Set(input.assignedStaffIds));
+      try {
+        await db
+          .insert(projectAssignments)
+          .values(uniqueIds.map((userId) => ({ projectId: project.id, userId })))
+          .onConflictDoNothing();
+      } catch (assignErr) {
+        console.error(
+          '[createProject] initial assignments failed (project still created):',
+          assignErr,
+        );
+      }
     }
 
     await logAudit({

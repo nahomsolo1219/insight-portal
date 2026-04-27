@@ -14,6 +14,7 @@ import type {
   PropertyRow,
   TemplateOption,
 } from './queries';
+import type { FieldStaffPickerRow } from '../../projects/[id]/queries';
 
 type MilestoneStatus = MilestoneRow['status'];
 
@@ -22,6 +23,7 @@ interface ProjectsListProps {
   projects: ProjectWithMilestones[];
   properties: PropertyRow[];
   templates: TemplateOption[];
+  fieldStaff: FieldStaffPickerRow[];
   activePropertyId: string | null;
 }
 
@@ -30,6 +32,7 @@ export function ProjectsList({
   projects,
   properties,
   templates,
+  fieldStaff,
   activePropertyId,
 }: ProjectsListProps) {
   const router = useRouter();
@@ -111,6 +114,7 @@ export function ProjectsList({
             clientId={clientId}
             properties={properties}
             templates={templates}
+            fieldStaff={fieldStaff}
             activePropertyId={activePropertyId}
           />
         </div>
@@ -125,6 +129,7 @@ export function ProjectsList({
           clientId={clientId}
           properties={properties}
           templates={templates}
+          fieldStaff={fieldStaff}
           activePropertyId={activePropertyId}
         />
       </div>
