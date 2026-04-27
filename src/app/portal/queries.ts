@@ -17,6 +17,7 @@ import {
   reports,
   staff,
 } from '@/db/schema';
+import { getSignedUrls } from '@/lib/storage/upload';
 
 export interface ClientProfile {
   id: string;
@@ -242,6 +243,9 @@ export interface ActivityItem {
   subtitle: string;
   /** ISO timestamp; the UI sorts on this and renders relative time. */
   date: string;
+  /** Project this item belongs to (when applicable). Drives the row's
+   *  click destination — null falls back to /portal/projects. */
+  projectId: string | null;
 }
 
 /**
@@ -282,6 +286,7 @@ export async function getClientRecentActivity(
             .select({
               title: milestones.title,
               updatedAt: milestones.updatedAt,
+              projectId: projects.id,
               projectName: projects.name,
             })
             .from(milestones)
@@ -297,6 +302,7 @@ export async function getClientRecentActivity(
       db
         .select({
           uploadedAt: photos.uploadedAt,
+          projectId: photos.projectId,
           propertyName: properties.name,
         })
         .from(photos)
@@ -328,33 +334,45 @@ export async function getClientRecentActivity(
         title: `${m.title} completed`,
         subtitle: m.projectName,
         date: m.updatedAt.toISOString(),
+        projectId: m.projectId,
       });
     }
 
     // Photos collapse into "N new photos at <Property> on <day>" so the
     // feed doesn't drown when field staff drops 12 shots at once.
-    const photoBuckets = new Map<string, { count: number; latest: Date }>();
+    // Bucket key includes projectId so a row that links to one project
+    // never silently collapses with a row from another project — the
+    // user clicks expecting to land on the right project page.
+    const photoBuckets = new Map<
+      string,
+      { count: number; latest: Date; propertyName: string; projectId: string | null }
+    >();
     for (const p of photoRows) {
       const day = p.uploadedAt.toISOString().slice(0, 10);
-      const key = `${day}__${p.propertyName}`;
+      const key = `${day}__${p.propertyName}__${p.projectId ?? 'none'}`;
       const entry = photoBuckets.get(key);
       if (entry) {
         entry.count += 1;
         if (p.uploadedAt > entry.latest) entry.latest = p.uploadedAt;
       } else {
-        photoBuckets.set(key, { count: 1, latest: p.uploadedAt });
+        photoBuckets.set(key, {
+          count: 1,
+          latest: p.uploadedAt,
+          propertyName: p.propertyName,
+          projectId: p.projectId,
+        });
       }
     }
-    for (const [key, entry] of photoBuckets) {
-      const propertyName = key.split('__')[1] ?? '';
+    for (const entry of photoBuckets.values()) {
       items.push({
         type: 'photo',
         title:
           entry.count === 1
             ? '1 new photo added'
             : `${entry.count} new photos added`,
-        subtitle: propertyName,
+        subtitle: entry.propertyName,
         date: entry.latest.toISOString(),
+        projectId: entry.projectId,
       });
     }
 
@@ -364,6 +382,7 @@ export async function getClientRecentActivity(
         title: `${r.name} added`,
         subtitle: r.propertyName,
         date: r.createdAt.toISOString(),
+        projectId: null,
       });
     }
   }
@@ -388,11 +407,68 @@ export async function getClientRecentActivity(
       title: `Invoice #${inv.number} issued`,
       subtitle: `$${dollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${inv.description ? ` · ${inv.description}` : ''}`,
       date: inv.createdAt.toISOString(),
+      projectId: null,
     });
   }
 
   items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   return items.slice(0, limit);
+}
+
+export interface RecentPhotoRow {
+  id: string;
+  caption: string | null;
+  tag: 'before' | 'during' | 'after' | null;
+  storagePath: string;
+  signedUrl: string | null;
+  projectId: string | null;
+  propertyName: string;
+}
+
+/**
+ * Most-recent categorized photos across all the client's properties for
+ * the dashboard "Recent photos" widget. Same scope-by-clientId pattern;
+ * URLs signed in one batch.
+ */
+export async function getClientRecentPhotos(
+  clientId: string,
+  limit = 6,
+): Promise<RecentPhotoRow[]> {
+  const clientProperties = await db
+    .select({ id: properties.id })
+    .from(properties)
+    .where(eq(properties.clientId, clientId));
+
+  const propertyIds = clientProperties.map((p) => p.id);
+  if (propertyIds.length === 0) return [];
+
+  const rows = await db
+    .select({
+      id: photos.id,
+      caption: photos.caption,
+      tag: photos.tag,
+      storagePath: photos.storagePath,
+      projectId: photos.projectId,
+      propertyName: properties.name,
+    })
+    .from(photos)
+    .innerJoin(properties, eq(properties.id, photos.propertyId))
+    .where(
+      and(
+        inArray(photos.propertyId, propertyIds),
+        eq(photos.status, 'categorized'),
+      ),
+    )
+    .orderBy(desc(photos.uploadedAt))
+    .limit(limit);
+
+  if (rows.length === 0) return [];
+
+  const urlByPath = await getSignedUrls(rows.map((p) => p.storagePath));
+  return rows.map((p) => ({
+    ...p,
+    signedUrl: urlByPath.get(p.storagePath) ?? null,
+  }));
 }
 
 export interface PortalBadgeCounts {

@@ -129,6 +129,14 @@ export function ProjectTimeline({ payload }: Props) {
         visibleIds={visibleIds}
       />
 
+      {allPhotos.length > 0 && (
+        <ProjectPhotosSection
+          photos={allPhotos}
+          visibleIds={visibleIds}
+          onPhotoClick={openLightbox}
+        />
+      )}
+
       {nextAppointment && (
         <NextVisitCard
           appointment={nextAppointment}
@@ -820,6 +828,67 @@ function RespondedSummary({
         </p>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Project-wide photos (all categorized shots, regardless of milestone link)
+// ---------------------------------------------------------------------------
+
+function ProjectPhotosSection({
+  photos,
+  visibleIds,
+  onPhotoClick,
+}: {
+  photos: TimelinePhoto[];
+  visibleIds: Set<string>;
+  onPhotoClick: (id: string) => void;
+}) {
+  // Honour the same tag/category filter the page header drives — the
+  // section is meant to surface every photo, but "every photo" still
+  // means "every photo the user is currently looking at".
+  const visible = photos.filter((p) => visibleIds.has(p.id));
+  if (visible.length === 0) return null;
+
+  return (
+    <section>
+      <SectionLabel>Photos</SectionLabel>
+      <div className="shadow-card rounded-2xl bg-white p-5">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+          {visible.map((photo) => (
+            <button
+              key={photo.id}
+              type="button"
+              onClick={() => onPhotoClick(photo.id)}
+              className="group relative aspect-square overflow-hidden rounded-xl bg-gray-100"
+              aria-label={photo.caption ?? 'View photo'}
+            >
+              {photo.signedUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={photo.signedUrl}
+                  alt={photo.caption ?? photo.tag ?? 'Project photo'}
+                  className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-gray-300">
+                  <Camera size={20} strokeWidth={1.25} />
+                </div>
+              )}
+              {photo.tag && (
+                <span className="absolute top-1.5 left-1.5 rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-medium tracking-wider text-gray-700 uppercase backdrop-blur-sm">
+                  {photo.tag}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-gray-400">
+          Showing {visible.length} {visible.length === 1 ? 'photo' : 'photos'}
+        </p>
+      </div>
+    </section>
   );
 }
 

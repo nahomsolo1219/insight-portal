@@ -1,7 +1,7 @@
 // Project-detail query for the client portal timeline. Fetches everything
 // the timeline page needs in parallel and signs photo URLs in one batch.
 
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   appointments,
@@ -185,6 +185,12 @@ export async function getProjectTimeline(
       .leftJoin(vendors, eq(vendors.id, milestones.vendorId))
       .where(eq(milestones.projectId, projectId))
       .orderBy(asc(milestones.order), asc(milestones.dueDate)),
+    // Include any photo on this project, plus property-level photos that
+    // weren't tied to a specific project — field staff often upload to
+    // the property without picking a project, and those would otherwise
+    // be invisible to the client. Photos linked to a *different* project
+    // on the same property are excluded (they belong on that project's
+    // timeline).
     db
       .select({
         id: photos.id,
@@ -195,7 +201,18 @@ export async function getProjectTimeline(
         milestoneId: photos.milestoneId,
       })
       .from(photos)
-      .where(and(eq(photos.projectId, projectId), eq(photos.status, 'categorized')))
+      .where(
+        and(
+          eq(photos.status, 'categorized'),
+          or(
+            eq(photos.projectId, projectId),
+            and(
+              eq(photos.propertyId, project.propertyId),
+              isNull(photos.projectId),
+            ),
+          ),
+        ),
+      )
       .orderBy(asc(photos.tag), desc(photos.uploadedAt)),
     db
       .select({

@@ -4,11 +4,13 @@ import {
   Calendar,
   Camera,
   CheckCircle2,
+  ChevronRight,
   ClipboardList,
   Clock,
   FileText,
   Hammer,
   Home,
+  ImageOff,
   MapPin,
   Receipt,
   Sparkles,
@@ -21,11 +23,13 @@ import {
   getClientActiveProjects,
   getClientDashboardStats,
   getClientRecentActivity,
+  getClientRecentPhotos,
   getClientUpcomingAppointments,
   getMyClientProfile,
   type ActivityItem,
   type ClientProfile,
   type ClientProjectRow,
+  type RecentPhotoRow,
   type UpcomingAppointmentRow,
 } from './queries';
 
@@ -36,12 +40,13 @@ export default async function PortalDashboardPage() {
   if (!user || user.role !== 'client' || !user.clientId) redirect('/');
 
   const clientId = user.clientId;
-  const [profile, stats, upcoming, activeProjects, activity] = await Promise.all([
+  const [profile, stats, upcoming, activeProjects, activity, recentPhotos] = await Promise.all([
     getMyClientProfile(clientId),
     getClientDashboardStats(clientId),
     getClientUpcomingAppointments(clientId, 3),
     getClientActiveProjects(clientId),
     getClientRecentActivity(clientId, 8),
+    getClientRecentPhotos(clientId, 6),
   ]);
 
   const firstName = pickFirstName(user.fullName, profile?.name);
@@ -67,10 +72,67 @@ export default async function PortalDashboardPage() {
 
       <UpcomingVisitsSection appointments={upcoming} />
 
+      <RecentPhotosSection photos={recentPhotos} />
+
       <RecentActivitySection items={activity} />
 
       {profile && <ProjectManagerCard profile={profile} />}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Recent photos
+// ---------------------------------------------------------------------------
+
+function RecentPhotosSection({ photos }: { photos: RecentPhotoRow[] }) {
+  if (photos.length === 0) return null;
+  return (
+    <section>
+      <SectionHeader title="Recent photos" />
+      <div className="shadow-card rounded-2xl bg-white p-4">
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:grid sm:grid-cols-3 sm:gap-3 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden md:grid-cols-6">
+          {photos.map((p) => (
+            <RecentPhotoTile key={p.id} photo={p} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RecentPhotoTile({ photo }: { photo: RecentPhotoRow }) {
+  // Photos with a project link land on that project's timeline (where the
+  // full-screen lightbox lives); orphans fall through to the projects list
+  // since we don't have a property-only landing page.
+  const href = photo.projectId
+    ? `/portal/projects/${photo.projectId}`
+    : '/portal/projects';
+  return (
+    <Link
+      href={href}
+      className="group relative block aspect-square h-24 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100 sm:h-auto sm:w-auto"
+      aria-label={photo.caption ?? `Photo at ${photo.propertyName}`}
+    >
+      {photo.signedUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={photo.signedUrl}
+          alt={photo.caption ?? photo.tag ?? 'Project photo'}
+          className="h-full w-full object-cover transition-transform group-hover:scale-105"
+          loading="lazy"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-gray-300">
+          <ImageOff size={20} strokeWidth={1.25} />
+        </div>
+      )}
+      {photo.tag && (
+        <span className="absolute top-1.5 left-1.5 rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-medium tracking-wider text-gray-700 uppercase backdrop-blur-sm">
+          {photo.tag}
+        </span>
+      )}
+    </Link>
   );
 }
 
@@ -95,9 +157,10 @@ function RecentActivitySection({ items }: { items: ActivityItem[] }) {
 function ActivityRow({ item, isLast }: { item: ActivityItem; isLast: boolean }) {
   const meta = ACTIVITY_META[item.type];
   return (
-    <div
+    <Link
+      href={getActivityHref(item)}
       className={cn(
-        'flex items-start gap-4 px-5 py-4',
+        'group flex items-start gap-4 px-5 py-4 transition-colors hover:bg-brand-warm-50',
         !isLast && 'border-b border-gray-50',
       )}
     >
@@ -116,8 +179,27 @@ function ActivityRow({ item, isLast }: { item: ActivityItem; isLast: boolean }) 
           <span>{relativeDate(item.date)}</span>
         </div>
       </div>
-    </div>
+      <ChevronRight
+        size={16}
+        strokeWidth={1.5}
+        className="mt-1 flex-shrink-0 text-gray-300 transition-colors group-hover:text-gray-500"
+      />
+    </Link>
   );
+}
+
+function getActivityHref(item: ActivityItem): string {
+  switch (item.type) {
+    case 'milestone':
+    case 'photo':
+      return item.projectId ? `/portal/projects/${item.projectId}` : '/portal/projects';
+    case 'report':
+      return '/portal/documents';
+    case 'invoice':
+      return '/portal/invoices';
+    default:
+      return '/portal';
+  }
 }
 
 const ACTIVITY_META: Record<
