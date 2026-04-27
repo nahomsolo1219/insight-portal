@@ -6,7 +6,7 @@ import { ProjectTimeline } from './ProjectTimeline';
 import { getProjectTimeline } from './queries';
 
 interface Props {
-  params: Promise<{ id: string }>;
+  params: Promise<{ propertyId: string; id: string }>;
 }
 
 /**
@@ -15,7 +15,7 @@ interface Props {
  * interactive lightbox + decision response state.
  */
 export default async function PortalProjectDetailPage({ params }: Props) {
-  const { id } = await params;
+  const { propertyId, id } = await params;
   const user = await getCurrentUser();
   if (!user || user.role !== 'client' || !user.clientId) redirect('/');
 
@@ -25,7 +25,7 @@ export default async function PortalProjectDetailPage({ params }: Props) {
   return (
     <div className="space-y-6">
       <Link
-        href="/portal/projects"
+        href={`/portal/p/${propertyId}/projects`}
         className="hover:text-brand-teal-500 inline-flex items-center gap-1 text-xs font-medium text-gray-500 transition-colors"
       >
         <ChevronLeft size={12} strokeWidth={2} />

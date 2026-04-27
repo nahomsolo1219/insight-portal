@@ -1,616 +1,204 @@
-import {
-  ArrowRight,
-  Briefcase,
-  Calendar,
-  Camera,
-  CheckCircle2,
-  ChevronRight,
-  ClipboardList,
-  Clock,
-  FileText,
-  Hammer,
-  Home,
-  ImageOff,
-  MapPin,
-  Receipt,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowRight, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getCurrentUser } from '@/lib/auth/current-user';
-import { cn, formatDate, formatTime, initialsFrom } from '@/lib/utils';
+import { PropertyCover } from '@/components/portal/PropertyCover';
+import { requireUser } from '@/lib/auth/current-user';
+import { cn, formatDate } from '@/lib/utils';
 import {
-  getClientActiveProjects,
-  getClientDashboardStats,
-  getClientRecentActivity,
-  getClientRecentPhotos,
-  getClientUpcomingAppointments,
+  getClientPropertyLandingCards,
   getMyClientProfile,
-  type ActivityItem,
-  type ClientProfile,
-  type ClientProjectRow,
-  type RecentPhotoRow,
-  type UpcomingAppointmentRow,
+  type PropertyLandingCard,
 } from './queries';
 
-export default async function PortalDashboardPage() {
-  // Layout already gates by role, but we re-fetch the user here to read
-  // their `clientId` — the layout's user object isn't passed down.
-  const user = await getCurrentUser();
-  if (!user || user.role !== 'client' || !user.clientId) redirect('/');
+const STATUS_CHIP: Record<NonNullable<PropertyLandingCard['statusTone']>, string> = {
+  green: 'bg-[var(--green-100)] text-[var(--green-700)]',
+  amber: 'bg-[var(--amber-100)] text-[var(--amber-600)]',
+  neutral: 'border-line border bg-paper text-ink-700',
+  rose: 'bg-[var(--rose-100)] text-[var(--rose-700)]',
+};
 
-  const clientId = user.clientId;
-  const [profile, stats, upcoming, activeProjects, activity, recentPhotos] = await Promise.all([
-    getMyClientProfile(clientId),
-    getClientDashboardStats(clientId),
-    getClientUpcomingAppointments(clientId, 3),
-    getClientActiveProjects(clientId),
-    getClientRecentActivity(clientId, 8),
-    getClientRecentPhotos(clientId, 6),
+/**
+ * Editorial landing page for the client portal. Three branches:
+ *
+ *  - 0 properties → empty state ("we'll have your home set up shortly").
+ *  - 1 property  → auto-redirect to that property's dashboard. The grid
+ *    visual would feel silly with one card and the propertyId-scoped
+ *    chrome is the canonical view.
+ *  - 2+          → grid of editorial cards with cover + region + meta
+ *    line + optional status chip. Each card is a single Link straight
+ *    to that property's dashboard.
+ *
+ * Auth gate happens in `layout.tsx` — by the time we run, `user.role`
+ * is `client` and `user.clientId` is set.
+ */
+export default async function PortalLandingPage() {
+  const user = await requireUser();
+  if (user.role !== 'client' || !user.clientId) redirect('/');
+
+  const [cards, profile] = await Promise.all([
+    getClientPropertyLandingCards(user.clientId),
+    getMyClientProfile(user.clientId),
   ]);
 
+  if (cards.length === 1) {
+    redirect(`/portal/p/${cards[0]!.id}/dashboard`);
+  }
+
   const firstName = pickFirstName(user.fullName, profile?.name);
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
 
   return (
-    <div className="space-y-10">
-      <Welcome firstName={firstName} today={today} />
-
-      <StatCards
-        activeProjects={stats.activeProjects}
-        pendingDecisions={stats.pendingDecisions}
-        upcomingAppointments={stats.upcomingAppointments}
-        nextAppointment={upcoming[0] ?? null}
-      />
-
-      <ActiveProjectsSection projects={activeProjects} />
-
-      <UpcomingVisitsSection appointments={upcoming} />
-
-      <RecentPhotosSection photos={recentPhotos} />
-
-      <RecentActivitySection items={activity} />
-
-      {profile && <ProjectManagerCard profile={profile} />}
+    <div className="bg-cream min-h-screen">
+      <Wordmark />
+      <main className="mx-auto max-w-[1100px] px-6 pb-24 pt-10">
+        <Hero firstName={firstName} cardCount={cards.length} />
+        {cards.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-2">
+            {cards.map((card) => (
+              <PropertyLandingCardItem key={card.id} card={card} />
+            ))}
+          </div>
+        )}
+      </main>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Recent photos
-// ---------------------------------------------------------------------------
-
-function RecentPhotosSection({ photos }: { photos: RecentPhotoRow[] }) {
-  if (photos.length === 0) return null;
+function Wordmark() {
   return (
-    <section>
-      <SectionHeader title="Recent photos" />
-      <div className="shadow-card rounded-2xl bg-white p-4">
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:grid sm:grid-cols-3 sm:gap-3 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden md:grid-cols-6">
-          {photos.map((p) => (
-            <RecentPhotoTile key={p.id} photo={p} />
-          ))}
-        </div>
+    <header className="border-line border-b bg-paper">
+      <div className="mx-auto flex max-w-[1100px] items-center justify-between px-6 py-5">
+        <Link href="/portal" className="serif inline-flex items-center text-2xl tracking-tight text-ink-900">
+          Insight
+          <span className="ml-0.5 text-amber-600">.</span>
+        </Link>
+        <form action="/logout" method="POST">
+          <button
+            type="submit"
+            className="text-ink-500 hover:text-ink-700 text-xs uppercase tracking-wider transition-colors"
+          >
+            Sign out
+          </button>
+        </form>
       </div>
-    </section>
-  );
-}
-
-function RecentPhotoTile({ photo }: { photo: RecentPhotoRow }) {
-  // Photos with a project link land on that project's timeline (where the
-  // full-screen lightbox lives); orphans fall through to the projects list
-  // since we don't have a property-only landing page.
-  const href = photo.projectId
-    ? `/portal/projects/${photo.projectId}`
-    : '/portal/projects';
-  return (
-    <Link
-      href={href}
-      className="group relative block aspect-square h-24 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100 sm:h-auto sm:w-auto"
-      aria-label={photo.caption ?? `Photo at ${photo.propertyName}`}
-    >
-      {photo.signedUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={photo.signedUrl}
-          alt={photo.caption ?? photo.tag ?? 'Project photo'}
-          className="h-full w-full object-cover transition-transform group-hover:scale-105"
-          loading="lazy"
-        />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center text-gray-300">
-          <ImageOff size={20} strokeWidth={1.25} />
-        </div>
-      )}
-      {photo.tag && (
-        <span className="absolute top-1.5 left-1.5 rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-medium tracking-wider text-gray-700 uppercase backdrop-blur-sm">
-          {photo.tag}
-        </span>
-      )}
-    </Link>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Recent activity
-// ---------------------------------------------------------------------------
-
-function RecentActivitySection({ items }: { items: ActivityItem[] }) {
-  if (items.length === 0) return null;
-  return (
-    <section>
-      <SectionHeader title="Recent activity" />
-      <div className="shadow-card overflow-hidden rounded-2xl bg-white">
-        {items.map((item, i) => (
-          <ActivityRow key={i} item={item} isLast={i === items.length - 1} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ActivityRow({ item, isLast }: { item: ActivityItem; isLast: boolean }) {
-  const meta = ACTIVITY_META[item.type];
-  return (
-    <Link
-      href={getActivityHref(item)}
-      className={cn(
-        'group flex items-start gap-4 px-5 py-4 transition-colors hover:bg-brand-warm-50',
-        !isLast && 'border-b border-gray-50',
-      )}
-    >
-      <span
-        className={cn(
-          'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl',
-          meta.tone,
-        )}
-      >
-        {meta.icon}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-gray-900">{item.title}</div>
-        <div className="mt-0.5 truncate text-xs text-gray-500">
-          {item.subtitle && <span>{item.subtitle} · </span>}
-          <span>{relativeDate(item.date)}</span>
-        </div>
-      </div>
-      <ChevronRight
-        size={16}
-        strokeWidth={1.5}
-        className="mt-1 flex-shrink-0 text-gray-300 transition-colors group-hover:text-gray-500"
-      />
-    </Link>
-  );
-}
-
-function getActivityHref(item: ActivityItem): string {
-  switch (item.type) {
-    case 'milestone':
-    case 'photo':
-      return item.projectId ? `/portal/projects/${item.projectId}` : '/portal/projects';
-    case 'report':
-      return '/portal/documents';
-    case 'invoice':
-      return '/portal/invoices';
-    default:
-      return '/portal';
-  }
-}
-
-const ACTIVITY_META: Record<
-  ActivityItem['type'],
-  { icon: React.ReactNode; tone: string }
-> = {
-  milestone: {
-    icon: <CheckCircle2 size={16} strokeWidth={1.75} />,
-    tone: 'bg-emerald-50 text-emerald-600',
-  },
-  photo: {
-    icon: <Camera size={16} strokeWidth={1.75} />,
-    tone: 'bg-brand-teal-50 text-brand-teal-500',
-  },
-  report: {
-    icon: <FileText size={16} strokeWidth={1.75} />,
-    tone: 'bg-blue-50 text-blue-600',
-  },
-  invoice: {
-    icon: <Receipt size={16} strokeWidth={1.75} />,
-    tone: 'bg-brand-gold-50 text-brand-gold-500',
-  },
-};
-
-/** "2h ago" / "3 days ago" / "Apr 22". Switches to absolute after a week. */
-function relativeDate(iso: string): string {
-  const then = new Date(iso);
-  const diffMs = Date.now() - then.getTime();
-  const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 1) return 'Just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
-  return formatDate(iso.slice(0, 10));
-}
-
-// ---------------------------------------------------------------------------
-// Welcome
-// ---------------------------------------------------------------------------
-
-function Welcome({ firstName, today }: { firstName: string; today: string }) {
-  return (
-    <header className="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="font-display text-brand-teal-500 text-3xl tracking-tight">
-          Welcome back, {firstName}
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">Your home is in good hands.</p>
-      </div>
-      <p className="text-xs tracking-wider text-gray-400 uppercase">{today}</p>
     </header>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Stat cards
-// ---------------------------------------------------------------------------
-
-interface StatCardsProps {
-  activeProjects: number;
-  pendingDecisions: number;
-  upcomingAppointments: number;
-  nextAppointment: UpcomingAppointmentRow | null;
-}
-
-function StatCards({
-  activeProjects,
-  pendingDecisions,
-  upcomingAppointments,
-  nextAppointment,
-}: StatCardsProps) {
+function Hero({ firstName, cardCount }: { firstName: string; cardCount: number }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <StatCard
-        href="/portal/projects"
-        icon={<Briefcase size={16} strokeWidth={1.5} />}
-        value={activeProjects}
-        label={activeProjects === 1 ? 'Active project' : 'Active projects'}
-        hint={activeProjects === 0 ? 'Nothing in flight' : 'See progress'}
-      />
-      <StatCard
-        href="/portal/projects"
-        icon={<ClipboardList size={16} strokeWidth={1.5} />}
-        value={pendingDecisions}
-        label={pendingDecisions === 1 ? 'Decision needs your input' : 'Decisions need your input'}
-        hint={pendingDecisions === 0 ? 'All caught up' : 'Review now'}
-        // Gold tint when there's something to do — drawing the eye matters
-        // here because pending decisions are the only thing the client
-        // *must* act on; everything else is informational.
-        accent={pendingDecisions > 0 ? 'gold' : 'default'}
-      />
-      <StatCard
-        href={upcomingAppointments > 0 ? '/portal/projects' : undefined}
-        icon={<Calendar size={16} strokeWidth={1.5} />}
-        value={upcomingAppointments}
-        label={upcomingAppointments === 1 ? 'Upcoming visit' : 'Upcoming visits'}
-        hint={
-          nextAppointment
-            ? `Next: ${formatDate(nextAppointment.date)}`
-            : 'No visits scheduled'
-        }
-      />
-    </div>
-  );
-}
-
-interface StatCardProps {
-  href?: string;
-  icon: React.ReactNode;
-  value: number;
-  label: string;
-  hint: string;
-  accent?: 'default' | 'gold';
-}
-
-function StatCard({ href, icon, value, label, hint, accent = 'default' }: StatCardProps) {
-  const inner = (
-    <div
-      className={cn(
-        'shadow-card group flex h-full flex-col rounded-2xl bg-white p-6 transition-all',
-        href && 'hover:shadow-elevated',
-        accent === 'gold' && 'ring-brand-gold-200 ring-1',
-      )}
-    >
-      <div
-        className={cn(
-          'mb-4 inline-flex h-8 w-8 items-center justify-center rounded-lg',
-          accent === 'gold'
-            ? 'bg-brand-gold-50 text-brand-gold-500'
-            : 'bg-brand-warm-200 text-brand-teal-500',
-        )}
-      >
-        {icon}
-      </div>
-      <div className="text-3xl font-light tracking-tight text-gray-900">{value}</div>
-      <div className="mt-1 text-sm font-medium text-gray-700">{label}</div>
-      <div
-        className={cn(
-          'mt-3 inline-flex items-center gap-1 text-xs',
-          accent === 'gold' ? 'text-brand-gold-500 font-medium' : 'text-gray-400',
-        )}
-      >
-        {hint}
-        {href && (
-          <ArrowRight
-            size={11}
-            strokeWidth={2}
-            className="-translate-x-0.5 transition-transform group-hover:translate-x-0"
-          />
-        )}
-      </div>
-    </div>
-  );
-
-  return href ? (
-    <Link href={href} className="block">
-      {inner}
-    </Link>
-  ) : (
-    inner
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Active projects
-// ---------------------------------------------------------------------------
-
-function ActiveProjectsSection({ projects }: { projects: ClientProjectRow[] }) {
-  return (
-    <section>
-      <SectionHeader title="Your projects" />
-      {projects.length === 0 ? (
-        <EmptyCard icon={<Sparkles size={20} strokeWidth={1.25} />}>
-          No active projects. Anything we&apos;re scheduling will show up here.
-        </EmptyCard>
-      ) : (
-        <div className="space-y-3">
-          {projects.map((p) => (
-            <ProjectRow key={p.id} project={p} />
-          ))}
-        </div>
-      )}
+    <section className="max-w-2xl">
+      <p className="eyebrow">Your homes</p>
+      <h1 className="serif text-ink-900 mt-3 text-4xl leading-tight md:text-5xl">
+        Welcome back, {firstName}.
+      </h1>
+      <p className="text-ink-500 mt-4 text-base leading-relaxed md:text-lg">
+        {cardCount === 0
+          ? 'We’re getting your home set up. You’ll see it here as soon as your project manager adds it.'
+          : 'Choose a home to step inside. Each one keeps its own visits, photos, decisions, and invoices.'}
+      </p>
     </section>
   );
 }
 
-function ProjectRow({ project }: { project: ClientProjectRow }) {
-  const Icon = project.type === 'remodel' ? Hammer : Briefcase;
-  const subtitleParts: string[] = [project.propertyName];
-  if (project.endDate) subtitleParts.push(`Est. ${formatDate(project.endDate)}`);
+function EmptyState() {
+  return (
+    <div className="border-line bg-paper mt-12 rounded-3xl border p-10 text-center">
+      <div className="bg-cream text-ink-400 mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full">
+        <Plus size={20} strokeWidth={1.5} />
+      </div>
+      <h2 className="serif text-ink-900 mt-4 text-xl">No homes on file yet</h2>
+      <p className="text-ink-500 mx-auto mt-2 max-w-md text-sm">
+        Your project manager will add your home shortly. Once it’s on file, this is where
+        your visits, photos, and invoices will live.
+      </p>
+    </div>
+  );
+}
 
+function PropertyLandingCardItem({ card }: { card: PropertyLandingCard }) {
   return (
     <Link
-      href={`/portal/projects/${project.id}`}
-      className="shadow-card hover:shadow-elevated group flex items-center gap-5 rounded-2xl bg-white p-5 transition-all"
+      href={`/portal/p/${card.id}/dashboard`}
+      className="group border-line bg-paper hover:border-line-2 block overflow-hidden rounded-3xl border transition-all hover:-translate-y-0.5"
+      style={{ boxShadow: 'var(--shadow-soft-md)' }}
     >
-      <div className="bg-brand-teal-50 text-brand-teal-500 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl">
-        <Icon size={18} strokeWidth={1.5} />
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-3">
-          <h3 className="truncate text-base font-semibold text-gray-900">{project.name}</h3>
-          <span className="flex-shrink-0 text-xs font-medium tabular-nums text-gray-500">
-            {project.progress}%
+      <PropertyCover
+        propertyId={card.id}
+        coverPhotoUrl={card.coverPhotoUrl}
+        uploadedAt={card.coverPhotoUploadedAt}
+        alt={`Cover photo for ${card.name}`}
+        className="relative aspect-[16/10] w-full"
+      />
+      <div className="p-6">
+        {(card.region || card.statusLabel) && (
+          <div className="flex items-center justify-between gap-3">
+            {card.region && <span className="eyebrow">{card.region}</span>}
+            {card.statusLabel && card.statusTone && (
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium',
+                  STATUS_CHIP[card.statusTone],
+                )}
+              >
+                {card.statusLabel}
+              </span>
+            )}
+          </div>
+        )}
+        <h2 className="serif text-ink-900 mt-2 text-2xl tracking-tight">{card.name}</h2>
+        <p className="text-ink-500 mt-1 text-sm">{formatAddress(card)}</p>
+        <p className="text-ink-400 mt-3 text-xs">{formatMeta(card)}</p>
+        <div className="border-line-2 mt-5 flex items-center justify-between border-t pt-4 text-sm">
+          <span className="text-ink-500">{formatActivity(card)}</span>
+          <span className="text-ink-700 inline-flex items-center gap-1 font-medium transition-transform group-hover:translate-x-0.5">
+            Open
+            <ArrowRight size={14} strokeWidth={1.75} />
           </span>
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
-          <div
-            className="bg-brand-teal-500 h-full rounded-full transition-all duration-300"
-            style={{ width: `${project.progress}%` }}
-          />
-        </div>
-        <p className="mt-2 text-xs text-gray-500">{subtitleParts.join(' · ')}</p>
       </div>
-
-      <ArrowRight
-        size={14}
-        strokeWidth={1.5}
-        className="text-gray-400 transition-transform group-hover:translate-x-0.5"
-      />
     </Link>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Upcoming visits
-// ---------------------------------------------------------------------------
-
-function UpcomingVisitsSection({ appointments }: { appointments: UpcomingAppointmentRow[] }) {
-  return (
-    <section>
-      <SectionHeader title="Upcoming visits" />
-      {appointments.length === 0 ? (
-        <EmptyCard icon={<Calendar size={20} strokeWidth={1.25} />}>
-          No visits scheduled. Your project manager will add appointments as needed.
-        </EmptyCard>
-      ) : (
-        <div className="shadow-card overflow-hidden rounded-2xl bg-white">
-          {appointments.map((appt, i) => (
-            <AppointmentRow key={appt.id} appointment={appt} isLast={i === appointments.length - 1} />
-          ))}
-        </div>
-      )}
-    </section>
-  );
+function formatAddress(card: PropertyLandingCard): string {
+  const parts: string[] = [card.address];
+  if (card.city) parts.push(card.city);
+  if (card.state) parts.push(card.state);
+  return parts.join(', ');
 }
 
-function AppointmentRow({
-  appointment,
-  isLast,
-}: {
-  appointment: UpcomingAppointmentRow;
-  isLast: boolean;
-}) {
-  const { weekday, day } = dateParts(appointment.date);
-
-  return (
-    <div
-      className={cn(
-        'flex items-start gap-5 px-5 py-4',
-        !isLast && 'border-b border-gray-50',
-      )}
-    >
-      <div className="bg-brand-teal-50 text-brand-teal-500 flex h-12 w-12 flex-shrink-0 flex-col items-center justify-center rounded-xl text-center">
-        <span className="text-[10px] font-semibold tracking-wider uppercase">{weekday}</span>
-        <span className="text-base font-light">{day}</span>
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <h4 className="truncate text-sm font-semibold text-gray-900">{appointment.title}</h4>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
-          {appointment.startTime && (
-            <span className="inline-flex items-center gap-1">
-              <Clock size={11} strokeWidth={1.5} />
-              {formatTime(appointment.startTime)}
-              {appointment.endTime && ` – ${formatTime(appointment.endTime)}`}
-            </span>
-          )}
-          <span className="inline-flex items-center gap-1">
-            <MapPin size={11} strokeWidth={1.5} />
-            {appointment.propertyName}
-          </span>
-          {appointment.projectName && (
-            <span className="inline-flex items-center gap-1">
-              <Briefcase size={11} strokeWidth={1.5} />
-              {appointment.projectName}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+function formatMeta(card: PropertyLandingCard): string {
+  const parts: string[] = [];
+  if (card.bedrooms != null) {
+    parts.push(`${card.bedrooms} ${card.bedrooms === 1 ? 'bed' : 'beds'}`);
+  }
+  if (card.bathrooms) {
+    const value = Number(card.bathrooms);
+    if (Number.isFinite(value)) {
+      parts.push(`${value} ${value === 1 ? 'bath' : 'baths'}`);
+    }
+  }
+  if (card.sqft != null) parts.push(`${card.sqft.toLocaleString('en-US')} sqft`);
+  return parts.join(' · ') || '—';
 }
 
-// ---------------------------------------------------------------------------
-// Project manager
-// ---------------------------------------------------------------------------
-
-function ProjectManagerCard({ profile }: { profile: ClientProfile }) {
-  if (!profile.assignedPmName) return null;
-  const initials = initialsFrom(profile.assignedPmName);
-
-  return (
-    <section>
-      <SectionHeader title="Your project manager" muted />
-      <div className="shadow-card flex items-center gap-4 rounded-2xl bg-white p-5">
-        <span className="bg-brand-teal-500 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white">
-          {initials || 'PM'}
-        </span>
-        <div className="min-w-0 flex-1">
-          <h4 className="truncate text-sm font-semibold text-gray-900">
-            {profile.assignedPmName}
-          </h4>
-          <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-gray-500">
-            {profile.assignedPmEmail && (
-              <a
-                href={`mailto:${profile.assignedPmEmail}`}
-                className="hover:text-brand-teal-500 transition-colors"
-              >
-                {profile.assignedPmEmail}
-              </a>
-            )}
-            {profile.assignedPmPhone && (
-              <a
-                href={`tel:${profile.assignedPmPhone}`}
-                className="hover:text-brand-teal-500 transition-colors"
-              >
-                {profile.assignedPmPhone}
-              </a>
-            )}
-          </div>
-          <p className="mt-1 text-[11px] text-gray-400">Available Mon–Fri, 8 AM – 5 PM</p>
-        </div>
-        <Home size={16} strokeWidth={1.25} className="hidden text-gray-300 sm:block" />
-      </div>
-    </section>
-  );
+function formatActivity(card: PropertyLandingCard): string {
+  if (card.pendingDecisionCount > 0) {
+    return `${card.pendingDecisionCount} ${card.pendingDecisionCount === 1 ? 'decision' : 'decisions'} awaiting`;
+  }
+  if (card.activeProjectCount > 0) {
+    return `${card.activeProjectCount} ${card.activeProjectCount === 1 ? 'project' : 'projects'} in flight`;
+  }
+  if (card.nextAppointmentDate) {
+    return `Next visit ${formatDate(card.nextAppointmentDate)}`;
+  }
+  return 'No active work';
 }
 
-// ---------------------------------------------------------------------------
-// Shared bits
-// ---------------------------------------------------------------------------
-
-function SectionHeader({ title, muted = false }: { title: string; muted?: boolean }) {
-  return (
-    <h2
-      className={cn(
-        'mb-3 text-[11px] font-semibold tracking-wider uppercase',
-        muted ? 'text-gray-400' : 'text-gray-500',
-      )}
-    >
-      {title}
-    </h2>
-  );
-}
-
-function EmptyCard({
-  icon,
-  children,
-}: {
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="shadow-card flex items-center gap-3 rounded-2xl bg-white px-5 py-4 text-sm text-gray-500">
-      <span className="bg-brand-warm-200 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-gray-400">
-        {icon}
-      </span>
-      {children}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Pick a friendly first name to greet the client. Prefers the profile's
- * `full_name` (set by David at invite time), falling back to splitting the
- * client record's name on whitespace. For "James and Sarah Anderson" this
- * lands on "James" — we'd rather have a slightly imperfect greeting than
- * write the household-formatting logic.
- */
 function pickFirstName(fullName: string | null, clientName: string | undefined): string {
   const source = (fullName || clientName || '').trim();
   if (!source) return 'there';
   return source.split(/\s+/)[0] ?? 'there';
-}
-
-/**
- * Same parse-as-local-date trick used elsewhere — `new Date(iso)` reads
- * "YYYY-MM-DD" as UTC midnight, which can shift the weekday backward in
- * West Coast timezones. We split manually to keep the date row honest.
- */
-function dateParts(iso: string): { weekday: string; day: string } {
-  const [yStr, mStr, dStr] = iso.split('-');
-  const y = Number.parseInt(yStr, 10);
-  const m = Number.parseInt(mStr, 10);
-  const d = Number.parseInt(dStr, 10);
-  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
-    return { weekday: '—', day: '—' };
-  }
-  const localDate = new Date(y, m - 1, d);
-  return {
-    weekday: localDate
-      .toLocaleDateString('en-US', { weekday: 'short' })
-      .toUpperCase(),
-    day: d.toString(),
-  };
 }

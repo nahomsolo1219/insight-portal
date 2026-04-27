@@ -5,7 +5,12 @@ import { getCurrentUser } from '@/lib/auth/current-user';
 import { cn, formatDate } from '@/lib/utils';
 import { getClientProjects, type ClientProjectListRow } from './queries';
 
-export default async function PortalProjectsPage() {
+export default async function PortalProjectsPage({
+  params,
+}: {
+  params: Promise<{ propertyId: string }>;
+}) {
+  const { propertyId } = await params;
   const user = await getCurrentUser();
   if (!user || user.role !== 'client' || !user.clientId) redirect('/');
 
@@ -29,7 +34,7 @@ export default async function PortalProjectsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
           {projects.map((p) => (
-            <ProjectCard key={p.id} project={p} />
+            <ProjectCard key={p.id} propertyId={propertyId} project={p} />
           ))}
         </div>
       )}
@@ -37,7 +42,13 @@ export default async function PortalProjectsPage() {
   );
 }
 
-function ProjectCard({ project }: { project: ClientProjectListRow }) {
+function ProjectCard({
+  propertyId,
+  project,
+}: {
+  propertyId: string;
+  project: ClientProjectListRow;
+}) {
   const Icon = project.type === 'remodel' ? Hammer : Briefcase;
   const iconTone =
     project.type === 'remodel'
@@ -47,7 +58,7 @@ function ProjectCard({ project }: { project: ClientProjectListRow }) {
 
   return (
     <Link
-      href={`/portal/projects/${project.id}`}
+      href={`/portal/p/${propertyId}/projects/${project.id}`}
       className={cn(
         'shadow-card group flex flex-col gap-4 rounded-2xl bg-white p-5 transition-all hover:shadow-elevated',
         isInactive && 'opacity-80',

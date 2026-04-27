@@ -86,6 +86,16 @@ export const vendorDocumentTypeEnum = pgEnum('vendor_document_type', [
   'certificate',
   'other',
 ]);
+// Surface tone for the editorial property landing chip — maps to the
+// portal's bare CSS palette (teal/amber/neutral/rose) so admin copy can
+// nudge a single property card visually without us hardcoding a meaning
+// like "active project" — David sets the label and tone together.
+export const propertyStatusToneEnum = pgEnum('property_status_tone', [
+  'green',
+  'amber',
+  'neutral',
+  'rose',
+]);
 
 // ---------- Shared timestamp columns ----------
 
@@ -175,6 +185,20 @@ export const properties = pgTable('properties', {
   zipcode: text('zipcode'),
   sqft: integer('sqft'),
   yearBuilt: integer('year_built'),
+  bedrooms: integer('bedrooms'),
+  // Half-baths exist in the wild — `numeric(3,1)` lets us store 2.5
+  // without carrying a separate "half_baths" column. Anything bigger
+  // than 99.9 is a data-entry mistake, not a real estate.
+  bathrooms: numeric('bathrooms', { precision: 3, scale: 1 }),
+  // Editorial region label (e.g. "Pacific Heights", "Sea Cliff"). Used
+  // by the redesigned landing card alongside city/state — admin enters
+  // it free-form so we don't have to maintain a closed list.
+  region: text('region'),
+  // Optional admin-authored status chip for the landing grid: free-text
+  // `statusLabel` + a `statusTone` enum that picks the colour palette.
+  // Both null = no chip rendered.
+  statusLabel: text('status_label'),
+  statusTone: propertyStatusToneEnum('status_tone'),
   gateCode: text('gate_code'),
   accessNotes: text('access_notes'),
   emergencyContact: text('emergency_contact'),

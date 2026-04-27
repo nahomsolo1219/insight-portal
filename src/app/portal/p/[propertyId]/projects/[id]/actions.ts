@@ -55,6 +55,7 @@ export async function respondToDecision(
         status: milestones.status,
         clientResponse: milestones.clientResponse,
         title: milestones.title,
+        propertyId: properties.id,
       })
       .from(milestones)
       .innerJoin(projects, eq(projects.id, milestones.projectId))
@@ -89,7 +90,7 @@ export async function respondToDecision(
       metadata: { response: trimmed },
     });
 
-    revalidatePath('/portal/projects');
+    revalidatePath(`/portal/p/${row.propertyId}/projects`);
     return { success: true };
   } catch (error) {
     console.error('[respondToDecision]', error);

@@ -34,57 +34,58 @@ export interface PortalNavClient {
 
 type BadgeKey = keyof PortalBadgeCounts;
 
+interface NavLinkSpec {
+  /** Path segment after `/portal/p/{propertyId}/` (no leading slash). */
+  segment: 'dashboard' | 'projects' | 'appointments' | 'documents' | 'invoices';
+  label: string;
+  icon: ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+  /** Which badge count drives the red dot for this link, if any. */
+  badge?: BadgeKey;
+}
+
 interface NavLink {
   href: string;
   label: string;
-  /** Match nested routes (e.g. /portal/projects/[id] keeps Projects active). */
-  prefix?: string;
+  /** Match nested routes (e.g. .../projects/[id] keeps Projects active). */
+  prefix: string;
   icon: ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
-  /** Which badge count drives the red dot for this link, if any. */
   badge?: BadgeKey;
 }
 
 /**
  * Single source of truth for the portal's primary navigation. The top bar
  * renders these on md+ and the mobile bottom tab bar renders the same list
- * with icons added.
+ * with icons added. Hrefs are built per render against the active
+ * `propertyId` so the same nav drives every property's chrome.
  */
-const NAV_LINKS: readonly NavLink[] = [
-  { href: '/portal', label: 'Dashboard', icon: LayoutDashboard },
-  {
-    href: '/portal/projects',
-    label: 'Projects',
-    prefix: '/portal/projects',
-    icon: Home,
-    badge: 'pendingDecisions',
-  },
-  {
-    href: '/portal/appointments',
-    label: 'Appointments',
-    prefix: '/portal/appointments',
-    icon: Calendar,
-  },
-  {
-    href: '/portal/documents',
-    label: 'Documents',
-    prefix: '/portal/documents',
-    icon: FileText,
-    badge: 'newDocuments',
-  },
-  {
-    href: '/portal/invoices',
-    label: 'Invoices',
-    prefix: '/portal/invoices',
-    icon: Receipt,
-    badge: 'unpaidInvoices',
-  },
+const NAV_SPECS: readonly NavLinkSpec[] = [
+  { segment: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { segment: 'projects', label: 'Projects', icon: Home, badge: 'pendingDecisions' },
+  { segment: 'appointments', label: 'Appointments', icon: Calendar },
+  { segment: 'documents', label: 'Documents', icon: FileText, badge: 'newDocuments' },
+  { segment: 'invoices', label: 'Invoices', icon: Receipt, badge: 'unpaidInvoices' },
 ];
+
+function buildLinks(propertyId: string): readonly NavLink[] {
+  const base = `/portal/p/${propertyId}`;
+  return NAV_SPECS.map((spec) => ({
+    href: `${base}/${spec.segment}`,
+    label: spec.label,
+    // Prefix-match keeps nested routes (e.g. .../projects/[id]) lit up
+    // under their parent tab.
+    prefix: `${base}/${spec.segment}`,
+    icon: spec.icon,
+    badge: spec.badge,
+  }));
+}
 
 interface Props {
   user: CurrentUser;
   /** May be null if the layout failed to find the linked client row. */
   client: PortalNavClient | null;
   badges: PortalBadgeCounts;
+  /** Active property — every nav href is scoped under this id. */
+  propertyId: string;
 }
 
 /**
@@ -96,17 +97,24 @@ interface Props {
  *   The standard iOS/Android pattern; thumb-distance matters more than
  *   header real estate at 375px.
  *
- * Both surfaces share `NAV_LINKS` and `useActiveHref` so adding a new
- * portal page is a one-place edit.
+ * Both surfaces share the same generated nav list and `useActiveHref` so
+ * adding a new portal page is a one-place edit.
  */
-export function PortalNav({ user, client, badges }: Props) {
+export function PortalNav({ user, client, badges, propertyId }: Props) {
   const pathname = usePathname();
+  const links = buildLinks(propertyId);
   const isActive = useActiveHref(pathname);
 
   return (
     <>
-      <TopBar user={user} client={client} isActive={isActive} badges={badges} />
-      <BottomTabs isActive={isActive} badges={badges} />
+      <TopBar
+        user={user}
+        client={client}
+        isActive={isActive}
+        badges={badges}
+        links={links}
+      />
+      <BottomTabs isActive={isActive} badges={badges} links={links} />
     </>
   );
 }
@@ -144,13 +152,13 @@ function BadgeDot({ count, position }: { count: number; position: 'top' | 'icon'
 // ---------------------------------------------------------------------------
 
 /**
- * `/portal` is exact-match (otherwise every nested portal route would
- * highlight Dashboard); other links use a prefix so child routes light up
- * the parent tab.
+ * Every nav link prefix-matches the pathname so child routes (e.g.
+ * .../projects/[id]) keep the parent tab active. Dashboard's prefix is
+ * its own full path, so `/portal/p/abc/dashboard/anything` would still
+ * match — there are no children under it today, so this is fine.
  */
 function useActiveHref(pathname: string) {
-  return (link: NavLink): boolean =>
-    link.prefix ? pathname.startsWith(link.prefix) : pathname === link.href;
+  return (link: NavLink): boolean => pathname.startsWith(link.prefix);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,11 +170,13 @@ function TopBar({
   client,
   isActive,
   badges,
+  links,
 }: {
   user: CurrentUser;
   client: PortalNavClient | null;
   isActive: (link: NavLink) => boolean;
   badges: PortalBadgeCounts;
+  links: readonly NavLink[];
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-gray-100 bg-white">
@@ -185,7 +195,7 @@ function TopBar({
 
         {/* Nav links — hidden on mobile (bottom tabs take over). */}
         <nav className="hidden flex-1 items-center gap-1 md:flex">
-          {NAV_LINKS.map((link) => {
+          {links.map((link) => {
             const active = isActive(link);
             const count = badgeCount(badges, link.badge);
             return (
@@ -437,9 +447,11 @@ function EditProfileModal({
 function BottomTabs({
   isActive,
   badges,
+  links,
 }: {
   isActive: (link: NavLink) => boolean;
   badges: PortalBadgeCounts;
+  links: readonly NavLink[];
 }) {
   return (
     <nav
@@ -452,7 +464,7 @@ function BottomTabs({
       aria-label="Primary"
     >
       <ul className="grid grid-cols-5">
-        {NAV_LINKS.map((link) => {
+        {links.map((link) => {
           const active = isActive(link);
           const count = badgeCount(badges, link.badge);
           const Icon = link.icon;

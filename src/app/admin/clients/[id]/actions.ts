@@ -172,6 +172,8 @@ export async function updateClient(
   }
 }
 
+export type PropertyStatusTone = 'green' | 'amber' | 'neutral' | 'rose';
+
 export interface UpdatePropertyInput {
   name: string;
   address: string;
@@ -180,6 +182,12 @@ export interface UpdatePropertyInput {
   zipcode?: string | null;
   sqft?: number | null;
   yearBuilt?: number | null;
+  bedrooms?: number | null;
+  /** Pass as a string ("2.5") or number — we normalise to a numeric DB string. */
+  bathrooms?: string | number | null;
+  region?: string | null;
+  statusLabel?: string | null;
+  statusTone?: PropertyStatusTone | null;
   gateCode?: string | null;
   accessNotes?: string | null;
   emergencyContact?: string | null;
@@ -218,6 +226,11 @@ export async function updateProperty(
         zipcode: input.zipcode?.trim() || null,
         sqft: input.sqft ?? null,
         yearBuilt: input.yearBuilt ?? null,
+        bedrooms: input.bedrooms ?? null,
+        bathrooms: normaliseBathrooms(input.bathrooms),
+        region: input.region?.trim() || null,
+        statusLabel: input.statusLabel?.trim() || null,
+        statusTone: input.statusLabel?.trim() ? (input.statusTone ?? null) : null,
         gateCode: input.gateCode?.trim() || null,
         accessNotes: input.accessNotes?.trim() || null,
         emergencyContact: input.emergencyContact?.trim() || null,
@@ -258,6 +271,11 @@ export interface CreatePropertyInput {
   zipcode?: string | null;
   sqft?: number | null;
   yearBuilt?: number | null;
+  bedrooms?: number | null;
+  bathrooms?: string | number | null;
+  region?: string | null;
+  statusLabel?: string | null;
+  statusTone?: PropertyStatusTone | null;
   gateCode?: string | null;
   emergencyContact?: string | null;
   accessNotes?: string | null;
@@ -296,6 +314,11 @@ export async function createProperty(
         zipcode: input.zipcode?.trim() || null,
         sqft: input.sqft ?? null,
         yearBuilt: input.yearBuilt ?? null,
+        bedrooms: input.bedrooms ?? null,
+        bathrooms: normaliseBathrooms(input.bathrooms),
+        region: input.region?.trim() || null,
+        statusLabel: input.statusLabel?.trim() || null,
+        statusTone: input.statusLabel?.trim() ? (input.statusTone ?? null) : null,
         gateCode: input.gateCode?.trim() || null,
         emergencyContact: input.emergencyContact?.trim() || null,
         accessNotes: input.accessNotes?.trim() || null,
@@ -318,6 +341,19 @@ export async function createProperty(
     console.error('[createProperty]', error);
     return { success: false, error: 'Failed to create property' };
   }
+}
+
+/**
+ * Drizzle's `numeric` column type expects a string. Accept either a number
+ * or a string from the form payload, reject anything that doesn't parse to
+ * a finite non-negative number, and round to one decimal so half-baths
+ * (2.5) survive but 2.53 doesn't sneak in.
+ */
+function normaliseBathrooms(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return (Math.round(parsed * 10) / 10).toFixed(1);
 }
 
 /**

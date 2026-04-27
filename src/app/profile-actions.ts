@@ -61,8 +61,10 @@ export async function uploadProfileAvatar(
 
   const signedUrl = await getSignedUrl(result.path);
 
-  // Revalidate the layouts that show the user chip.
+  // Revalidate the layouts that show the user chip. Portal uses the
+  // layout-mode form so the per-property PortalNav (which sits below
+  // /portal/layout.tsx) picks up the new avatar too.
   revalidatePath('/admin');
-  revalidatePath('/portal');
+  revalidatePath('/portal', 'layout');
   return { success: true, url: signedUrl ?? '' };
 }

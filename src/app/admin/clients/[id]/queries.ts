@@ -49,6 +49,12 @@ export interface PropertyRow {
   zipcode: string | null;
   sqft: number | null;
   yearBuilt: number | null;
+  bedrooms: number | null;
+  /** `numeric` columns surface as strings — UI parses for display. */
+  bathrooms: string | null;
+  region: string | null;
+  statusLabel: string | null;
+  statusTone: 'green' | 'amber' | 'neutral' | 'rose' | null;
   gateCode: string | null;
   accessNotes: string | null;
   emergencyContact: string | null;
@@ -77,6 +83,11 @@ export async function getPropertyDetail(propertyId: string): Promise<PropertyRow
       zipcode: properties.zipcode,
       sqft: properties.sqft,
       yearBuilt: properties.yearBuilt,
+      bedrooms: properties.bedrooms,
+      bathrooms: properties.bathrooms,
+      region: properties.region,
+      statusLabel: properties.statusLabel,
+      statusTone: properties.statusTone,
       gateCode: properties.gateCode,
       accessNotes: properties.accessNotes,
       emergencyContact: properties.emergencyContact,
@@ -142,6 +153,11 @@ export async function getClientDetail(clientId: string): Promise<ClientDetailPay
       zipcode: properties.zipcode,
       sqft: properties.sqft,
       yearBuilt: properties.yearBuilt,
+      bedrooms: properties.bedrooms,
+      bathrooms: properties.bathrooms,
+      region: properties.region,
+      statusLabel: properties.statusLabel,
+      statusTone: properties.statusTone,
       gateCode: properties.gateCode,
       accessNotes: properties.accessNotes,
       emergencyContact: properties.emergencyContact,
@@ -812,6 +828,11 @@ export async function getClientPropertiesDetailed(
       zipcode: properties.zipcode,
       sqft: properties.sqft,
       yearBuilt: properties.yearBuilt,
+      bedrooms: properties.bedrooms,
+      bathrooms: properties.bathrooms,
+      region: properties.region,
+      statusLabel: properties.statusLabel,
+      statusTone: properties.statusTone,
       gateCode: properties.gateCode,
       accessNotes: properties.accessNotes,
       emergencyContact: properties.emergencyContact,

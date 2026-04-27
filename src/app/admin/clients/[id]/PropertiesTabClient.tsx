@@ -290,6 +290,8 @@ function ProjectsList({ projects }: { projects: PropertyProjectRow[] }) {
 // Edit modal
 // ---------------------------------------------------------------------------
 
+type StatusTone = 'green' | 'amber' | 'neutral' | 'rose';
+
 interface EditFormState {
   name: string;
   address: string;
@@ -298,10 +300,33 @@ interface EditFormState {
   zipcode: string;
   sqft: string;
   yearBuilt: string;
+  bedrooms: string;
+  bathrooms: string;
+  region: string;
+  statusLabel: string;
+  statusTone: StatusTone;
   gateCode: string;
   emergencyContact: string;
   accessNotes: string;
 }
+
+const STATUS_TONE_OPTIONS: { value: StatusTone; label: string }[] = [
+  { value: 'neutral', label: 'Neutral' },
+  { value: 'green', label: 'Green' },
+  { value: 'amber', label: 'Amber' },
+  { value: 'rose', label: 'Rose' },
+];
+
+// Editorial chip palette — mirrors the Phase 0 client-portal CSS vars
+// (--teal-* / --amber-* / cream / muted rose). Hardcoded as utility
+// classes here so the chip is self-contained in admin and doesn't
+// depend on a portal-only stylesheet.
+const STATUS_CHIP_TONE: Record<StatusTone, string> = {
+  green: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100',
+  amber: 'bg-amber-50 text-amber-700 ring-1 ring-amber-100',
+  neutral: 'bg-paper text-ink-700 ring-1 ring-line',
+  rose: 'bg-rose-50 text-rose-700 ring-1 ring-rose-100',
+};
 
 function EditPropertyModal({
   property,
@@ -324,6 +349,11 @@ function EditPropertyModal({
     zipcode: property.zipcode ?? '',
     sqft: property.sqft != null ? property.sqft.toString() : '',
     yearBuilt: property.yearBuilt != null ? property.yearBuilt.toString() : '',
+    bedrooms: property.bedrooms != null ? property.bedrooms.toString() : '',
+    bathrooms: property.bathrooms ?? '',
+    region: property.region ?? '',
+    statusLabel: property.statusLabel ?? '',
+    statusTone: property.statusTone ?? 'neutral',
     gateCode: property.gateCode ?? '',
     emergencyContact: property.emergencyContact ?? '',
     accessNotes: property.accessNotes ?? '',
@@ -338,11 +368,22 @@ function EditPropertyModal({
 
     const sqftNum = form.sqft.trim() ? Number(form.sqft) : null;
     const yearNum = form.yearBuilt.trim() ? Number(form.yearBuilt) : null;
+    const bedroomsNum = form.bedrooms.trim() ? Number(form.bedrooms) : null;
+    const bathroomsNum = form.bathrooms.trim() ? Number(form.bathrooms) : null;
     if (sqftNum !== null && (!Number.isFinite(sqftNum) || sqftNum < 0)) {
       return setError('Square footage must be a positive number.');
     }
     if (yearNum !== null && (!Number.isFinite(yearNum) || yearNum < 1800 || yearNum > 2100)) {
       return setError('Year built must be a real year.');
+    }
+    if (
+      bedroomsNum !== null &&
+      (!Number.isFinite(bedroomsNum) || bedroomsNum < 0 || !Number.isInteger(bedroomsNum))
+    ) {
+      return setError('Bedrooms must be a whole number.');
+    }
+    if (bathroomsNum !== null && (!Number.isFinite(bathroomsNum) || bathroomsNum < 0)) {
+      return setError('Bathrooms must be a positive number.');
     }
 
     startTransition(async () => {
@@ -354,6 +395,11 @@ function EditPropertyModal({
         zipcode: form.zipcode || undefined,
         sqft: sqftNum,
         yearBuilt: yearNum,
+        bedrooms: bedroomsNum,
+        bathrooms: bathroomsNum,
+        region: form.region || undefined,
+        statusLabel: form.statusLabel || undefined,
+        statusTone: form.statusLabel.trim() ? form.statusTone : undefined,
         gateCode: form.gateCode || undefined,
         emergencyContact: form.emergencyContact || undefined,
         accessNotes: form.accessNotes || undefined,
@@ -452,28 +498,111 @@ function EditPropertyModal({
             />
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Square footage">
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              value={form.sqft}
-              onChange={(e) => setForm({ ...form, sqft: e.target.value })}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Year built">
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1800}
-              max={2100}
-              value={form.yearBuilt}
-              onChange={(e) => setForm({ ...form, yearBuilt: e.target.value })}
-              className={inputClass}
-            />
-          </Field>
+        <div className="space-y-4 rounded-2xl border border-gray-100 bg-brand-warm-50 p-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Property details</h3>
+            <p className="mt-0.5 text-xs text-gray-500">
+              Surfaced on the client&rsquo;s portal landing card.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Square footage">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={form.sqft}
+                onChange={(e) => setForm({ ...form, sqft: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Bedrooms">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={form.bedrooms}
+                onChange={(e) => setForm({ ...form, bedrooms: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Bathrooms">
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step={0.5}
+                value={form.bathrooms}
+                onChange={(e) => setForm({ ...form, bathrooms: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Year built">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1800}
+                max={2100}
+                value={form.yearBuilt}
+                onChange={(e) => setForm({ ...form, yearBuilt: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Region" hint="e.g. Pacific Heights, Sea Cliff.">
+              <input
+                type="text"
+                value={form.region}
+                onChange={(e) => setForm({ ...form, region: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+          <div className="grid grid-cols-[1fr_auto] items-end gap-3">
+            <Field
+              label="Status label"
+              hint="Optional chip on the landing card. Leave blank to hide."
+            >
+              <input
+                type="text"
+                value={form.statusLabel}
+                maxLength={40}
+                placeholder="e.g. Project active"
+                onChange={(e) => setForm({ ...form, statusLabel: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Tone">
+              <select
+                value={form.statusTone}
+                onChange={(e) =>
+                  setForm({ ...form, statusTone: e.target.value as StatusTone })
+                }
+                className={inputClass}
+              >
+                {STATUS_TONE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          {form.statusLabel.trim() && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Preview:</span>
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium',
+                  STATUS_CHIP_TONE[form.statusTone],
+                )}
+              >
+                {form.statusLabel.trim()}
+              </span>
+            </div>
+          )}
         </div>
         <Field label="Gate code">
           <input

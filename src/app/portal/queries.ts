@@ -566,3 +566,147 @@ export async function getPortalBadgeCounts(
     newDocuments: docRow + reportRow,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Per-property landing cards (drives /portal grid)
+// ---------------------------------------------------------------------------
+
+export interface PropertyLandingCard {
+  id: string;
+  name: string;
+  address: string;
+  city: string | null;
+  state: string | null;
+  region: string | null;
+  sqft: number | null;
+  bedrooms: number | null;
+  /** `numeric` — string form, e.g. "2.5". UI parses for display. */
+  bathrooms: string | null;
+  statusLabel: string | null;
+  statusTone: 'green' | 'amber' | 'neutral' | 'rose' | null;
+  coverPhotoUrl: string | null;
+  coverPhotoUploadedAt: Date | null;
+  activeProjectCount: number;
+  pendingDecisionCount: number;
+  /** ISO date of the soonest scheduled / confirmed appointment, or null. */
+  nextAppointmentDate: string | null;
+}
+
+/**
+ * Per-property summary cards for the editorial landing page. One row per
+ * property the client owns, decorated with three live signals:
+ *  - active project count
+ *  - pending decision count (milestones in `awaiting_client`)
+ *  - next appointment date (scheduled / confirmed only)
+ *
+ * Implementation: one fetch for the property rows (with all the editorial
+ * metadata), then three parallel aggregate reads keyed off the resolved
+ * property/project ID lists. Buckets the results by property in memory so
+ * the caller gets a single shaped array without N+1 queries.
+ */
+export async function getClientPropertyLandingCards(
+  clientId: string,
+): Promise<PropertyLandingCard[]> {
+  const propertyRows = await db
+    .select({
+      id: properties.id,
+      name: properties.name,
+      address: properties.address,
+      city: properties.city,
+      state: properties.state,
+      region: properties.region,
+      sqft: properties.sqft,
+      bedrooms: properties.bedrooms,
+      bathrooms: properties.bathrooms,
+      statusLabel: properties.statusLabel,
+      statusTone: properties.statusTone,
+      coverPhotoUrl: properties.coverPhotoUrl,
+      coverPhotoUploadedAt: properties.coverPhotoUploadedAt,
+    })
+    .from(properties)
+    .where(eq(properties.clientId, clientId))
+    .orderBy(asc(properties.name));
+
+  if (propertyRows.length === 0) return [];
+
+  const propertyIds = propertyRows.map((p) => p.id);
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Project ids per property — needed for the decision-count subquery.
+  const projectRows = await db
+    .select({ id: projects.id, propertyId: projects.propertyId, status: projects.status })
+    .from(projects)
+    .where(inArray(projects.propertyId, propertyIds));
+
+  const projectIdsByProperty = new Map<string, string[]>();
+  const activeCountByProperty = new Map<string, number>();
+  for (const p of projectRows) {
+    const list = projectIdsByProperty.get(p.propertyId);
+    if (list) list.push(p.id);
+    else projectIdsByProperty.set(p.propertyId, [p.id]);
+    if (p.status === 'active') {
+      activeCountByProperty.set(
+        p.propertyId,
+        (activeCountByProperty.get(p.propertyId) ?? 0) + 1,
+      );
+    }
+  }
+
+  const allProjectIds = projectRows.map((p) => p.id);
+
+  // Pending decisions (project-scoped) + next appointment (property-scoped)
+  // run in parallel — neither depends on the other.
+  const [decisionRows, nextAppointmentRows] = await Promise.all([
+    allProjectIds.length === 0
+      ? []
+      : db
+          .select({ projectId: milestones.projectId })
+          .from(milestones)
+          .where(
+            and(
+              inArray(milestones.projectId, allProjectIds),
+              eq(milestones.status, 'awaiting_client'),
+            ),
+          ),
+    db
+      .select({
+        propertyId: appointments.propertyId,
+        date: appointments.date,
+      })
+      .from(appointments)
+      .where(
+        and(
+          inArray(appointments.propertyId, propertyIds),
+          gte(appointments.date, today),
+          inArray(appointments.status, ['scheduled', 'confirmed']),
+        ),
+      )
+      .orderBy(asc(appointments.date)),
+  ]);
+
+  // Decisions counted via the projectId → propertyId reverse map.
+  const propertyByProject = new Map<string, string>();
+  for (const p of projectRows) propertyByProject.set(p.id, p.propertyId);
+  const decisionCountByProperty = new Map<string, number>();
+  for (const d of decisionRows) {
+    const pid = propertyByProject.get(d.projectId);
+    if (!pid) continue;
+    decisionCountByProperty.set(pid, (decisionCountByProperty.get(pid) ?? 0) + 1);
+  }
+
+  // Earliest appointment per property — the rows are already date-ascending,
+  // so the first row we see for a given property is its "next".
+  const nextDateByProperty = new Map<string, string>();
+  for (const a of nextAppointmentRows) {
+    if (!nextDateByProperty.has(a.propertyId)) {
+      nextDateByProperty.set(a.propertyId, a.date);
+    }
+  }
+
+  return propertyRows.map((p) => ({
+    ...p,
+    activeProjectCount: activeCountByProperty.get(p.id) ?? 0,
+    pendingDecisionCount: decisionCountByProperty.get(p.id) ?? 0,
+    nextAppointmentDate: nextDateByProperty.get(p.id) ?? null,
+  }));
+}
