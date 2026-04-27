@@ -41,11 +41,90 @@
   --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: var(--font-dm-serif), Georgia, serif;
 
-  /* Shadows — soft, warm, premium */
+  /* Shadows — soft, warm, premium (admin + field surfaces) */
   --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
   --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
   --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.03);
   --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.06);
+
+  /* ----------------------------------------------------------------------
+   * Client portal tokens (Phase 0 — see docs/DESIGN_SYSTEM.md).
+   *
+   * These tokens are scoped to the redesigned client portal — `/portal/*`
+   * surfaces should reach for these, while admin / field continue to use
+   * the brand-teal-* / brand-gold-* scale above. Naming is deliberately
+   * distinct so a future audit can see at a glance which surface a class
+   * belongs to.
+   * -------------------------------------------------------------------- */
+
+  /* Surface — paper, cream, ivory layered over each other.
+     `bg-paper`, `bg-cream`, `bg-ivory` Tailwind utilities. */
+  --color-paper: #ffffff;
+  --color-cream: #fbf8f1;
+  --color-ivory: #f7f4ed;
+
+  /* Hairlines for editorial card / section dividers.
+     `border-line`, `border-line-2` Tailwind utilities. */
+  --color-line: #e8e2d4;
+  --color-line-2: #efe9db;
+
+  /* Ink scale — softer than pure black, calibrated for cream backgrounds.
+     `text-ink-{300,400,500,700,900}` Tailwind utilities. */
+  --color-ink-300: #b5b8b5;
+  --color-ink-400: #8c9290;
+  --color-ink-500: #6b7370;
+  --color-ink-700: #3c4543;
+  --color-ink-900: #1a1f1e;
+
+  /* Soft drop-shadows for client-portal cards. Admin / field keep
+     `shadow-soft / -card / -elevated / -modal` above. */
+  --shadow-soft-sm: 0 1px 2px rgba(20, 30, 28, 0.04), 0 1px 1px rgba(20, 30, 28, 0.03);
+  --shadow-soft-md: 0 8px 24px rgba(20, 30, 28, 0.06), 0 2px 6px rgba(20, 30, 28, 0.04);
+  --shadow-soft-lg: 0 24px 60px rgba(20, 30, 28, 0.1), 0 8px 20px rgba(20, 30, 28, 0.05);
+}
+
+/* ------------------------------------------------------------------------
+ * Client-portal CSS variables that aren't Tailwind utilities.
+ *
+ * These exist as bare names because:
+ *   1. The teal / amber / chip-color scales would clobber Tailwind defaults
+ *      (and our existing brand-teal-* scale) if registered under
+ *      --color-* in @theme. Keeping them outside @theme leaves Tailwind's
+ *      defaults intact — admin status badges keep their existing
+ *      `bg-amber-50 text-amber-700` look.
+ *   2. The radius scale doesn't map 1:1 to Tailwind's existing rounded-*
+ *      utilities (notably the new --r-md = 10px), so it lives as raw
+ *      tokens that client-portal styles can compose into custom rules.
+ *
+ * Use via `var(--teal-700)` / `style={{ background: 'var(--cream)' }}`
+ * etc. inside the client portal's editorial components.
+ * ---------------------------------------------------------------------- */
+:root {
+  /* Brand teal — client portal scale (parallel to brand-teal-*). */
+  --teal-50: #e8f0ef;
+  --teal-700: #1a6863;
+  --teal-800: #14504c;
+  --teal-900: #0e3a38;
+
+  /* Brand amber — client portal scale (parallel to brand-gold-*). */
+  --amber-50: #faf4e5;
+  --amber-100: #f4e9d2;
+  --amber-500: #c99a3f;
+  --amber-600: #b8862e;
+
+  /* Status chip palette — used for badges/pills on the client portal. */
+  --rose-100: #f4e4e0;
+  --rose-700: #8b3d2e;
+  --green-100: #dceae0;
+  --green-700: #2e6b4a;
+  --blue-100: #dde6ee;
+  --blue-700: #2d4f70;
+
+  /* Editorial radius scale. */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 24px;
 }
 
 /* ---------- Base styles ---------- */
@@ -67,9 +146,37 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Utility for the premium display face used on page titles only. */
+/* Utility for the premium display face used on page titles only.
+   Admin portal only — DM Serif Display. */
 .font-display {
   font-family: var(--font-display);
+}
+
+/* ---------- Client portal editorial typography ----------
+ * `.serif` is the canonical entry point for Fraunces — use this on any
+ * client-portal title, greeting, or editorial accent. It bakes in the
+ * variable-font optical sizing + the slight negative letter-spacing
+ * Fraunces wants at large sizes so callers don't have to remember.
+ *
+ * `.eyebrow` is the all-caps section label that sits above editorial
+ * cards (rendered hairline-style in amber/teal). Kept as a standalone
+ * class — not a Tailwind composition — because the precise sizing,
+ * tracking, and weight combination is too specific for utility classes
+ * to express cleanly. Applied to <h2>, <h3>, or `<span>` in section
+ * headers.
+ */
+.serif {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-ink-500);
+  font-weight: 500;
 }
 
 /* ---------- Cursor affordances ----------
