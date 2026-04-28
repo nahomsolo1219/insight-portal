@@ -30,10 +30,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // Date label refreshes on each request — long-open tabs won't see today
   // tick over without a navigation, but admins get a fresh value on every
-  // page load.
-  const dateLabel = new Date().toLocaleDateString('en-US', {
+  // page load. Two parallel formats: the full label sits in the header on
+  // sm+, and the abbreviated `Apr 28, 2026` form takes over on narrower
+  // viewports where the full string would crowd.
+  const now = new Date();
+  const dateLabel = now.toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const dateLabelShort = now.toLocaleDateString('en-US', {
+    month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
@@ -50,6 +58,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <AdminHeader
           user={user}
           dateLabel={dateLabel}
+          dateLabelShort={dateLabelShort}
           tiers={formOptions.tiers}
           pms={formOptions.pms}
           projectPickerClients={projectPickerClients}

@@ -7,7 +7,6 @@ import {
   Plus,
   Search,
 } from 'lucide-react';
-import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { DashboardNewProjectButton } from '@/app/admin/DashboardNewProjectButton';
 import { NewClientButton } from '@/app/admin/clients/NewClientButton';
@@ -18,9 +17,11 @@ import { cn, initialsFrom } from '@/lib/utils';
 
 interface AdminHeaderProps {
   user: CurrentUser;
-  /** ISO-ish string like "Tuesday, April 28, 2026" — server-rendered so the
-   *  date doesn't tick over for a long-open tab without a refresh. */
+  /** Full date label like "Tuesday, April 28, 2026" — shown at sm+. */
   dateLabel: string;
+  /** Compact date like "Apr 28, 2026" — shown when the full label
+   *  would crowd a narrow viewport. */
+  dateLabelShort: string;
   /** Tiers + PMs power the New Client modal. */
   tiers: TierOption[];
   pms: PmOption[];
@@ -29,28 +30,23 @@ interface AdminHeaderProps {
 }
 
 /**
- * Top-of-screen admin chrome. Single row across the full viewport width:
+ * Top-of-screen admin chrome. Single utility row across the full viewport:
  *
- *   [logo panel · title+date · search · New Client · New Project · | · bell · avatar]
+ *   [logo panel · date · search · New Client · New Project · | · bell · avatar]
  *
- * The logo panel is a teal block with width matching the sidebar so the
- * header reads as visually anchored. Title comes from a pathname →
- * label registry; date is supplied by the server layout.
- *
- * Button click semantics are unchanged from the previous per-page renders
- * — `NewClientButton` and `DashboardNewProjectButton` keep their existing
- * modals; this component only changes where they live.
+ * The header is intentionally title-less — every admin page renders its
+ * own editorial eyebrow + h1 in the body, so duplicating the title here
+ * read as visual noise. The space the title used to occupy now holds just
+ * the date (server-rendered, refreshes per request).
  */
 export function AdminHeader({
   user,
   dateLabel,
+  dateLabelShort,
   tiers,
   pms,
   projectPickerClients,
 }: AdminHeaderProps) {
-  const pathname = usePathname();
-  const pageTitle = getPageTitle(pathname);
-
   return (
     <header className="bg-paper border-line flex h-16 flex-shrink-0 border-b">
       {/* Logo panel — width matches sidebar so the teal block sits directly
@@ -77,18 +73,15 @@ export function AdminHeader({
 
       {/* Header content area — everything except the logo panel. */}
       <div className="flex min-w-0 flex-1 items-center gap-4 px-4 sm:px-6">
-        {/* Title + date stack */}
-        <div className="hidden min-w-0 flex-shrink-0 sm:block">
-          <h1 className="text-ink-900 truncate text-2xl font-light tracking-tight leading-tight">
-            {pageTitle}
-          </h1>
-          <p className="text-ink-500 text-sm leading-tight">{dateLabel}</p>
-        </div>
-
-        {/* Mobile-condensed title (no date row). */}
-        <h1 className="text-ink-900 truncate text-base font-medium tracking-tight sm:hidden">
-          {pageTitle}
-        </h1>
+        {/* Date label — full at sm+, abbreviated below. The page-body
+            eyebrow + h1 own the editorial title; the header is utility
+            chrome only. */}
+        <p className="text-ink-500 hidden flex-shrink-0 text-sm sm:block">
+          {dateLabel}
+        </p>
+        <p className="text-ink-500 flex-shrink-0 text-xs sm:hidden">
+          {dateLabelShort}
+        </p>
 
         {/* Search — flexes to fill the middle. Collapses to icon-only on
             mobile. */}
@@ -118,39 +111,6 @@ export function AdminHeader({
 }
 
 // ---------------------------------------------------------------------------
-// Page title registry
-// ---------------------------------------------------------------------------
-
-/**
- * Pathname → header title. Exact match wins; otherwise the longest matching
- * `${prefix}/` rolls up the title (so `/admin/clients/[id]` reads as
- * "Clients" rather than dropping to the generic fallback).
- */
-const PAGE_TITLES: Record<string, string> = {
-  '/admin': 'Dashboard',
-  '/admin/schedule': 'Schedule',
-  '/admin/clients': 'Clients',
-  '/admin/photo-queue': 'Photo queue',
-  '/admin/decisions': 'Decisions',
-  '/admin/invoices': 'Invoices',
-  '/admin/vendors': 'Vendors',
-  '/admin/staff': 'Staff',
-  '/admin/templates': 'Templates',
-  '/admin/settings': 'Settings',
-  '/admin/projects': 'Projects',
-};
-
-function getPageTitle(pathname: string): string {
-  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname]!;
-  // Longest-prefix match — sort prefixes by length descending so
-  // `/admin/clients` beats `/admin` for `/admin/clients/[id]`.
-  const sortedPrefixes = Object.keys(PAGE_TITLES).sort((a, b) => b.length - a.length);
-  for (const prefix of sortedPrefixes) {
-    if (pathname.startsWith(prefix + '/')) return PAGE_TITLES[prefix]!;
-  }
-  return 'Admin';
-}
-
 // ---------------------------------------------------------------------------
 // Search input — Cmd+K affordance + global focus shortcut.
 // ---------------------------------------------------------------------------
