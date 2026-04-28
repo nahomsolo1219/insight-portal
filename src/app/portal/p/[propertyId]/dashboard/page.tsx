@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { FeaturedDecisionCard } from '@/components/portal/FeaturedDecisionCard';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { cn, formatDate, formatTime, initialsFrom } from '@/lib/utils';
 import {
@@ -32,6 +33,8 @@ import {
   type RecentPhotoRow,
   type UpcomingAppointmentRow,
 } from '../../../queries';
+import { selectDashboardHeroCopy } from './heroCopy';
+import { getPropertyDashboardData } from './queries';
 
 export default async function PortalDashboardPage({
   params,
@@ -47,26 +50,68 @@ export default async function PortalDashboardPage({
   if (!user || user.role !== 'client' || !user.clientId) redirect('/');
 
   const clientId = user.clientId;
-  const [profile, stats, upcoming, activeProjects, activity, recentPhotos] = await Promise.all([
-    getMyClientProfile(clientId),
-    getClientDashboardStats(clientId),
-    getClientUpcomingAppointments(clientId, 3),
-    getClientActiveProjects(clientId),
-    getClientRecentActivity(clientId, 8),
-    getClientRecentPhotos(clientId, 6),
-  ]);
+  const [profile, stats, upcoming, activeProjects, activity, recentPhotos, propertyData] =
+    await Promise.all([
+      getMyClientProfile(clientId),
+      getClientDashboardStats(clientId),
+      getClientUpcomingAppointments(clientId, 3),
+      getClientActiveProjects(clientId),
+      getClientRecentActivity(clientId, 8),
+      getClientRecentPhotos(clientId, 6),
+      getPropertyDashboardData(clientId, propertyId),
+    ]);
 
   const firstName = pickFirstName(user.fullName, profile?.name);
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
+  const now = new Date();
+  const todayLabel = now
+    .toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })
+    .toUpperCase();
+  const greeting = pickGreeting(now);
+  const todayIso = now.toISOString().slice(0, 10);
+
+  const heroCopy = selectDashboardHeroCopy({
+    statusTone: propertyData.statusTone,
+    statusLabel: propertyData.statusLabel,
+    pendingDecisionCount: propertyData.pendingDecisionCount,
+    pendingDecision: propertyData.featuredDecision
+      ? { projectName: propertyData.featuredDecision.projectName }
+      : null,
+    mostRecentCompletedVisit: propertyData.mostRecentCompletedVisit
+      ? {
+          date: propertyData.mostRecentCompletedVisit.date,
+          visitorFirstName: propertyData.mostRecentCompletedVisit.visitorFirstName,
+        }
+      : null,
+    nextScheduledVisit: propertyData.nextScheduledVisit
+      ? {
+          date: propertyData.nextScheduledVisit.date,
+          visitorFirstName: propertyData.nextScheduledVisit.visitorFirstName,
+        }
+      : null,
+    activeProjectCount: propertyData.activeProjectCount,
+    todayIso,
   });
 
   return (
     <div className="space-y-10">
-      <Welcome firstName={firstName} today={today} />
+      <EditorialHero
+        firstName={firstName}
+        greeting={greeting}
+        dateLabel={todayLabel}
+        subtitle={heroCopy.text}
+      />
+
+      {propertyData.featuredDecision && (
+        <FeaturedDecisionCard
+          decision={propertyData.featuredDecision}
+          pendingDecisionCount={propertyData.pendingDecisionCount}
+        />
+      )}
 
       <StatCards
         propertyId={propertyId}
@@ -86,6 +131,42 @@ export default async function PortalDashboardPage({
 
       {profile && <ProjectManagerCard profile={profile} />}
     </div>
+  );
+}
+
+/** Branch on local hour: morning before noon, afternoon 12-5, evening
+ *  after 5. Server timezone is the implicit reference (matches the rest
+ *  of the portal — no timezone helper exists). */
+function pickGreeting(now: Date): 'morning' | 'afternoon' | 'evening' {
+  const h = now.getHours();
+  if (h < 12) return 'morning';
+  if (h < 17) return 'afternoon';
+  return 'evening';
+}
+
+/** Editorial greeting hero. Replaces the older `Welcome` strip with the
+ *  cream/Fraunces voice established by Phase 2A's landing page. */
+function EditorialHero({
+  firstName,
+  greeting,
+  dateLabel,
+  subtitle,
+}: {
+  firstName: string;
+  greeting: 'morning' | 'afternoon' | 'evening';
+  dateLabel: string;
+  subtitle: string;
+}) {
+  return (
+    <header className="max-w-2xl">
+      <p className="eyebrow">{dateLabel}</p>
+      <h1 className="serif text-ink-900 mt-3 text-4xl leading-tight md:text-5xl">
+        Good {greeting}, {firstName}.
+      </h1>
+      <p className="text-ink-500 mt-4 text-base italic leading-relaxed md:text-lg">
+        {subtitle}
+      </p>
+    </header>
   );
 }
 
@@ -283,24 +364,6 @@ function relativeDate(iso: string): string {
   const diffDay = Math.floor(diffHr / 24);
   if (diffDay < 7) return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
   return formatDate(iso.slice(0, 10));
-}
-
-// ---------------------------------------------------------------------------
-// Welcome
-// ---------------------------------------------------------------------------
-
-function Welcome({ firstName, today }: { firstName: string; today: string }) {
-  return (
-    <header className="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="font-display text-brand-teal-500 text-3xl tracking-tight">
-          Welcome back, {firstName}
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">Your home is in good hands.</p>
-      </div>
-      <p className="text-xs tracking-wider text-gray-400 uppercase">{today}</p>
-    </header>
-  );
 }
 
 // ---------------------------------------------------------------------------

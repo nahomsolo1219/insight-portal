@@ -1,7 +1,7 @@
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { ContactFab } from '@/components/portal/ContactFab';
-import { PortalNav } from '@/components/portal/PortalNav';
+import { PortalHeader } from '@/components/portal/PortalHeader';
 import { db } from '@/db';
 import { clients, properties } from '@/db/schema';
 import { requireUser } from '@/lib/auth/current-user';
@@ -17,10 +17,14 @@ interface Props {
  * Per-property portal chrome. Validates the URL's `propertyId` belongs to
  * the authenticated client (a forged URL bounces back to `/portal` rather
  * than 404ing — the landing page knows what to do next), then loads the
- * client/profile/badge data PortalNav + ContactFab need.
+ * client/profile data the new editorial header needs.
  *
  * Auth gating already happened in the outer `/portal/layout.tsx`; here we
- * only deal with property scoping.
+ * only deal with property scoping. Phase 2B-1 of the redesign replaces the
+ * old `PortalNav` (top-tab pattern) with `PortalHeader` (cream wordmark +
+ * switcher / bell / overflow / avatar) and switches the page background
+ * to `bg-cream`; the existing nested page bodies still render on cream
+ * until Phase 2B-2 redesigns each section.
  */
 export default async function PortalPropertyLayout({ children, params }: Props) {
   const { propertyId } = await params;
@@ -37,8 +41,11 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
     .limit(1);
   if (!property) redirect('/portal');
 
-  // Three parallel reads, same pattern the layout used pre-redesign.
-  const [clientRow, profile, badges] = await Promise.all([
+  // Four parallel reads. The properties list drives the header's switcher
+  // pill (only renders when the client owns 2+); badges drive the bell's
+  // amber dot (any pending decision count > 0); profile drives the
+  // PM contact card on the FAB.
+  const [clientRow, profile, badges, propertyRows] = await Promise.all([
     db
       .select({
         id: clients.id,
@@ -53,6 +60,18 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
       .then((rows) => rows[0] ?? null),
     getMyClientProfile(user.clientId),
     getPortalBadgeCounts(user.clientId),
+    db
+      .select({
+        id: properties.id,
+        name: properties.name,
+        city: properties.city,
+        state: properties.state,
+        coverPhotoUrl: properties.coverPhotoUrl,
+        coverPhotoUploadedAt: properties.coverPhotoUploadedAt,
+      })
+      .from(properties)
+      .where(eq(properties.clientId, user.clientId))
+      .orderBy(asc(properties.name)),
   ]);
 
   const avatarUrl = clientRow?.avatarStoragePath
@@ -60,8 +79,8 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
     : null;
 
   return (
-    <div className="bg-brand-warm-100 min-h-screen text-[#444]">
-      <PortalNav
+    <div className="bg-cream min-h-screen text-ink-700">
+      <PortalHeader
         user={user}
         client={
           clientRow
@@ -74,8 +93,9 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
               }
             : null
         }
-        badges={badges}
         propertyId={propertyId}
+        properties={propertyRows}
+        pendingDecisionCount={badges.pendingDecisions}
       />
       <main className="mx-auto max-w-[900px] px-6 pt-10 pb-24 md:pb-10">{children}</main>
       <ContactFab

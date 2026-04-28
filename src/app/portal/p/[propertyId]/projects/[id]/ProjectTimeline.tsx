@@ -16,11 +16,11 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import { LoadingDots } from '@/components/admin/LoadingDots';
 import { useToast } from '@/components/admin/ToastProvider';
+import { DecisionResponder } from '@/components/portal/DecisionResponder';
 import { cn, formatDate, formatTime, initialsFrom } from '@/lib/utils';
-import { downloadProjectPhotosAsZip, respondToDecision } from './actions';
+import { downloadProjectPhotosAsZip } from './actions';
 import type {
   PortalDecisionOption,
   TimelineMilestone,
@@ -488,7 +488,14 @@ function PhaseCard({
         )}
 
         {isDecision && !hasResponse && (
-          <DecisionResponder milestone={milestone} />
+          <div className="mt-4">
+            <DecisionResponder
+              milestoneId={milestone.id}
+              questionType={milestone.questionType}
+              options={milestone.options}
+              variant="timeline"
+            />
+          </div>
         )}
 
         {isDecision && hasResponse && milestone.clientResponse && (
@@ -591,203 +598,6 @@ function StatusBadge({ status }: { status: PhaseStatus }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Decision responder
-// ---------------------------------------------------------------------------
-
-function DecisionResponder({ milestone }: { milestone: TimelineMilestone }) {
-  const router = useRouter();
-  const { showToast } = useToast();
-  const [isPending, startTransition] = useTransition();
-  const [selected, setSelected] = useState<string | null>(null);
-  const [openText, setOpenText] = useState('');
-
-  const type = milestone.questionType;
-
-  function submit(response: string) {
-    startTransition(async () => {
-      const result = await respondToDecision(milestone.id, response);
-      if (!result.success) {
-        showToast(result.error, 'error');
-        return;
-      }
-      showToast('Response sent');
-      router.refresh();
-    });
-  }
-
-  // Acknowledge: single button.
-  if (type === 'acknowledge') {
-    return (
-      <button
-        type="button"
-        onClick={() => submit('Acknowledged')}
-        disabled={isPending}
-        className="bg-brand-teal-500 hover:bg-brand-teal-600 mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-xl px-6 text-sm font-medium text-white shadow-soft transition-all disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {isPending ? (
-          <>
-            Sending
-            <LoadingDots />
-          </>
-        ) : (
-          "I've read this"
-        )}
-      </button>
-    );
-  }
-
-  // Approval: two buttons (Approve / Request changes).
-  if (type === 'approval') {
-    return (
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <button
-          type="button"
-          onClick={() => submit('Approved')}
-          disabled={isPending}
-          className="bg-brand-teal-500 hover:bg-brand-teal-600 inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl text-sm font-medium text-white shadow-soft transition-all disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isPending ? <LoadingDots /> : 'Approve'}
-        </button>
-        <button
-          type="button"
-          onClick={() => submit('Request changes')}
-          disabled={isPending}
-          className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Request changes
-        </button>
-      </div>
-    );
-  }
-
-  // Open-text: textarea + submit.
-  if (type === 'open') {
-    return (
-      <div className="mt-4 space-y-2">
-        <textarea
-          value={openText}
-          onChange={(e) => setOpenText(e.target.value)}
-          rows={3}
-          placeholder="Type your response..."
-          className="focus:ring-brand-teal-200 focus:border-brand-teal-300 w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:ring-2 focus:outline-none"
-        />
-        <button
-          type="button"
-          onClick={() => submit(openText)}
-          disabled={isPending || !openText.trim()}
-          className="bg-brand-teal-500 hover:bg-brand-teal-600 inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-medium text-white shadow-soft transition-all disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isPending ? (
-            <>
-              Sending
-              <LoadingDots />
-            </>
-          ) : (
-            'Submit'
-          )}
-        </button>
-      </div>
-    );
-  }
-
-  // Single / multi (or fallback): tile grid. Selecting an option promotes
-  // it to a "Confirm" state — guards against an accidental tap on the
-  // wrong tile being a permanent answer.
-  const options = milestone.options;
-  if (options.length === 0) {
-    return (
-      <p className="mt-3 text-sm text-gray-500 italic">
-        Your project manager hasn&apos;t finalised the options yet — check back soon.
-      </p>
-    );
-  }
-
-  return (
-    <div className="mt-4 space-y-3">
-      <div
-        className={cn(
-          'grid gap-3',
-          // Mobile: 2 columns so thumbnails stay legible. Desktop: 3 across
-          // since the portal's 900px column doesn't justify 4.
-          'grid-cols-2 md:grid-cols-3',
-        )}
-      >
-        {options.map((opt, i) => {
-          const isSelected = selected === opt.label;
-          return (
-            <button
-              key={`${opt.label}-${i}`}
-              type="button"
-              onClick={() => setSelected(opt.label)}
-              disabled={isPending}
-              className={cn(
-                'group flex min-h-[44px] flex-col overflow-hidden rounded-xl border bg-white text-left transition-all',
-                isSelected
-                  ? 'border-brand-teal-500 ring-2 ring-brand-teal-200'
-                  : 'border-gray-200 hover:border-brand-teal-300',
-                isPending && 'opacity-60',
-              )}
-            >
-              {opt.imageUrl && (
-                <div className="aspect-[4/3] w-full overflow-hidden bg-gray-100">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={opt.imageUrl}
-                    alt={opt.label}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-              )}
-              <div className="flex-1 p-3">
-                <div className="text-sm font-medium text-gray-900">
-                  {opt.label || 'Option'}
-                </div>
-                {opt.description && (
-                  <div className="mt-0.5 text-xs text-gray-500">{opt.description}</div>
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {selected && (
-        <div className="flex flex-col gap-2 rounded-xl bg-brand-warm-50 p-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-gray-700">
-            You selected <strong className="font-semibold">{selected}</strong>. Confirm?
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setSelected(null)}
-              disabled={isPending}
-              className="rounded-lg px-3 py-2 text-xs font-medium text-gray-500 transition-all hover:bg-white"
-            >
-              Change
-            </button>
-            <button
-              type="button"
-              onClick={() => submit(selected)}
-              disabled={isPending}
-              className="bg-brand-teal-500 hover:bg-brand-teal-600 inline-flex items-center gap-1 rounded-lg px-4 py-2 text-xs font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isPending ? (
-                <>
-                  Sending
-                  <LoadingDots />
-                </>
-              ) : (
-                'Confirm'
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function RespondedSummary({
   response,
