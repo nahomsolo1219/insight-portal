@@ -13,6 +13,9 @@ import type { PmOption, TierOption } from './queries';
 interface NewClientButtonProps {
   tiers: TierOption[];
   pms: PmOption[];
+  /** `'header'` adopts the compact admin-header CTA styling (Session 2);
+   *  `'standalone'` keeps the legacy lozenge look for backward compat. */
+  variant?: 'standalone' | 'header';
 }
 
 interface FormState {
@@ -31,7 +34,7 @@ const emptyForm: FormState = {
   assignedPmId: '',
 };
 
-export function NewClientButton({ tiers, pms }: NewClientButtonProps) {
+export function NewClientButton({ tiers, pms, variant = 'standalone' }: NewClientButtonProps) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -86,10 +89,17 @@ export function NewClientButton({ tiers, pms }: NewClientButtonProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft inline-flex items-center gap-2 rounded-xl px-5 py-2.5 font-medium text-white transition-all duration-150"
+        title="New client"
+        className={
+          variant === 'header'
+            ? 'bg-brand-gold-500 hover:bg-brand-gold-600 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-paper transition-colors md:px-4'
+            : 'bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft inline-flex items-center gap-2 rounded-xl px-5 py-2.5 font-medium text-white transition-all duration-150'
+        }
       >
         <Plus size={16} strokeWidth={2} />
-        New Client
+        <span className={variant === 'header' ? 'hidden md:inline' : undefined}>
+          New Client
+        </span>
       </button>
 
       <Modal

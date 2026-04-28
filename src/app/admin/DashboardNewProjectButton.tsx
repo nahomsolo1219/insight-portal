@@ -9,6 +9,9 @@ import type { ClientPickerRow } from './queries';
 
 interface Props {
   clients: ClientPickerRow[];
+  /** `'header'` adopts the compact admin-header outline styling (Session 2);
+   *  `'standalone'` keeps the legacy outlined-teal look for backward compat. */
+  variant?: 'standalone' | 'header';
 }
 
 /**
@@ -21,7 +24,7 @@ interface Props {
  * modal will detect the empty property list and prompt David to add a
  * property first.
  */
-export function DashboardNewProjectButton({ clients }: Props) {
+export function DashboardNewProjectButton({ clients, variant = 'standalone' }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -50,10 +53,17 @@ export function DashboardNewProjectButton({ clients }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="border-brand-teal-200 text-brand-teal-500 hover:bg-brand-teal-50 inline-flex items-center gap-2 rounded-xl border px-5 py-2.5 font-medium transition-all"
+        title="New project"
+        className={
+          variant === 'header'
+            ? 'border-line bg-paper text-ink-900 hover:bg-cream inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors md:px-4'
+            : 'border-brand-teal-200 text-brand-teal-500 hover:bg-brand-teal-50 inline-flex items-center gap-2 rounded-xl border px-5 py-2.5 font-medium transition-all'
+        }
       >
         <Plus size={16} strokeWidth={2} />
-        New Project
+        <span className={variant === 'header' ? 'hidden md:inline' : undefined}>
+          New Project
+        </span>
       </button>
 
       <Modal

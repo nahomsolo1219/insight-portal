@@ -1,13 +1,11 @@
-import { AlertCircle, Briefcase, Plus, TrendingUp, Users } from 'lucide-react';
+import { AlertCircle, Briefcase, TrendingUp, Users } from 'lucide-react';
 import Link from 'next/link';
 import { StatCard } from '@/components/admin/StatCard';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { formatCurrency, initialsFrom } from '@/lib/utils';
-import { DashboardNewProjectButton } from './DashboardNewProjectButton';
 import {
   getActiveClientsCount,
-  getActiveClientsForProjectPicker,
   getActiveProjectsCount,
   getNewClientsThisMonthCount,
   getOutstandingInvoices,
@@ -33,7 +31,6 @@ export default async function DashboardPage() {
     pendingPhotos,
     unpaidInvoices,
     activity,
-    projectPickerClients,
   ] = await Promise.all([
     getActiveClientsCount(),
     getNewClientsThisMonthCount(),
@@ -45,7 +42,6 @@ export default async function DashboardPage() {
     getPendingPhotosCount(),
     getUnpaidInvoicesForAlerts(),
     getRecentActivity(),
-    getActiveClientsForProjectPicker(),
   ]);
 
   const today = new Date().toLocaleDateString('en-US', {
@@ -60,28 +56,17 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      {/* Page header */}
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <div className="mb-3 flex items-center gap-2">
-            <span aria-hidden="true" className="bg-brand-gold-500 inline-block h-px w-8" />
-            <span className="text-ink-500 text-[11px] font-medium uppercase tracking-[0.18em]">
-              Operations
-            </span>
-          </div>
-          <h1 className="text-ink-900 text-3xl font-light tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">{today}</p>
+      {/* Page header — the two CTAs ("+ New Client" / "+ New Project") that
+          used to live here moved into the global AdminHeader in Session 2. */}
+      <div className="mb-8">
+        <div className="mb-3 flex items-center gap-2">
+          <span aria-hidden="true" className="bg-brand-gold-500 inline-block h-px w-8" />
+          <span className="text-ink-500 text-[11px] font-medium uppercase tracking-[0.18em]">
+            Operations
+          </span>
         </div>
-        <div className="flex gap-3">
-          <Link
-            href="/admin/clients"
-            className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft inline-flex items-center gap-2 rounded-xl px-5 py-2.5 font-medium text-white transition-all duration-150"
-          >
-            <Plus size={16} strokeWidth={2} />
-            New Client
-          </Link>
-          <DashboardNewProjectButton clients={projectPickerClients} />
-        </div>
+        <h1 className="text-ink-900 text-3xl font-light tracking-tight">Dashboard</h1>
+        <p className="mt-1 text-sm text-gray-500">{today}</p>
       </div>
 
       {/* Stat cards */}

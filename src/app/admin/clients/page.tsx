@@ -2,31 +2,28 @@ import { ChevronRight, Users } from 'lucide-react';
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { formatCurrency, initialsFrom } from '@/lib/utils';
-import { NewClientButton } from './NewClientButton';
-import { getClientFormOptions, listClients } from './queries';
+import { listClients } from './queries';
 
 export default async function ClientsPage() {
   await requireAdmin();
 
-  const [clientRows, formOptions] = await Promise.all([listClients(), getClientFormOptions()]);
+  const clientRows = await listClients();
 
   return (
     <div>
-      {/* Page header */}
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <div className="mb-3 flex items-center gap-2">
-            <span aria-hidden="true" className="bg-brand-gold-500 inline-block h-px w-8" />
-            <span className="text-ink-500 text-[11px] font-medium uppercase tracking-[0.18em]">
-              Book of business
-            </span>
-          </div>
-          <h1 className="text-ink-900 text-3xl font-light tracking-tight">Clients</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {clientRows.length} {clientRows.length === 1 ? 'client' : 'clients'}
-          </p>
+      {/* Page header — "+ New Client" used to render here; it moved into
+          the global AdminHeader in Session 2. */}
+      <div className="mb-8">
+        <div className="mb-3 flex items-center gap-2">
+          <span aria-hidden="true" className="bg-brand-gold-500 inline-block h-px w-8" />
+          <span className="text-ink-500 text-[11px] font-medium uppercase tracking-[0.18em]">
+            Book of business
+          </span>
         </div>
-        <NewClientButton tiers={formOptions.tiers} pms={formOptions.pms} />
+        <h1 className="text-ink-900 text-3xl font-light tracking-tight">Clients</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          {clientRows.length} {clientRows.length === 1 ? 'client' : 'clients'}
+        </p>
       </div>
 
       {clientRows.length === 0 ? (

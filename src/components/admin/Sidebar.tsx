@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   LayoutTemplate,
   LogOut,
-  Search,
   Settings,
   UserCog,
   Users,
@@ -89,6 +88,12 @@ interface SidebarProps {
   counts: SidebarCounts;
 }
 
+/**
+ * Admin sidebar. After Session 2's header redesign, the sidebar lost the
+ * teal logo band (the new header owns the logo panel directly above the
+ * sidebar's column) and the search input (search lives in the header). The
+ * nav structure is unchanged; only the chrome above and below shifted.
+ */
 export function Sidebar({ user, counts }: SidebarProps) {
   const pathname = usePathname();
   const displayName = user.fullName ?? user.email;
@@ -97,38 +102,15 @@ export function Sidebar({ user, counts }: SidebarProps) {
 
   return (
     <aside className="border-line bg-paper flex h-full w-64 flex-shrink-0 flex-col border-r">
-      {/* Teal header band — kept dark so the dark-background logo stays
-          legible. Padding bumped slightly so the logo floats with breathing
-          room rather than sitting boxed against the edges. */}
-      <div className="bg-brand-teal-500 px-6 py-6">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/logo-dark.svg"
-          alt="Insight Home Maintenance"
-          className="h-7 w-auto"
-        />
-      </div>
-
-      {/* Search */}
-      <div className="px-4 pt-4 pb-2">
-        <div className="relative">
-          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#a3a3a3]" />
-          <input
-            type="search"
-            placeholder="Search clients, projects…"
-            className="bg-cream focus:border-brand-teal-200 w-full rounded-lg border border-transparent py-2 pr-3 pl-9 text-sm text-[#444] placeholder-[#a3a3a3] transition-colors focus:bg-paper focus:outline-none"
-          />
-        </div>
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-2">
+      {/* Nav — starts directly under the header, with comfortable top
+          breathing room since there's no longer a logo band or search
+          element above it. */}
+      <nav className="flex-1 overflow-y-auto px-3 pt-5 pb-2">
         {sections.map((section) => (
           <div key={section.heading} className="mb-6">
             {/* Section heading: amber hairline + uppercase tracked label —
                 editorial eyebrow pattern at sidebar density. brand-gold-500
-                keeps the admin token system intact (client-portal amber
-                isn't used here). */}
+                keeps the admin token system intact. */}
             <div className="mb-2 flex items-center gap-2 px-3">
               <span
                 aria-hidden="true"
@@ -175,7 +157,10 @@ export function Sidebar({ user, counts }: SidebarProps) {
         ))}
       </nav>
 
-      {/* User footer */}
+      {/* User footer — kept as a compact identity strip. The canonical
+          avatar dropdown lives in the header now, but this strip still
+          surfaces who's signed in and lets sign-out happen without
+          opening the header menu. */}
       <div className="border-line flex items-center gap-3 border-t px-4 py-3">
         <div className="bg-brand-teal-500 flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold text-white">
           {initials || displayName.slice(0, 2).toUpperCase()}
