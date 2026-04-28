@@ -1,7 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { ContactFab } from '@/components/portal/ContactFab';
-import { PortalHeader } from '@/components/portal/PortalHeader';
+import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { db } from '@/db';
 import { clients, properties } from '@/db/schema';
 import { requireUser } from '@/lib/auth/current-user';
@@ -17,12 +17,13 @@ interface Props {
  * Per-property portal chrome. Validates the URL's `propertyId` belongs to
  * the authenticated client (a forged URL bounces back to `/portal` rather
  * than 404ing — the landing page knows what to do next), then loads the
- * client/profile data the new editorial header needs.
+ * client/profile data the sidebar needs.
  *
  * Auth gating already happened in the outer `/portal/layout.tsx`; here we
- * only deal with property scoping. PortalHeader (cream chrome + property
- * switcher pill + tab strip + bell + avatar) sits at the top of every
- * property-scoped page; the page bodies render on `bg-cream` beneath it.
+ * only deal with property scoping. PortalSidebar (dark teal column with
+ * logo, property switcher pill, nav, notifications, and profile menu)
+ * lives at the left edge of every property-scoped page; the page bodies
+ * render on `bg-cream` to its right.
  */
 export default async function PortalPropertyLayout({ children, params }: Props) {
   const { propertyId } = await params;
@@ -39,10 +40,10 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
     .limit(1);
   if (!property) redirect('/portal');
 
-  // Four parallel reads. The properties list drives the header's switcher
-  // pill (only renders when the client owns 2+); badges drive the bell's
-  // amber dot (any pending decision count > 0); profile drives the
-  // PM contact card on the FAB.
+  // Four parallel reads. The properties list drives the sidebar's
+  // switcher pill (only opens a dropdown when ≥ 2); badges drive the
+  // notifications row badge (any pending decision count > 0); profile
+  // drives the PM contact card on the FAB.
   const [clientRow, profile, badges, propertyRows] = await Promise.all([
     db
       .select({
@@ -62,6 +63,7 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
       .select({
         id: properties.id,
         name: properties.name,
+        region: properties.region,
         city: properties.city,
         state: properties.state,
         coverPhotoUrl: properties.coverPhotoUrl,
@@ -76,9 +78,13 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
     ? await getSignedUrl(clientRow.avatarStoragePath)
     : null;
 
+  // `md:pl-64` reserves the desktop column the fixed-position sidebar
+  // occupies. On mobile the sidebar is hidden off-canvas (drawer mode),
+  // so no padding is needed — content goes edge-to-edge under the
+  // mobile top bar that PortalSidebar also renders.
   return (
-    <div className="bg-cream min-h-screen text-ink-700">
-      <PortalHeader
+    <div className="bg-cream min-h-screen text-ink-700 md:pl-64">
+      <PortalSidebar
         user={user}
         client={
           clientRow

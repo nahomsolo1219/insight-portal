@@ -486,7 +486,7 @@ export interface PortalBadgeCounts {
  *  - unpaid + partial invoices (Invoices tab)
  *
  * Cheap because it's all `count()` aggregates — runs once per portal
- * request via the layout, threaded into PortalHeader as a prop.
+ * request via the layout, threaded into PortalSidebar as a prop.
  */
 export async function getPortalBadgeCounts(
   clientId: string,

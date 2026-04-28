@@ -73,9 +73,9 @@ export async function updateMyProfile(input: UpdateMyProfileInput): Promise<Acti
     });
 
     // Revalidate the entire portal tree — the client name + avatar
-    // surface in the landing card, the per-property PortalHeader user
-    // chip, and the dashboard greeting. Layout-level invalidation is
-    // the simplest way to catch all three.
+    // surface in the landing card, the per-property PortalSidebar
+    // profile row, and the dashboard greeting. Layout-level
+    // invalidation is the simplest way to catch all three.
     revalidatePath('/portal', 'layout');
     return { success: true };
   } catch (error) {
