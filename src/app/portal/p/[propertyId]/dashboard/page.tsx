@@ -101,10 +101,9 @@ export default async function PortalDashboardPage({
   });
 
   return (
-    // Centered 1100px max — keeps the two-column body from sprawling on
-    // wide displays while still giving the right rail enough breathing
-    // room. Below 1100px the container flows full-width naturally.
-    <div className="mx-auto w-full max-w-[1100px] space-y-6">
+    // Centered 1200px max — matches the parent layout's main container.
+    // Below 1200px the container flows full-width naturally.
+    <div className="mx-auto w-full max-w-[1200px] space-y-6">
       <EditorialHero
         firstName={firstName}
         greeting={greeting}

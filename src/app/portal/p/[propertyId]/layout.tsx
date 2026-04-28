@@ -1,12 +1,11 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
-import { ContactFab } from '@/components/portal/ContactFab';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { db } from '@/db';
 import { clients, properties } from '@/db/schema';
 import { requireUser } from '@/lib/auth/current-user';
 import { getSignedUrl } from '@/lib/storage/upload';
-import { getMyClientProfile, getPortalBadgeCounts } from '../../queries';
+import { getPortalBadgeCounts } from '../../queries';
 
 interface Props {
   children: React.ReactNode;
@@ -40,11 +39,11 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
     .limit(1);
   if (!property) redirect('/portal');
 
-  // Four parallel reads. The properties list drives the sidebar's
+  // Three parallel reads. The properties list drives the sidebar's
   // switcher pill (only opens a dropdown when ≥ 2); badges drive the
-  // notifications row badge (any pending decision count > 0); profile
-  // drives the PM contact card on the FAB.
-  const [clientRow, profile, badges, propertyRows] = await Promise.all([
+  // notifications row badge (any pending decision count > 0); the
+  // client row hydrates the sidebar profile chip (name + avatar).
+  const [clientRow, badges, propertyRows] = await Promise.all([
     db
       .select({
         id: clients.id,
@@ -57,7 +56,6 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
       .where(eq(clients.id, user.clientId))
       .limit(1)
       .then((rows) => rows[0] ?? null),
-    getMyClientProfile(user.clientId),
     getPortalBadgeCounts(user.clientId),
     db
       .select({
@@ -101,12 +99,7 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
         properties={propertyRows}
         pendingDecisionCount={badges.pendingDecisions}
       />
-      <main className="mx-auto max-w-[900px] px-6 pt-10 pb-24 md:pb-10">{children}</main>
-      <ContactFab
-        pmName={profile?.assignedPmName ?? null}
-        pmEmail={profile?.assignedPmEmail ?? null}
-        pmPhone={profile?.assignedPmPhone ?? null}
-      />
+      <main className="mx-auto max-w-[1200px] px-6 pt-10 pb-24 md:pb-10">{children}</main>
     </div>
   );
 }
