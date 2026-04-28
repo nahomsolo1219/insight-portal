@@ -453,7 +453,7 @@ function StatMini({
   return (
     <div className="shadow-soft-md rounded-2xl bg-paper p-5">
       <div className="text-xs font-medium tracking-wider text-gray-500 uppercase">{label}</div>
-      <div className={cn('mt-2 serif text-2xl font-light tracking-tight', valueClass)}>{value}</div>
+      <div className={cn('mt-2 text-2xl font-light tracking-tight', valueClass)}>{value}</div>
     </div>
   );
 }

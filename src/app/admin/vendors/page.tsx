@@ -15,7 +15,7 @@ export default async function VendorsPage() {
             Subcontractor directory
           </span>
         </div>
-        <h1 className="serif text-ink-900 text-3xl tracking-tight">Vendors</h1>
+        <h1 className="text-ink-900 text-3xl font-light tracking-tight">Vendors</h1>
         <p className="mt-1 text-sm text-[#737373]">
           {vendors.length} {vendors.length === 1 ? 'vendor' : 'vendors'} on file.
         </p>

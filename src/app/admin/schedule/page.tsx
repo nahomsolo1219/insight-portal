@@ -35,7 +35,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
             Calendar
           </span>
         </div>
-        <h1 className="serif text-ink-900 text-3xl tracking-tight">Schedule</h1>
+        <h1 className="text-ink-900 text-3xl font-light tracking-tight">Schedule</h1>
         <p className="mt-1 text-sm text-[#737373]">
           All appointments across clients. Click a client to drill in.
         </p>

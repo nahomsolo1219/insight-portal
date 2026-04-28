@@ -27,15 +27,23 @@ section for why).
 
 | Surface | Page background | Body font | Display font | Brand teal scale | Brand accent scale | Card shadow | Notes |
 |---|---|---|---|---|---|---|---|
-| **Admin** (`/admin/*`) | `bg-brand-warm-100` | Inter | DM Serif Display (`.font-display`) | `brand-teal-{50..700}` | `brand-gold-{50..600}` | `shadow-card` | Information-dense, table-heavy. |
-| **Client** (`/portal/*`) | `bg-cream` (Phase 0+) | Inter (body), Fraunces (editorial) | Fraunces (`.serif`) | Bare `--teal-{50,700,800,900}` | Bare `--amber-{50,100,500,600}` | `shadow-soft-md` | Editorial, photo-driven. Phase 0 lays foundations; pages still on admin tokens until Phase 1 ships. |
+| **Admin** (`/admin/*`) | `bg-cream` | Inter | none | `brand-teal-{50..700}` | `brand-gold-{50..600}` | `shadow-soft-md` | Information-dense, table-heavy. |
+| **Client** (`/portal/*`) | `bg-cream` | Inter | none | Bare `--teal-{50,700,800,900}` | Bare `--amber-{50,100,500,600}` | `shadow-soft-md` | Editorial, photo-driven. |
 | **Field** (`/field/*`) | `bg-gray-50` (flagged) | Inter | none | `brand-teal-{50..700}` | `brand-gold-{50..600}` | `shadow-card` | Mobile-first, ≥44px tap targets. Inherits admin tokens today. |
 
+**Inter only.** All three surfaces use Inter for everything — body and
+editorial. Page titles and hero headlines compose `font-light` +
+`tracking-tight` (and `tracking-tighter` at the very largest sizes —
+the negative tracking compensates for the optical density a serif
+used to carry at 4xl+). Earlier phases of the redesign loaded Fraunces
+(client portal) and DM Serif Display (admin); both were removed to
+conform to the client brand spec, which is Helvetica Neue / Inter only.
+
 **Mental model:** if you're touching a file under `src/app/admin/**` or
-`src/app/field/**`, reach for the `brand-teal-*` / `brand-gold-*` / `shadow-card`
-scales below. If you're touching `src/app/portal/**` (after Phase 1 lands), reach
-for `bg-cream` / `text-ink-700` / `.serif` / `shadow-soft-md` and the bare
-`--teal-*` / `--amber-*` / chip-color CSS variables.
+`src/app/field/**`, reach for the `brand-teal-*` / `brand-gold-*` scales
+below. If you're touching `src/app/portal/**`, reach for `bg-cream` /
+`text-ink-700` / `shadow-soft-md` and the bare `--teal-*` / `--amber-*` /
+chip-color CSS variables.
 
 ---
 
@@ -168,36 +176,31 @@ status colors. Used for editorial chips on the client portal:
 
 ### Typography
 
-Three fonts loaded via `next/font/google` in `src/app/layout.tsx`. Each is scoped
-to a specific surface — don't mix them.
+Inter for everything. Page titles, hero headlines, and stat numerals
+compose `font-light` + `tracking-tight` (and `tracking-tighter` at the
+very largest sizes — 4xl and up — where the negative tracking
+compensates for the optical density a serif used to carry); body text
+is the default Inter at normal weight. Italics keep the Inter italic
+face at light weight for the editorial subtitles.
 
-- **Inter** (sans, 300/400/500/600/700) → CSS var `--font-inter` → utility `font-sans`
-  (default body across all three surfaces).
-- **DM Serif Display** (400) → `--font-dm-serif` → utility `font-display`.
-  **Admin portal only** — page titles. Client portal does not use this; field staff
-  has no display face.
-- **Fraunces** (300/400/500/600/700, normal + italic) → `--font-fraunces` →
-  global `.serif` class with optical-sizing + tracking baked in.
-  **Client portal only** — greetings, hero copy, editorial accents. Admin portal
-  does not use this; field staff has no display face.
+- **Inter** (sans, 300/400/500/600/700, normal + italic) → CSS var
+  `--font-inter` → utility `font-sans`. Used across all three surfaces.
+- **DM Serif Display** is loaded but no longer applied; removing the
+  font-loading entry is a separate cleanup.
 
-The dual-serif (DM Serif Display + Fraunces) is intentional: admin's "premium ops
-dashboard" voice and the client portal's "editorial concierge" voice want different
-characters. Keep them separate.
+Earlier phases of the redesign loaded a display serif (Fraunces on
+the client portal, DM Serif Display on the admin pages). Both were
+removed to conform to the client brand spec — Helvetica Neue / Inter
+only — and the editorial feel now comes entirely from Inter at light
+weight + tightened tracking at large sizes.
 
-#### Client-only utility classes
+#### Client-only utility class
 
-In addition to the `font-display` / `font-sans` Tailwind utilities, the client portal
-uses two global CSS classes (`.serif`, `.eyebrow`) that bake in tracking and
-optical-sizing values too specific to express via Tailwind atoms.
+The client portal still uses one global CSS class (`.eyebrow`) that
+bakes in tracking and weight values too specific to express via
+Tailwind atoms.
 
 ```css
-.serif {
-  font-family: var(--font-fraunces), Georgia, serif;
-  font-optical-sizing: auto;
-  letter-spacing: -0.01em;
-}
-
 .eyebrow {
   font-size: 11px;
   letter-spacing: 0.18em;
@@ -207,10 +210,15 @@ optical-sizing values too specific to express via Tailwind atoms.
 }
 ```
 
-`<h1 className="serif text-3xl">` for hero greetings; `<span className="eyebrow">`
-for the all-caps section labels above editorial cards. Both classes are
-**client-portal only** — using them on admin or field would break the
-information-density contract those surfaces hold.
+`<span className="eyebrow">` for the all-caps section labels above
+editorial cards. The class is **client-portal only** — using it on
+admin or field would break the information-density contract those
+surfaces hold. Page titles and hero headlines are pure Tailwind:
+
+```jsx
+<h1 className="text-ink-900 text-3xl font-light tracking-tight">Dashboard</h1>
+<h1 className="text-ink-900 text-4xl font-light tracking-tighter md:text-5xl">Welcome back, Nahom.</h1>
+```
 
 Sizes in actual use:
 
@@ -218,14 +226,15 @@ Sizes in actual use:
 |---|---|---|
 | `text-[9px]` | 9 | Badge counts (red dots) |
 | `text-[10px]` | 10 | Section labels (`SECTION_NAME` uppercase tracked), bottom-tab labels |
-| `text-[11px]` | 11 | Status badges, secondary meta |
+| `text-[11px]` | 11 | Status badges, secondary meta, eyebrow rule labels |
 | `text-xs` | 12 | Card meta lines, secondary text |
 | `text-sm` | 14 | Body, nav labels, button text |
 | `text-base` | 16 | Card titles, primary text |
 | `text-lg` | 18 | Hero stat values on tablet |
 | `text-xl` | 20 | Modal titles, stat values on cards |
-| `text-2xl` | 24 | Stat-card numbers, portal page titles on mobile |
-| `text-3xl` | 30 | Page titles (`font-display`) |
+| `text-2xl` | 24 | Stat-card numbers (`font-light tracking-tight`), portal page titles on mobile |
+| `text-3xl` | 30 | Page titles (`font-light tracking-tight`) |
+| `text-4xl` / `text-5xl` | 36 / 48 | Client-portal hero headlines (`font-light tracking-tighter`) |
 
 Weights:
 

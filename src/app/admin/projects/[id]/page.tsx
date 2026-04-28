@@ -73,7 +73,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="serif text-ink-900 text-3xl tracking-tight">
+              <h1 className="text-ink-900 text-3xl font-light tracking-tight">
                 {project.name}
               </h1>
               <span
@@ -225,7 +225,7 @@ function StatCard({
       <div className="text-[10px] font-medium tracking-wider text-gray-500 uppercase">
         {label}
       </div>
-      <div className={cn('mt-2 serif text-2xl font-light tracking-tight tabular-nums', valueClass)}>
+      <div className={cn('mt-2 text-2xl font-light tracking-tight tabular-nums', valueClass)}>
         {value}
       </div>
       {hint && <div className="mt-1 text-xs text-gray-500">{hint}</div>}

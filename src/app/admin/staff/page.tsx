@@ -15,7 +15,7 @@ export default async function StaffPage() {
             Internal team
           </span>
         </div>
-        <h1 className="serif text-ink-900 text-3xl tracking-tight">Staff</h1>
+        <h1 className="text-ink-900 text-3xl font-light tracking-tight">Staff</h1>
         <p className="mt-1 text-sm text-[#737373]">
           {members.length} {members.length === 1 ? 'member' : 'members'} on the roster.
         </p>

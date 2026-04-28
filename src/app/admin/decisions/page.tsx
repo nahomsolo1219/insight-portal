@@ -16,7 +16,7 @@ export default async function DecisionsPage() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <h1 className="serif text-ink-900 text-3xl tracking-tight">Decisions</h1>
+          <h1 className="text-ink-900 text-3xl font-light tracking-tight">Decisions</h1>
           {rows.length > 0 && (
             <span className="bg-brand-gold-400 rounded-full px-3 py-1 text-sm font-medium text-white">
               {rows.length}

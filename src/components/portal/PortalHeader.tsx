@@ -89,7 +89,7 @@ export function PortalHeader({
       <div className="mx-auto flex h-16 max-w-[1200px] items-center gap-3 px-4 sm:h-[68px] sm:gap-4 sm:px-6">
         <Link
           href="/portal"
-          className="serif text-ink-900 inline-flex items-baseline text-xl tracking-tight sm:text-2xl"
+          className="text-ink-900 inline-flex items-baseline text-xl font-light tracking-tight sm:text-2xl"
           aria-label="Insight HM — back to all homes"
         >
           Insight

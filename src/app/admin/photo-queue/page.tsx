@@ -27,7 +27,7 @@ export default async function PhotoQueuePage() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <h1 className="serif text-ink-900 text-3xl tracking-tight">Photo queue</h1>
+          <h1 className="text-ink-900 text-3xl font-light tracking-tight">Photo queue</h1>
           {photosWithUrls.length > 0 && (
             <span className="bg-brand-gold-400 rounded-full px-3 py-1 text-sm font-medium text-white">
               {photosWithUrls.length}

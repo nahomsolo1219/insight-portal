@@ -21,7 +21,7 @@ export default async function ClientsPage() {
               Book of business
             </span>
           </div>
-          <h1 className="serif text-ink-900 text-3xl tracking-tight">Clients</h1>
+          <h1 className="text-ink-900 text-3xl font-light tracking-tight">Clients</h1>
           <p className="mt-1 text-sm text-gray-500">
             {clientRows.length} {clientRows.length === 1 ? 'client' : 'clients'}
           </p>

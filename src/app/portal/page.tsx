@@ -70,7 +70,7 @@ function Wordmark() {
   return (
     <header className="border-line border-b bg-paper">
       <div className="mx-auto flex max-w-[1100px] items-center justify-between px-6 py-5">
-        <Link href="/portal" className="serif inline-flex items-center text-2xl tracking-tight text-ink-900">
+        <Link href="/portal" className="inline-flex items-center text-2xl font-light tracking-tight text-ink-900">
           Insight
           <span className="ml-0.5 text-amber-600">.</span>
         </Link>
@@ -91,7 +91,7 @@ function Hero({ firstName, subtitle }: { firstName: string; subtitle: string }) 
   return (
     <section className="max-w-2xl">
       <p className="eyebrow">Your homes</p>
-      <h1 className="serif text-ink-900 mt-3 text-4xl leading-tight md:text-5xl">
+      <h1 className="text-ink-900 mt-3 text-4xl font-light tracking-tighter leading-tight md:text-5xl">
         Welcome back, {firstName}.
       </h1>
       <p className="text-ink-500 mt-4 text-base italic leading-relaxed md:text-lg">
@@ -107,7 +107,7 @@ function EmptyState() {
       <div className="bg-cream text-ink-400 mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full">
         <Plus size={20} strokeWidth={1.5} />
       </div>
-      <h2 className="serif text-ink-900 mt-4 text-xl">No homes on file yet</h2>
+      <h2 className="text-ink-900 mt-4 text-xl font-light tracking-tight">No homes on file yet</h2>
       <p className="text-ink-500 mx-auto mt-2 max-w-md text-sm">
         Your project manager will add your home shortly. Once it’s on file, this is where
         your visits, photos, and invoices will live.
@@ -146,7 +146,7 @@ function PropertyLandingCardItem({ card }: { card: PropertyLandingCard }) {
             )}
           </div>
         )}
-        <h2 className="serif text-ink-900 mt-2 text-2xl tracking-tight">{card.name}</h2>
+        <h2 className="text-ink-900 mt-2 text-2xl font-light tracking-tight">{card.name}</h2>
         <p className="text-ink-500 mt-1 text-sm">{formatAddress(card)}</p>
         <p className="text-ink-400 mt-3 text-xs">{formatMeta(card)}</p>
         <div className="border-line-2 mt-5 flex items-center justify-between border-t pt-4 text-sm">

@@ -145,7 +145,7 @@ function pickGreeting(now: Date): 'morning' | 'afternoon' | 'evening' {
 }
 
 /** Editorial greeting hero. Replaces the older `Welcome` strip with the
- *  cream/Fraunces voice established by Phase 2A's landing page. */
+ *  cream + editorial-light voice established by Phase 2A's landing page. */
 function EditorialHero({
   firstName,
   greeting,
@@ -160,7 +160,7 @@ function EditorialHero({
   return (
     <header className="max-w-2xl">
       <p className="eyebrow">{dateLabel}</p>
-      <h1 className="serif text-ink-900 mt-3 text-4xl leading-tight md:text-5xl">
+      <h1 className="text-ink-900 mt-3 text-4xl font-light tracking-tighter leading-tight md:text-5xl">
         Good {greeting}, {firstName}.
       </h1>
       <p className="text-ink-500 mt-4 text-base italic leading-relaxed md:text-lg">

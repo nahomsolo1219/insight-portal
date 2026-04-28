@@ -153,24 +153,19 @@ body {
 }
 
 /* ---------- Client portal editorial typography ----------
- * `.serif` is the canonical entry point for Fraunces — use this on any
- * client-portal title, greeting, or editorial accent. It bakes in the
- * variable-font optical sizing + the slight negative letter-spacing
- * Fraunces wants at large sizes so callers don't have to remember.
- *
  * `.eyebrow` is the all-caps section label that sits above editorial
  * cards (rendered hairline-style in amber/teal). Kept as a standalone
  * class — not a Tailwind composition — because the precise sizing,
  * tracking, and weight combination is too specific for utility classes
  * to express cleanly. Applied to <h2>, <h3>, or `<span>` in section
  * headers.
+ *
+ * Page titles and hero headlines compose from Tailwind utilities —
+ * `font-light` + `tracking-tight` (or `tracking-tighter` at the very
+ * largest sizes; negative tracking carries the editorial weight at
+ * 4xl+). The brand spec is Helvetica Neue / Inter only, so no display
+ * face is loaded on this surface.
  */
-.serif {
-  font-family: var(--font-fraunces), Georgia, serif;
-  font-optical-sizing: auto;
-  letter-spacing: -0.01em;
-}
-
 .eyebrow {
   font-size: 11px;
   letter-spacing: 0.18em;

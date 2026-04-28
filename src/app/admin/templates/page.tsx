@@ -29,7 +29,7 @@ export default async function TemplatesPage({ searchParams }: PageProps) {
             Project templates
           </span>
         </div>
-        <h1 className="serif text-ink-900 text-3xl tracking-tight">Templates</h1>
+        <h1 className="text-ink-900 text-3xl font-light tracking-tight">Templates</h1>
         <p className="mt-1 text-sm text-[#737373]">
           Reusable project templates. Click a template to edit in the visual builder.
         </p>

@@ -47,7 +47,7 @@ Admin portal for Insight Home Maintenance, a luxury home maintenance and remodel
 
 ## Design rules — IMPORTANT
 
-> **Design system: see [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) — all UI work must conform to its surface-scoped tokens.** The doc opens with a Surface map showing which token bucket each surface uses (admin / client / field). Token tables, primitive APIs, layout patterns, and the polish list follow. The summary below stays as a quick reference for admin work; client-portal redesign reaches for the cream / ink / Fraunces / soft-shadow scale documented in the Client-only sections.
+> **Design system: see [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) — all UI work must conform to its surface-scoped tokens.** The doc opens with a Surface map showing which token bucket each surface uses (admin / client / field). Token tables, primitive APIs, layout patterns, and the polish list follow. The summary below stays as a quick reference for admin work; client-portal redesign reaches for the cream / ink / soft-shadow scale documented in the Client-only sections. Typography is Inter only across all surfaces (per brand spec — Helvetica Neue / Inter, no display serif).
 >
 > **Portal + field inventory: see [docs/PORTAL_FIELD_INVENTORY.md](docs/PORTAL_FIELD_INVENTORY.md) — per-page breakdown of `/portal` and `/field`, auth/RLS posture, server actions, and gaps against the original scope.**
 

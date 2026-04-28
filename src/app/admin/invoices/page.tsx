@@ -25,7 +25,7 @@ export default async function InvoicesPage() {
             Financial
           </span>
         </div>
-        <h1 className="serif text-ink-900 text-3xl tracking-tight">Invoices</h1>
+        <h1 className="text-ink-900 text-3xl font-light tracking-tight">Invoices</h1>
         <p className="mt-1 text-sm text-[#737373]">
           Every invoice across the book. Per-client uploads live on each client&apos;s Invoices tab.
         </p>

@@ -100,7 +100,7 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
         />
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-3">
-            <h1 className="serif text-ink-900 text-3xl tracking-tight">{client.name}</h1>
+            <h1 className="text-ink-900 text-3xl font-light tracking-tight">{client.name}</h1>
             {client.tierName && (
               <span className="bg-brand-teal-50 text-brand-teal-500 rounded-md px-2.5 py-1 text-xs font-medium">
                 {client.tierName}
@@ -170,8 +170,8 @@ function StatMini({ label, value, valueColor = 'default' }: StatMiniProps) {
       <div
         className={
           valueColor === 'amber'
-            ? 'serif mt-2 text-2xl font-light tracking-tight text-amber-600'
-            : 'serif mt-2 text-2xl font-light tracking-tight text-ink-900'
+            ? 'mt-2 text-2xl font-light tracking-tight text-amber-600'
+            : 'mt-2 text-2xl font-light tracking-tight text-ink-900'
         }
       >
         {value}

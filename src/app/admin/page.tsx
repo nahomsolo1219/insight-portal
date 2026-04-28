@@ -69,7 +69,7 @@ export default async function DashboardPage() {
               Operations
             </span>
           </div>
-          <h1 className="serif text-ink-900 text-3xl tracking-tight">Dashboard</h1>
+          <h1 className="text-ink-900 text-3xl font-light tracking-tight">Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">{today}</p>
         </div>
         <div className="flex gap-3">

@@ -45,7 +45,7 @@ export default async function VendorDetailPage({ params }: PageProps) {
       <div className="mb-8 flex items-start justify-between gap-5">
         <div className="min-w-0">
           <div className="mb-1 flex flex-wrap items-center gap-3">
-            <h1 className="serif text-ink-900 text-3xl tracking-tight">{vendor.name}</h1>
+            <h1 className="text-ink-900 text-3xl font-light tracking-tight">{vendor.name}</h1>
             <span className="bg-cream text-gray-600 rounded-md px-2.5 py-1 text-xs font-medium">
               {vendor.category}
             </span>
@@ -149,7 +149,7 @@ function StatCard({ label, value, hint, tone = 'default', icon }: StatCardProps)
           {icon}
         </div>
       </div>
-      <div className={cn('mt-2 serif text-2xl font-light tracking-tight', valueClass)}>{value}</div>
+      <div className={cn('mt-2 text-2xl font-light tracking-tight', valueClass)}>{value}</div>
       {hint && <div className="mt-1 text-xs text-gray-500">{hint}</div>}
     </div>
   );

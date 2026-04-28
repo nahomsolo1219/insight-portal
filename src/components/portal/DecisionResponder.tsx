@@ -231,7 +231,7 @@ export function DecisionResponder({
                 <div
                   className={cn(
                     isEditorial
-                      ? 'serif text-ink-900 text-base'
+                      ? 'text-ink-900 text-base font-light tracking-tight'
                       : 'text-sm font-medium text-gray-900',
                   )}
                 >

@@ -13,7 +13,7 @@ interface FeaturedDecisionCardProps {
  *
  * Visual structure (matches the Phase 2B-1 mockup):
  *   - Eyebrow row — amber hairline rule + "DECISION · {projectName}" label
- *   - Fraunces headline — the decision question text
+ *   - Editorial-light headline — the decision question text
  *   - Body — the milestone notes (or a generic line)
  *   - Response controls — DecisionResponder, editorial variant
  *   - Optional footer hint — only when there are siblings worth surfacing
@@ -56,7 +56,7 @@ export function FeaturedDecisionCard({
 
       <h2
         id="featured-decision-heading"
-        className="serif text-ink-900 mt-3 text-2xl leading-tight sm:text-3xl"
+        className="text-ink-900 mt-3 text-2xl font-light tracking-tight leading-tight sm:text-3xl"
       >
         {headline}
       </h2>

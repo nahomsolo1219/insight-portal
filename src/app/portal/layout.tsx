@@ -12,8 +12,8 @@ import { getCurrentUser } from '@/lib/auth/current-user';
  *
  * Visual chrome (PortalNav, ContactFab, the warm 900px column) lives in
  * the per-property layout at `p/[propertyId]/layout.tsx` because the
- * landing page renders its own bg-cream + Fraunces treatment and shouldn't
- * inherit nav links scoped to "no property in particular".
+ * landing page renders its own bg-cream + editorial-light treatment and
+ * shouldn't inherit nav links scoped to "no property in particular".
  */
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();

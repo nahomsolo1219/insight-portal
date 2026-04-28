@@ -32,7 +32,7 @@ export function TemplatePreview({ name, phases, onClose }: Props) {
   return (
     <Modal open onClose={onClose} title="Client preview" size="lg">
       <div className="bg-brand-teal-500 -m-6 mb-6 px-6 py-6 text-white">
-        <h2 className="serif text-2xl">{name || 'Untitled template'}</h2>
+        <h2 className="text-2xl font-light tracking-tight">{name || 'Untitled template'}</h2>
         <div className="mt-2 text-xs text-white/70">
           {phases.length} {phases.length === 1 ? 'phase' : 'phases'}
           {weeks !== null && (

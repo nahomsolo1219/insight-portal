@@ -18,7 +18,7 @@ export default async function SettingsPage() {
             Workspace
           </span>
         </div>
-        <h1 className="serif text-ink-900 text-3xl tracking-tight">Settings</h1>
+        <h1 className="text-ink-900 text-3xl font-light tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-[#737373]">
           Company, membership tiers, and email templates.
         </p>

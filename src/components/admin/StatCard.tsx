@@ -58,7 +58,7 @@ export function StatCard({
       </div>
       <div
         className={cn(
-          'serif text-4xl leading-none font-light tracking-tight',
+          'text-4xl leading-none font-light tracking-tight',
           valueClasses[valueColor],
         )}
       >
