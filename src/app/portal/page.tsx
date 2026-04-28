@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { PropertyCover } from '@/components/portal/PropertyCover';
 import { requireUser } from '@/lib/auth/current-user';
 import { cn, formatDate } from '@/lib/utils';
+import { selectHeroCopy } from './heroCopy';
 import {
   getClientPropertyLandingCards,
   getMyClientProfile,
@@ -50,7 +51,7 @@ export default async function PortalLandingPage() {
     <div className="bg-cream min-h-screen">
       <Wordmark />
       <main className="mx-auto max-w-[1100px] px-6 pb-24 pt-10">
-        <Hero firstName={firstName} cardCount={cards.length} />
+        <Hero firstName={firstName} subtitle={selectHeroCopy(cards).text} />
         {cards.length === 0 ? (
           <EmptyState />
         ) : (
@@ -86,17 +87,15 @@ function Wordmark() {
   );
 }
 
-function Hero({ firstName, cardCount }: { firstName: string; cardCount: number }) {
+function Hero({ firstName, subtitle }: { firstName: string; subtitle: string }) {
   return (
     <section className="max-w-2xl">
       <p className="eyebrow">Your homes</p>
       <h1 className="serif text-ink-900 mt-3 text-4xl leading-tight md:text-5xl">
         Welcome back, {firstName}.
       </h1>
-      <p className="text-ink-500 mt-4 text-base leading-relaxed md:text-lg">
-        {cardCount === 0
-          ? 'We’re getting your home set up. You’ll see it here as soon as your project manager adds it.'
-          : 'Choose a home to step inside. Each one keeps its own visits, photos, decisions, and invoices.'}
+      <p className="text-ink-500 mt-4 text-base italic leading-relaxed md:text-lg">
+        {subtitle}
       </p>
     </section>
   );
