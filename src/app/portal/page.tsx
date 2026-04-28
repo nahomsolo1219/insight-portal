@@ -1,4 +1,5 @@
 import { ArrowRight, Plus } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { PropertyCover } from '@/components/portal/PropertyCover';
@@ -70,9 +71,15 @@ function Wordmark() {
   return (
     <header className="border-line border-b bg-paper">
       <div className="mx-auto flex max-w-[1100px] items-center justify-between px-6 py-5">
-        <Link href="/portal" className="inline-flex items-center text-2xl font-light tracking-tight text-ink-900">
-          Insight
-          <span className="ml-0.5 text-amber-600">.</span>
+        <Link href="/portal" className="inline-flex items-center" aria-label="Insight HM">
+          <Image
+            src="/logo-light.svg"
+            alt="Insight HM"
+            width={130}
+            height={28}
+            className="h-7 w-auto"
+            priority
+          />
         </Link>
         <form action="/logout" method="POST">
           <button

@@ -20,11 +20,9 @@ interface Props {
  * client/profile data the new editorial header needs.
  *
  * Auth gating already happened in the outer `/portal/layout.tsx`; here we
- * only deal with property scoping. Phase 2B-1 of the redesign replaces the
- * old `PortalNav` (top-tab pattern) with `PortalHeader` (cream wordmark +
- * switcher / bell / overflow / avatar) and switches the page background
- * to `bg-cream`; the existing nested page bodies still render on cream
- * until Phase 2B-2 redesigns each section.
+ * only deal with property scoping. PortalHeader (cream chrome + property
+ * switcher pill + tab strip + bell + avatar) sits at the top of every
+ * property-scoped page; the page bodies render on `bg-cream` beneath it.
  */
 export default async function PortalPropertyLayout({ children, params }: Props) {
   const { propertyId } = await params;

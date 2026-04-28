@@ -10,10 +10,10 @@ import { getCurrentUser } from '@/lib/auth/current-user';
  *   2. Provide the toast context every nested page (landing + per-property
  *      sub-pages) relies on.
  *
- * Visual chrome (PortalNav, ContactFab, the warm 900px column) lives in
+ * Visual chrome (PortalHeader, ContactFab, the 1100px column) lives in
  * the per-property layout at `p/[propertyId]/layout.tsx` because the
  * landing page renders its own bg-cream + editorial-light treatment and
- * shouldn't inherit nav links scoped to "no property in particular".
+ * shouldn't inherit nav tabs scoped to "no property in particular".
  */
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();

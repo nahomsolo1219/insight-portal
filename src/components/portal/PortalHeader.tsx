@@ -2,18 +2,14 @@
 
 import {
   Bell,
-  Briefcase,
-  Calendar,
   Check,
   ChevronDown,
-  FileText,
   LogOut,
-  MoreVertical,
   Pencil,
-  Receipt,
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { Field, inputClass } from '@/components/admin/Field';
 import { LoadingDots } from '@/components/admin/LoadingDots';
@@ -52,27 +48,35 @@ interface PortalHeaderProps {
   pendingDecisionCount: number;
 }
 
-const OVERFLOW_LINKS: ReadonlyArray<{
-  segment: 'projects' | 'appointments' | 'documents' | 'invoices';
+interface NavTab {
+  segment: 'dashboard' | 'projects' | 'appointments' | 'documents' | 'invoices';
   label: string;
-  icon: typeof Briefcase;
-}> = [
-  { segment: 'projects', label: 'Projects', icon: Briefcase },
-  { segment: 'appointments', label: 'Appointments', icon: Calendar },
-  { segment: 'documents', label: 'Documents', icon: FileText },
-  { segment: 'invoices', label: 'Invoices', icon: Receipt },
+}
+
+/** Top-level nav tabs shown on every property-scoped page. The order
+ *  matches the user's reading priority — what's happening at this home,
+ *  then secondary references (appointments / docs / invoices). */
+const NAV_TABS: ReadonlyArray<NavTab> = [
+  { segment: 'dashboard', label: 'Dashboard' },
+  { segment: 'projects', label: 'Projects' },
+  { segment: 'appointments', label: 'Appointments' },
+  { segment: 'documents', label: 'Documents' },
+  { segment: 'invoices', label: 'Invoices' },
 ];
 
 /**
- * Editorial chrome for the per-property portal. Replaces the older
- * `PortalNav` top-tab pattern with a quieter cream header — wordmark on
- * the left, optional property switcher pill, then overflow menu / bell /
- * avatar on the right. Phase 2B-1 of the client-portal redesign.
+ * Editorial chrome for the per-property portal. Two stacked rows in a
+ * single sticky header:
  *
- * The bell is the only notifications affordance — clicking it smooth-
- * scrolls to the dashboard's `#featured-decision` anchor when there's a
- * pending decision, and is a no-op otherwise. We intentionally do not
- * route to a separate notifications page.
+ *   Row 1 (`h-16` / `sm:h-[68px]`): logo, optional property switcher pill,
+ *     notification bell, avatar dropdown.
+ *   Row 2 (`h-12`): horizontal tab strip — Dashboard / Projects / Appoint-
+ *     ments / Documents / Invoices, scrollable on narrow viewports.
+ *
+ * Tabs replaced the original three-dot overflow menu (Session 3) — every
+ * page is one click away, no hidden surfaces. The bell is the only
+ * notifications affordance: a smooth-scroll to the dashboard's
+ * `#featured-decision` anchor when a decision is pending; no-op otherwise.
  */
 export function PortalHeader({
   user,
@@ -86,35 +90,100 @@ export function PortalHeader({
 
   return (
     <header className="bg-cream border-line sticky top-0 z-40 border-b">
-      <div className="mx-auto flex h-16 max-w-[1200px] items-center gap-3 px-4 sm:h-[68px] sm:gap-4 sm:px-6">
-        <Link
-          href="/portal"
-          className="text-ink-900 inline-flex items-baseline text-xl font-light tracking-tight sm:text-2xl"
-          aria-label="Insight HM — back to all homes"
-        >
-          Insight
-          <span className="text-amber-600 mx-px" aria-hidden="true">
-            ·
-          </span>
-          HM
-        </Link>
+      <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
+        {/* Row 1: chrome */}
+        <div className="flex h-16 items-center gap-3 sm:h-[68px] sm:gap-4">
+          <Link
+            href="/portal"
+            className="inline-flex items-center"
+            aria-label="Insight HM — back to all homes"
+          >
+            <Image
+              src="/logo-light.svg"
+              alt="Insight HM"
+              width={130}
+              height={28}
+              className="h-7 w-auto sm:h-8"
+              priority
+            />
+          </Link>
 
-        {showSwitcher && activeProperty && (
-          <PropertySwitcher
-            propertyId={propertyId}
-            activeProperty={activeProperty}
-            properties={properties}
-          />
-        )}
+          {showSwitcher && activeProperty && (
+            <PropertySwitcher
+              propertyId={propertyId}
+              activeProperty={activeProperty}
+              properties={properties}
+            />
+          )}
 
-        <div className="ml-auto flex items-center gap-1 sm:gap-2">
-          <OverflowMenu propertyId={propertyId} />
-          <NotificationBell pendingDecisionCount={pendingDecisionCount} />
-          <AvatarMenu user={user} client={client} />
+          <div className="ml-auto flex items-center gap-1 sm:gap-2">
+            <NotificationBell pendingDecisionCount={pendingDecisionCount} />
+            <AvatarMenu user={user} client={client} />
+          </div>
         </div>
+
+        {/* Row 2: tab strip */}
+        <PortalTabs propertyId={propertyId} />
       </div>
     </header>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Top-tab strip
+// ---------------------------------------------------------------------------
+
+function PortalTabs({ propertyId }: { propertyId: string }) {
+  const pathname = usePathname();
+  const base = `/portal/p/${propertyId}`;
+
+  return (
+    <nav
+      aria-label="Property sections"
+      // overflow-x-auto + the [&::-webkit-scrollbar]:hidden pair lets the
+      // strip scroll horizontally on narrow viewports without showing a
+      // scrollbar gutter; tabs wrap to one row regardless of count.
+      className="-mx-4 flex gap-1 overflow-x-auto px-4 [-ms-overflow-style:none] [scrollbar-width:none] sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:hidden"
+    >
+      {NAV_TABS.map((tab) => {
+        const href = `${base}/${tab.segment}`;
+        const active = isTabActive(pathname, href);
+        return (
+          <Link
+            key={tab.segment}
+            href={href}
+            aria-current={active ? 'page' : undefined}
+            className={cn(
+              'relative flex-shrink-0 px-4 py-3 text-sm font-medium transition-colors',
+              active
+                ? 'text-ink-900'
+                : 'text-ink-500 hover:text-ink-700',
+            )}
+          >
+            {tab.label}
+            {active && (
+              <span
+                aria-hidden="true"
+                className="absolute right-4 -bottom-px left-4 h-0.5 rounded-full"
+                style={{ backgroundColor: 'var(--amber-500)' }}
+              />
+            )}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+/**
+ * Active rule: prefix-match so `/projects/[id]` keeps the Projects tab
+ * lit. Dashboard is the only path that uses an exact match — without it
+ * the prefix `/dashboard` would match every nested route under it (none
+ * exist today, but this keeps the rule honest).
+ */
+function isTabActive(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  return pathname.startsWith(href + '/');
 }
 
 // ---------------------------------------------------------------------------
@@ -258,53 +327,8 @@ function NotificationBell({ pendingDecisionCount }: { pendingDecisionCount: numb
 }
 
 // ---------------------------------------------------------------------------
-// Overflow menu — secondary pages live behind the three-dot icon.
-// ---------------------------------------------------------------------------
-
-function OverflowMenu({ propertyId }: { propertyId: string }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useDismissOnOutside(ref, open, () => setOpen(false));
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label="More"
-        className="text-ink-700 hover:bg-paper hover:text-ink-900 inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors"
-      >
-        <MoreVertical size={18} strokeWidth={1.5} />
-      </button>
-      {open && (
-        <div
-          role="menu"
-          className="border-line bg-paper absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border py-1"
-          style={{ boxShadow: 'var(--shadow-soft-md)' }}
-        >
-          {OVERFLOW_LINKS.map(({ segment, label, icon: Icon }) => (
-            <Link
-              key={segment}
-              href={`/portal/p/${propertyId}/${segment}`}
-              onClick={() => setOpen(false)}
-              role="menuitem"
-              className="text-ink-700 hover:bg-cream hover:text-ink-900 flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
-            >
-              <Icon size={14} strokeWidth={1.5} className="text-ink-400" />
-              {label}
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Avatar menu — Edit profile modal + Sign out (matching the prior PortalNav
-// precedent — there's no standalone Account page yet).
+// Avatar menu — Edit profile modal + Sign out. There's no standalone
+// Account page yet, so the dropdown intentionally has just two items.
 // ---------------------------------------------------------------------------
 
 function AvatarMenu({
@@ -391,8 +415,7 @@ function AvatarMenu({
 }
 
 // ---------------------------------------------------------------------------
-// Edit profile modal — same shape as the legacy PortalNav modal so the
-// existing updateMyProfile server action keeps working unchanged.
+// Edit profile modal — drives the existing updateMyProfile server action.
 // ---------------------------------------------------------------------------
 
 function EditProfileModal({
