@@ -879,10 +879,10 @@ Decide whether field titles should use the display face. If yes, normalise. If n
 Admin pages render full empty-state cards with icon + title + body + CTA.
 Portal pages typically render plain text inside a card without the icon/title structure:
 
-- [src/app/portal/appointments/page.tsx:220](../src/app/portal/appointments/page.tsx#L220)
-- [src/app/portal/documents/page.tsx:226](../src/app/portal/documents/page.tsx#L226)
-- [src/app/portal/invoices/page.tsx:200](../src/app/portal/invoices/page.tsx#L200)
-- [src/app/portal/projects/page.tsx:117](../src/app/portal/projects/page.tsx#L117)
+- [src/app/portal/p/[propertyId]/appointments/page.tsx:220](../src/app/portal/p/[propertyId]/appointments/page.tsx#L220)
+- [src/app/portal/p/[propertyId]/documents/page.tsx:226](../src/app/portal/p/[propertyId]/documents/page.tsx#L226)
+- [src/app/portal/p/[propertyId]/invoices/page.tsx:200](../src/app/portal/p/[propertyId]/invoices/page.tsx#L200)
+- [src/app/portal/p/[propertyId]/projects/page.tsx:117](../src/app/portal/p/[propertyId]/projects/page.tsx#L117)
 
 Extract a shared `<EmptyState icon title body action?>` component.
 

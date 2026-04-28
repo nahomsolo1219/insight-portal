@@ -244,7 +244,9 @@ export interface ActivityItem {
   /** ISO timestamp; the UI sorts on this and renders relative time. */
   date: string;
   /** Project this item belongs to (when applicable). Drives the row's
-   *  click destination — null falls back to /portal/projects. */
+   *  click destination — null falls back to the property-scoped projects
+   *  index (`/portal/p/{propertyId}/projects`); the dashboard's
+   *  `getActivityHref(propertyId, item)` helper builds the URL. */
   projectId: string | null;
 }
 
