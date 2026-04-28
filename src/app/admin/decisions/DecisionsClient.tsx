@@ -1,8 +1,9 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, Clock, MessageCircle, ThumbsUp } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Check, Clock, MessageCircle, ThumbsUp } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { cn } from '@/lib/utils';
 import type { DecisionRow } from './queries';
 
 interface DecisionsClientProps {
@@ -69,8 +70,15 @@ export function DecisionsClient({ rows }: DecisionsClientProps) {
 
 function DecisionCard({ row }: { row: DecisionRow }) {
   const urgency = urgencyFor(row.dueDate);
-  const options = normaliseOptions(row.options);
   const typeIcon = typeIconFor(row.questionType);
+  // Match the response back to a specific option so we can render that
+  // option's image alongside the response text. Defaults to null when the
+  // client typed free-form (open-text) or when the response label doesn't
+  // match any option (rare — happens on legacy rows).
+  const chosen =
+    row.clientResponse
+      ? row.options.find((o) => o.label === row.clientResponse) ?? null
+      : null;
 
   return (
     <div className="shadow-soft-md rounded-2xl bg-paper p-5">
@@ -107,19 +115,63 @@ function DecisionCard({ row }: { row: DecisionRow }) {
         <p className="mt-4 text-sm whitespace-pre-wrap text-gray-700">{row.questionBody}</p>
       )}
 
-      {options.length > 0 && (
+      {row.options.length > 0 && (
         <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {options.map((opt, i) => (
-            <div
-              key={`${row.id}-opt-${i}`}
-              className="bg-brand-warm-50 rounded-xl border border-line-2 px-3 py-2 text-sm text-gray-700"
-            >
-              <span className="mr-2 text-xs font-medium text-gray-400">
-                {String.fromCharCode(65 + i)}
-              </span>
-              {opt}
-            </div>
-          ))}
+          {row.options.map((opt, i) => {
+            const isChosen = chosen?.label === opt.label;
+            return (
+              <div
+                key={`${row.id}-opt-${i}`}
+                className={cn(
+                  'flex items-stretch gap-3 overflow-hidden rounded-xl border px-3 py-2 transition-colors',
+                  isChosen
+                    ? 'border-emerald-400 bg-emerald-50'
+                    : 'bg-brand-warm-50 border-line-2',
+                )}
+              >
+                {opt.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={opt.imageUrl}
+                    alt={opt.label}
+                    className="h-20 w-20 flex-shrink-0 rounded-lg object-cover"
+                    loading="lazy"
+                  />
+                ) : null}
+                <div className="flex min-w-0 flex-1 flex-col justify-center text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-400">
+                      {String.fromCharCode(65 + i)}
+                    </span>
+                    <span className="truncate text-gray-900 font-medium">{opt.label}</span>
+                    {isChosen && (
+                      <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-emerald-800 uppercase">
+                        <Check size={9} strokeWidth={2.5} />
+                        Chose
+                      </span>
+                    )}
+                  </div>
+                  {opt.description && (
+                    <p className="mt-0.5 text-xs text-gray-500 line-clamp-2">
+                      {opt.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Open-text / approval / acknowledge responses don't match an
+          option — render them as a stand-alone block with the raw text
+          (and no image, since there isn't one). */}
+      {row.clientResponse && !chosen && (
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm">
+          <div className="text-[10px] font-semibold tracking-wider text-emerald-800 uppercase">
+            Client response
+          </div>
+          <p className="mt-1 whitespace-pre-wrap text-gray-900">{row.clientResponse}</p>
         </div>
       )}
     </div>
@@ -182,27 +234,6 @@ function UrgencyBadge({ urgency, dueDate }: { urgency: Urgency; dueDate: string 
 function formatDueDate(iso: string): string {
   const [y, m, d] = iso.split('-').map((n) => Number.parseInt(n, 10));
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-// ---------- option parsing ----------
-
-/** The `options` jsonb column can hold several shapes depending on the
- * question type. Coerce to a plain string[] for display; drop anything we
- * can't understand so a misshapen row doesn't break the page. */
-function normaliseOptions(raw: unknown): string[] {
-  if (Array.isArray(raw)) {
-    return raw
-      .map((item) => {
-        if (typeof item === 'string') return item;
-        if (item && typeof item === 'object' && 'label' in item) {
-          const label = (item as { label: unknown }).label;
-          return typeof label === 'string' ? label : null;
-        }
-        return null;
-      })
-      .filter((s): s is string => Boolean(s));
-  }
-  return [];
 }
 
 // ---------- type label + icon ----------

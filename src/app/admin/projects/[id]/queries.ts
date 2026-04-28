@@ -16,6 +16,10 @@ import {
   staff,
   vendors,
 } from '@/db/schema';
+import {
+  hydrateOptionGroups,
+  type AdminDecisionOption,
+} from '@/lib/decision-options';
 import { getSignedUrls } from '@/lib/storage/upload';
 
 export type ProjectStatus = 'active' | 'completed' | 'on_hold';
@@ -56,7 +60,9 @@ export interface ProjectMilestoneRow {
   vendorName: string | null;
   questionType: string | null;
   questionBody: string | null;
-  options: unknown;
+  /** Hydrated server-side: each option carries a pre-signed `imageUrl`
+   *  when it stored an `imageStoragePath`. */
+  options: AdminDecisionOption[];
   clientResponse: string | null;
   respondedAt: Date | null;
 }
@@ -129,7 +135,7 @@ export async function getProjectDetail(
 export async function getProjectMilestones(
   projectId: string,
 ): Promise<ProjectMilestoneRow[]> {
-  return db
+  const rows = await db
     .select({
       id: milestones.id,
       title: milestones.title,
@@ -150,6 +156,14 @@ export async function getProjectMilestones(
     .leftJoin(vendors, eq(vendors.id, milestones.vendorId))
     .where(eq(milestones.projectId, projectId))
     .orderBy(asc(milestones.order), asc(milestones.dueDate));
+
+  // Sign every decision-option image across every milestone in one batch.
+  const optionsByRow = await hydrateOptionGroups(rows);
+
+  return rows.map((row) => ({
+    ...row,
+    options: optionsByRow.get(row.id) ?? [],
+  }));
 }
 
 /**

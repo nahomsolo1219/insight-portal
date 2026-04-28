@@ -5,6 +5,10 @@
 import { asc, desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { clients, milestones, projects, properties } from '@/db/schema';
+import {
+  hydrateOptionGroups,
+  type AdminDecisionOption,
+} from '@/lib/decision-options';
 
 export interface DecisionRow {
   id: string;
@@ -13,8 +17,9 @@ export interface DecisionRow {
   dueDate: string | null;
   questionType: 'single' | 'multi' | 'approval' | 'open' | 'acknowledge' | null;
   questionBody: string | null;
-  /** jsonb — shape varies by questionType; client normalises to a string[]. */
-  options: unknown;
+  /** Hydrated server-side: each option gets a pre-signed `imageUrl` when
+   *  the underlying jsonb stored an `imageStoragePath`. */
+  options: AdminDecisionOption[];
   clientResponse: string | null;
   respondedAt: Date | null;
   projectId: string;
@@ -27,7 +32,7 @@ export interface DecisionRow {
 }
 
 export async function getPendingDecisions(): Promise<DecisionRow[]> {
-  return db
+  const rows = await db
     .select({
       id: milestones.id,
       title: milestones.title,
@@ -51,4 +56,12 @@ export async function getPendingDecisions(): Promise<DecisionRow[]> {
     .innerJoin(clients, eq(clients.id, properties.clientId))
     .where(eq(milestones.status, 'awaiting_client'))
     .orderBy(asc(milestones.dueDate), desc(milestones.createdAt));
+
+  // Sign every option image across every milestone in one batch.
+  const optionsByRow = await hydrateOptionGroups(rows);
+
+  return rows.map((row) => ({
+    ...row,
+    options: optionsByRow.get(row.id) ?? [],
+  }));
 }

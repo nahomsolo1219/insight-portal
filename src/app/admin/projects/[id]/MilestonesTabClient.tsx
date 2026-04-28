@@ -26,6 +26,7 @@ import {
   updateMilestone,
   type UpdateMilestoneInput,
 } from './actions';
+import type { AdminDecisionOption } from '@/lib/decision-options';
 import type { ProjectMilestoneRow, VendorOption } from './queries';
 
 interface Props {
@@ -213,7 +214,10 @@ function MilestoneRow({
   const isInProgress = milestone.status === 'in_progress';
   const isDecision = Boolean(milestone.questionType);
   const canSendDecision = isDecision && !isAwaiting && !isComplete;
-  const options = parseOptions(milestone.options);
+  // `milestone.options` arrives pre-parsed + URL-hydrated from the
+  // server query; nothing to do at the client. Empty array when the row
+  // never had options.
+  const options = milestone.options;
 
   const metaParts = [
     milestone.dueDate ? `Due ${formatShortDate(milestone.dueDate)}` : null,
@@ -315,47 +319,68 @@ function MilestoneRow({
   );
 }
 
-interface ParsedDecisionOption {
-  label: string;
-  description: string | null;
-}
-
-function parseOptions(raw: unknown): ParsedDecisionOption[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item): ParsedDecisionOption | null => {
-      if (typeof item === 'string') return { label: item, description: null };
-      if (item && typeof item === 'object') {
-        const obj = item as Record<string, unknown>;
-        const label = typeof obj.label === 'string' ? obj.label : '';
-        if (!label) return null;
-        return {
-          label,
-          description: typeof obj.description === 'string' ? obj.description : null,
-        };
-      }
-      return null;
-    })
-    .filter((x): x is ParsedDecisionOption => x !== null);
-}
-
 function DecisionDetails({
   questionBody,
   options,
   response,
 }: {
   questionBody: string | null;
-  options: ParsedDecisionOption[];
+  options: AdminDecisionOption[];
   response: string | null;
 }) {
+  // Match the response back to a specific option so we can render that
+  // option's image alongside the response label. Open-text / approval /
+  // acknowledge responses don't match any option — fall back to plain
+  // text.
+  const chosen = response ? options.find((o) => o.label === response) ?? null : null;
+  const hasOptions = options.length > 0;
+
   return (
-    <div className="mt-2 space-y-1.5 rounded-lg bg-gray-50 px-3 py-2 text-xs">
+    <div className="mt-2 space-y-2 rounded-lg bg-gray-50 px-3 py-2 text-xs">
       {questionBody && <p className="text-gray-700">{questionBody}</p>}
-      {options.length > 0 && (
-        <p className="text-gray-500">
-          Options: {options.map((o) => o.label).join(', ')}
-        </p>
+
+      {hasOptions && (
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          {options.map((opt, i) => {
+            const isChosen = chosen?.label === opt.label;
+            return (
+              <div
+                key={`opt-${i}`}
+                className={cn(
+                  'flex items-stretch gap-2 overflow-hidden rounded-md border bg-paper px-2 py-1.5',
+                  isChosen ? 'border-emerald-300 bg-emerald-50' : 'border-line-2',
+                )}
+              >
+                {opt.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={opt.imageUrl}
+                    alt={opt.label}
+                    className="h-12 w-12 flex-shrink-0 rounded object-cover"
+                    loading="lazy"
+                  />
+                ) : null}
+                <div className="flex min-w-0 flex-1 flex-col justify-center">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-medium text-gray-400">
+                      {String.fromCharCode(65 + i)}
+                    </span>
+                    <span className="truncate text-xs font-medium text-gray-900">
+                      {opt.label}
+                    </span>
+                    {isChosen && (
+                      <span className="text-[9px] font-semibold tracking-wider text-emerald-700 uppercase">
+                        Chose
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
+
       <p className="text-gray-500">
         Client response:{' '}
         {response ? (
