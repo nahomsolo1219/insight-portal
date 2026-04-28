@@ -45,7 +45,7 @@ export function Toast({ open, tone = 'success', message, onClose, durationMs = 3
       role="status"
       aria-live="polite"
       className={cn(
-        'shadow-elevated fixed right-6 bottom-6 z-50 flex max-w-sm items-start gap-3 rounded-xl border bg-white px-4 py-3',
+        'shadow-elevated fixed right-6 bottom-6 z-50 flex max-w-sm items-start gap-3 rounded-xl border bg-paper px-4 py-3',
         toneStyles[tone].bg,
       )}
     >

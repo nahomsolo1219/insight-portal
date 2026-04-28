@@ -108,7 +108,7 @@ export function ReportsTabClient({
       {reports.length === 0 ? (
         <EmptyState onUploadClick={() => setUploadOpen(true)} />
       ) : (
-        <div className="shadow-card overflow-hidden rounded-2xl bg-white">
+        <div className="shadow-soft-md overflow-hidden rounded-2xl bg-paper">
           {reports.map((r) => (
             <ReportRowItem
               key={r.id}
@@ -166,7 +166,7 @@ function ReportRowItem({ report, clientId, onDelete }: ReportRowItemProps) {
 
   return (
     <div className="hover:bg-brand-warm-50 flex items-center gap-4 border-t border-gray-50 px-5 py-4 transition-colors first:border-t-0">
-      <div className="bg-brand-warm-100 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-gray-500">
+      <div className="bg-cream flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-gray-500">
         <Icon size={18} strokeWidth={1.5} />
       </div>
 
@@ -240,7 +240,7 @@ interface EmptyStateProps {
 
 function EmptyState({ onUploadClick }: EmptyStateProps) {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
         <FileText size={24} strokeWidth={1.5} />
       </div>
@@ -385,7 +385,7 @@ function UploadModal({ onClose, clientId, propertyId, vendors, projects }: Uploa
                     'flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
                     isActive
                       ? 'border-brand-teal-500 bg-brand-teal-50 text-brand-teal-500'
-                      : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-gray-200 text-gray-600',
+                      : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-line text-gray-600',
                   )}
                 >
                   <Icon size={14} strokeWidth={1.5} />

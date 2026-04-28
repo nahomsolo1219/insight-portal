@@ -84,7 +84,7 @@ export function VendorsClient({ vendors }: VendorsClientProps) {
       {vendors.length === 0 ? (
         <EmptyState onCreate={() => setCreateOpen(true)} />
       ) : filtered.length === 0 ? (
-        <div className="shadow-card rounded-2xl bg-white p-12 text-center text-sm text-gray-400">
+        <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center text-sm text-gray-400">
           No vendors match &ldquo;{search}&rdquo;.
         </div>
       ) : (
@@ -100,11 +100,11 @@ export function VendorsClient({ vendors }: VendorsClientProps) {
 
 function VendorTable({ vendors }: { vendors: VendorRow[] }) {
   return (
-    <div className="shadow-card overflow-hidden rounded-2xl bg-white">
+    <div className="shadow-soft-md overflow-hidden rounded-2xl bg-paper">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-100">
+            <tr className="border-b border-line-2">
               <Th>Name</Th>
               <Th>Category</Th>
               <Th>Contact</Th>
@@ -164,7 +164,7 @@ function VendorTableRow({ vendor }: { vendor: VendorRow }) {
           className={cn(
             'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium',
             vendor.active
-              ? 'bg-brand-warm-100 text-gray-600'
+              ? 'bg-cream text-gray-600'
               : 'bg-gray-100 text-gray-400',
           )}
         >
@@ -244,7 +244,7 @@ function ToggleActiveButton({ vendor }: { vendor: VendorRow }) {
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
         <Users size={24} strokeWidth={1.5} />
       </div>

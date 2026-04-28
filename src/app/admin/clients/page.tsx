@@ -15,7 +15,13 @@ export default async function ClientsPage() {
       {/* Page header */}
       <div className="mb-8 flex items-start justify-between">
         <div>
-          <h1 className="font-display text-brand-teal-500 text-3xl">Clients</h1>
+          <div className="mb-3 flex items-center gap-2">
+            <span aria-hidden="true" className="bg-brand-gold-500 inline-block h-px w-8" />
+            <span className="text-ink-500 text-[11px] font-medium uppercase tracking-[0.18em]">
+              Book of business
+            </span>
+          </div>
+          <h1 className="serif text-ink-900 text-3xl tracking-tight">Clients</h1>
           <p className="mt-1 text-sm text-gray-500">
             {clientRows.length} {clientRows.length === 1 ? 'client' : 'clients'}
           </p>
@@ -31,7 +37,7 @@ export default async function ClientsPage() {
             <Link
               key={client.id}
               href={`/admin/clients/${client.id}`}
-              className="shadow-card hover:shadow-elevated block rounded-2xl bg-white p-5 transition-shadow duration-200"
+              className="shadow-soft-md hover:shadow-elevated block rounded-2xl bg-paper p-5 transition-shadow duration-200"
             >
               <div className="flex items-center gap-5">
                 {client.avatarUrl ? (
@@ -115,7 +121,7 @@ export default async function ClientsPage() {
 
 function EmptyState() {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
         <Users size={24} strokeWidth={1.5} />
       </div>

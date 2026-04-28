@@ -115,7 +115,7 @@ export function InvoicesClient({ invoices, summary }: InvoicesClientProps) {
           <select
             value={clientFilter}
             onChange={(e) => setClientFilter(e.target.value)}
-            className="focus:ring-brand-teal-200 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:outline-none"
+            className="focus:ring-brand-teal-200 rounded-xl border border-line bg-paper px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:outline-none"
           >
             <option value="">All clients</option>
             {clientOptions.map((c) => (
@@ -130,7 +130,7 @@ export function InvoicesClient({ invoices, summary }: InvoicesClientProps) {
       {optimisticInvoices.length === 0 ? (
         <EmptyState />
       ) : filtered.length === 0 ? (
-        <div className="shadow-card rounded-2xl bg-white p-12 text-center text-sm text-gray-400">
+        <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center text-sm text-gray-400">
           No invoices match the current filters.
         </div>
       ) : (
@@ -186,9 +186,9 @@ function SummaryCard({
         ? 'text-amber-600'
         : 'text-gray-900';
   return (
-    <div className="shadow-card rounded-2xl bg-white p-5">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-5">
       <div className="text-xs font-medium tracking-wider text-gray-500 uppercase">{label}</div>
-      <div className={cn('mt-2 text-2xl font-light tracking-tight', toneClass)}>{value}</div>
+      <div className={cn('mt-2 serif text-2xl font-light tracking-tight', toneClass)}>{value}</div>
       {hint && <div className="mt-1 text-xs text-gray-400">{hint}</div>}
     </div>
   );
@@ -217,7 +217,7 @@ function ToggleGroup<V extends string>({
             className={cn(
               'rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all',
               isActive
-                ? 'shadow-soft text-brand-teal-500 bg-white'
+                ? 'shadow-soft text-brand-teal-500 bg-paper'
                 : 'hover:text-brand-teal-500 text-gray-500',
             )}
           >
@@ -239,11 +239,11 @@ function InvoiceTable({
   onStatusChange: (invoiceId: string, clientId: string, status: InvoiceStatus) => void;
 }) {
   return (
-    <div className="shadow-card overflow-hidden rounded-2xl bg-white">
+    <div className="shadow-soft-md overflow-hidden rounded-2xl bg-paper">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-100">
+            <tr className="border-b border-line-2">
               <Th>Invoice #</Th>
               <Th>Client</Th>
               <Th>Description</Th>
@@ -391,7 +391,7 @@ function StatusBadgeButton({
 
 function EmptyState() {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <h3 className="text-base font-semibold text-gray-900">No invoices yet</h3>
       <p className="mx-auto mt-2 max-w-sm text-sm text-gray-500">
         Invoices are uploaded per-client from the client detail page. Once any client has an

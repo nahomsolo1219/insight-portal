@@ -37,7 +37,7 @@ export function SettingsClient({ tiers, emailTemplates }: SettingsClientProps) {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-[220px_1fr]">
       {/* Vertical nav */}
-      <nav className="shadow-card h-fit rounded-2xl bg-white p-2">
+      <nav className="shadow-soft-md h-fit rounded-2xl bg-paper p-2">
         {SECTIONS.map((s) => {
           const Icon = s.icon;
           const isActive = active === s.id;
@@ -73,12 +73,12 @@ export function SettingsClient({ tiers, emailTemplates }: SettingsClientProps) {
 
 function CompanySection() {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-6">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-6">
       <h2 className="text-lg font-semibold text-gray-900">Insight Home Maintenance</h2>
       <p className="mt-2 text-sm text-gray-500">
         Luxury home maintenance and remodel firm — SF Bay Area.
       </p>
-      <div className="bg-brand-warm-50 mt-5 rounded-xl border border-gray-100 px-4 py-3 text-sm text-gray-500">
+      <div className="bg-brand-warm-50 mt-5 rounded-xl border border-line-2 px-4 py-3 text-sm text-gray-500">
         Company profile editing (logo, contact info, branding) comes in a future update.
       </div>
     </div>
@@ -113,7 +113,7 @@ function TiersSection({ tiers }: { tiers: MembershipTierRow[] }) {
       </div>
 
       {tiers.length === 0 ? (
-        <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+        <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
           <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
             <CreditCard size={24} strokeWidth={1.5} />
           </div>
@@ -124,10 +124,10 @@ function TiersSection({ tiers }: { tiers: MembershipTierRow[] }) {
           </p>
         </div>
       ) : (
-        <div className="shadow-card overflow-hidden rounded-2xl bg-white">
+        <div className="shadow-soft-md overflow-hidden rounded-2xl bg-paper">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-100">
+              <tr className="border-b border-line-2">
                 <Th>Tier</Th>
                 <Th align="right">Annual price</Th>
                 <Th align="right">Clients</Th>
@@ -517,7 +517,7 @@ function EmailTemplatesSection({ templates }: { templates: EmailTemplateRow[] })
       </div>
 
       {templates.length === 0 ? (
-        <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+        <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
           <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
             <Mail size={24} strokeWidth={1.5} />
           </div>
@@ -600,7 +600,7 @@ function EmailTemplateCard({
   }
 
   return (
-    <div className="shadow-card rounded-2xl bg-white p-5">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-gray-900">{template.name}</h3>
@@ -629,7 +629,7 @@ function EmailTemplateCard({
       </div>
 
       {editing && (
-        <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
+        <div className="mt-4 space-y-4 border-t border-line-2 pt-4">
           <Field label="Subject" required>
             <input
               type="text"

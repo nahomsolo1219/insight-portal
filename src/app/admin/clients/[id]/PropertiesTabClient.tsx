@@ -139,7 +139,7 @@ function PropertyCard({ property, isOpen, onToggle, onEdit, onDelete }: Property
   if (property.yearBuilt) subtitleParts.push(`Built ${property.yearBuilt}`);
 
   return (
-    <div className="shadow-card overflow-hidden rounded-2xl bg-white">
+    <div className="shadow-soft-md overflow-hidden rounded-2xl bg-paper">
       {/* Header — click anywhere on this strip to toggle. The Edit button
           stops propagation so it doesn't double-fire as a toggle. */}
       <button
@@ -198,7 +198,7 @@ function PropertyCard({ property, isOpen, onToggle, onEdit, onDelete }: Property
       </button>
 
       {isOpen && (
-        <div className="border-t border-gray-100 px-5 py-4">
+        <div className="border-t border-line-2 px-5 py-4">
           <PropertyDetails property={property} />
           <ProjectsList projects={property.projects} />
           <div className="mt-5 flex justify-end">
@@ -498,7 +498,7 @@ function EditPropertyModal({
             />
           </Field>
         </div>
-        <div className="space-y-4 rounded-2xl border border-gray-100 bg-brand-warm-50 p-4">
+        <div className="space-y-4 rounded-2xl border border-line-2 bg-brand-warm-50 p-4">
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Property details</h3>
             <p className="mt-0.5 text-xs text-gray-500">

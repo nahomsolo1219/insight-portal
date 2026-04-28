@@ -41,8 +41,8 @@ function PhaseNodeImpl({ id, data, selected }: NodeProps<PhaseNodeType>) {
   return (
     <div
       className={cn(
-        'w-[420px] overflow-hidden rounded-2xl border bg-white shadow-card transition-all',
-        selected ? 'border-brand-teal-500 ring-2 ring-brand-teal-200' : 'border-gray-100',
+        'w-[420px] overflow-hidden rounded-2xl border bg-paper shadow-soft-md transition-all',
+        selected ? 'border-brand-teal-500 ring-2 ring-brand-teal-200' : 'border-line-2',
       )}
     >
       {/* Incoming handle (top) */}
@@ -109,7 +109,7 @@ function PhaseNodeImpl({ id, data, selected }: NodeProps<PhaseNodeType>) {
 
       {/* Expanded body */}
       {expanded && (
-        <div className="space-y-4 border-t border-gray-100 p-4">
+        <div className="space-y-4 border-t border-line-2 p-4">
           <Field label="Phase title">
             <input
               type="text"
@@ -186,11 +186,11 @@ function PhaseNodeImpl({ id, data, selected }: NodeProps<PhaseNodeType>) {
             />
           </Field>
 
-          <div className="border-t border-gray-100 pt-3">
+          <div className="border-t border-line-2 pt-3">
             <MilestoneEditor phaseId={id} milestones={phase.milestones} />
           </div>
 
-          <div className="border-t border-gray-100 pt-3">
+          <div className="border-t border-line-2 pt-3">
             <DecisionEditor phaseId={id} milestones={phase.milestones} />
           </div>
         </div>
@@ -227,7 +227,7 @@ function Field({
 }
 
 const inputClass =
-  'block w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:border-brand-teal-300 focus:outline-none focus:ring-2 focus:ring-brand-teal-200';
+  'block w-full rounded-lg border border-line bg-paper px-3 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:border-brand-teal-300 focus:outline-none focus:ring-2 focus:ring-brand-teal-200';
 
 function stopCanvasEvent(e: React.SyntheticEvent) {
   e.stopPropagation();

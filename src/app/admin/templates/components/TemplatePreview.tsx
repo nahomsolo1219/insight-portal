@@ -32,7 +32,7 @@ export function TemplatePreview({ name, phases, onClose }: Props) {
   return (
     <Modal open onClose={onClose} title="Client preview" size="lg">
       <div className="bg-brand-teal-500 -m-6 mb-6 px-6 py-6 text-white">
-        <h2 className="font-display text-2xl">{name || 'Untitled template'}</h2>
+        <h2 className="serif text-2xl">{name || 'Untitled template'}</h2>
         <div className="mt-2 text-xs text-white/70">
           {phases.length} {phases.length === 1 ? 'phase' : 'phases'}
           {weeks !== null && (
@@ -41,7 +41,7 @@ export function TemplatePreview({ name, phases, onClose }: Props) {
             </>
           )}
         </div>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-paper/10">
           <div
             className="bg-brand-gold-400 h-full rounded-full transition-all"
             style={{
@@ -60,7 +60,7 @@ export function TemplatePreview({ name, phases, onClose }: Props) {
         </div>
       ) : (
         <div className="relative space-y-5 pl-8">
-          <div className="absolute top-2 bottom-2 left-3 w-px border-l border-dashed border-gray-200" />
+          <div className="absolute top-2 bottom-2 left-3 w-px border-l border-dashed border-line" />
           {phases.map((phase, i) => {
             const status: Status = i === 0 ? 'complete' : i === 1 ? 'active' : 'upcoming';
             return <PhasePreviewCard key={phase.id} phase={phase} number={i + 1} status={status} />;
@@ -92,8 +92,8 @@ function PhasePreviewCard({
         className={cn(
           'absolute -left-[22px] top-2 flex h-4 w-4 items-center justify-center rounded-full',
           status === 'complete' && 'bg-brand-teal-500',
-          status === 'active' && 'border-2 border-brand-gold-400 bg-white',
-          status === 'upcoming' && 'border border-gray-300 bg-white',
+          status === 'active' && 'border-2 border-brand-gold-400 bg-paper',
+          status === 'upcoming' && 'border border-gray-300 bg-paper',
         )}
       >
         {status === 'complete' && <Check size={10} strokeWidth={3} className="text-white" />}
@@ -101,7 +101,7 @@ function PhasePreviewCard({
 
       <div
         className={cn(
-          'shadow-card rounded-xl bg-white p-4',
+          'shadow-soft-md rounded-xl bg-paper p-4',
           status === 'active' && 'border-brand-gold-300 border',
           status === 'upcoming' && 'opacity-70',
         )}
@@ -164,7 +164,7 @@ function PhasePreviewCard({
                     {d.decisionOptions.map((opt, i) => (
                       <div
                         key={i}
-                        className="hover:border-brand-gold-400 overflow-hidden rounded-xl border border-gray-200 bg-white text-left transition-all"
+                        className="hover:border-brand-gold-400 overflow-hidden rounded-xl border border-line bg-paper text-left transition-all"
                       >
                         <div className="aspect-[4/3] w-full overflow-hidden bg-gray-100">
                           {opt.imageUrl ? (
@@ -198,7 +198,7 @@ function PhasePreviewCard({
                     {d.decisionOptions.map((opt, i) => (
                       <span
                         key={i}
-                        className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700"
+                        className="rounded-md border border-line bg-paper px-2 py-0.5 text-[11px] text-gray-700"
                       >
                         {opt.label || 'Untitled'}
                       </span>

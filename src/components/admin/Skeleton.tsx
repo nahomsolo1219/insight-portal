@@ -20,7 +20,7 @@ export function SkeletonLine({ width = '100%', height = '16px' }: SkeletonLinePr
 
 export function SkeletonCard() {
   return (
-    <div className="shadow-card animate-pulse space-y-4 rounded-2xl bg-white p-6">
+    <div className="shadow-soft-md animate-pulse space-y-4 rounded-2xl bg-paper p-6">
       <SkeletonLine width="40%" height="20px" />
       <SkeletonLine width="100%" />
       <SkeletonLine width="75%" />
@@ -30,7 +30,7 @@ export function SkeletonCard() {
 
 export function SkeletonTable({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="shadow-card animate-pulse space-y-4 rounded-2xl bg-white p-6">
+    <div className="shadow-soft-md animate-pulse space-y-4 rounded-2xl bg-paper p-6">
       <SkeletonLine width="30%" height="20px" />
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="flex gap-4">
@@ -50,7 +50,7 @@ export function SkeletonGrid({ items = 4 }: { items?: number }) {
       {Array.from({ length: items }).map((_, i) => (
         <div
           key={i}
-          className="shadow-card animate-pulse overflow-hidden rounded-2xl bg-white"
+          className="shadow-soft-md animate-pulse overflow-hidden rounded-2xl bg-paper"
         >
           <div className="aspect-square bg-gray-100" />
           <div className="space-y-2 p-3">

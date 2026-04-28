@@ -82,7 +82,7 @@ export function DashboardNewProjectButton({ clients }: Props) {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search clients"
             autoFocus
-            className="focus:ring-brand-teal-200 focus:border-brand-teal-300 w-full rounded-xl border border-gray-200 bg-white py-2.5 pr-3 pl-9 text-sm text-gray-900 focus:ring-2 focus:outline-none"
+            className="focus:ring-brand-teal-200 focus:border-brand-teal-300 w-full rounded-xl border border-line bg-paper py-2.5 pr-3 pl-9 text-sm text-gray-900 focus:ring-2 focus:outline-none"
           />
         </div>
 
@@ -93,7 +93,7 @@ export function DashboardNewProjectButton({ clients }: Props) {
         ) : (
           // Bounded scroll container so 50+ clients don't push the modal
           // off-screen. Each row is a 44px+ touch target.
-          <ul className="max-h-[360px] divide-y divide-gray-50 overflow-y-auto rounded-xl border border-gray-100">
+          <ul className="max-h-[360px] divide-y divide-gray-50 overflow-y-auto rounded-xl border border-line-2">
             {filtered.map((c) => (
               <li key={c.id}>
                 <button

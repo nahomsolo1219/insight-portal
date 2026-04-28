@@ -98,7 +98,7 @@ export function DetailsTabClient({ project }: Props) {
 
   return (
     <div className="space-y-8">
-      <section className="shadow-card rounded-2xl bg-white p-6">
+      <section className="shadow-soft-md rounded-2xl bg-paper p-6">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">Project information</h2>
           <button
@@ -183,7 +183,7 @@ export function DetailsTabClient({ project }: Props) {
       </section>
 
       {isRemodel && (
-        <section className="shadow-card rounded-2xl bg-white p-6">
+        <section className="shadow-soft-md rounded-2xl bg-paper p-6">
           <h2 className="mb-5 text-base font-semibold text-gray-900">Budget</h2>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
             <Field label="Contract amount" hint="Total signed contract.">

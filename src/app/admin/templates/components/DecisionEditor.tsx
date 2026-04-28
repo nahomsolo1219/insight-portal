@@ -128,7 +128,7 @@ function DecisionRowDisplay({
             onClick={onEdit}
             onMouseDown={stopCanvasEvent}
             aria-label="Edit"
-            className="rounded p-1 text-gray-400 transition-all hover:bg-white hover:text-pink-500"
+            className="rounded p-1 text-gray-400 transition-all hover:bg-paper hover:text-pink-500"
           >
             <Pencil size={11} strokeWidth={1.5} />
           </button>
@@ -208,7 +208,7 @@ function DecisionRowEdit({
   }
 
   return (
-    <div className="space-y-2 rounded-lg border border-pink-200 bg-white p-2">
+    <div className="space-y-2 rounded-lg border border-pink-200 bg-paper p-2">
       <input
         type="text"
         value={question}
@@ -248,7 +248,7 @@ function DecisionRowEdit({
             type="button"
             onClick={() => setOptions((prev) => [...prev, emptyOption()])}
             onMouseDown={stopCanvasEvent}
-            className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-gray-200 py-1 text-[11px] text-gray-500 hover:border-pink-300 hover:text-pink-500"
+            className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-line py-1 text-[11px] text-gray-500 hover:border-pink-300 hover:text-pink-500"
           >
             <Plus size={10} strokeWidth={2} />
             Add option
@@ -350,7 +350,7 @@ function OptionRowEdit({
   }
 
   return (
-    <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-2">
+    <div className="rounded-lg border border-line-2 bg-gray-50/50 p-2">
       <div className="flex gap-2">
         {/* Image zone */}
         <div className="relative flex-shrink-0">
@@ -360,7 +360,7 @@ function OptionRowEdit({
             onMouseDown={stopCanvasEvent}
             disabled={uploading}
             className={cn(
-              'flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white transition-all',
+              'flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-line bg-paper transition-all',
               !uploading && 'hover:border-brand-teal-300 hover:bg-brand-warm-50',
               uploading && 'cursor-wait',
             )}
@@ -377,7 +377,7 @@ function OptionRowEdit({
               <ImageIcon size={20} strokeWidth={1.25} className="text-gray-300" />
             )}
             {uploading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/80">
+              <div className="absolute inset-0 flex items-center justify-center bg-paper/80">
                 <Loader2 size={16} strokeWidth={2} className="animate-spin text-gray-500" />
               </div>
             )}
@@ -396,7 +396,7 @@ function OptionRowEdit({
               onClick={handleRemoveImage}
               onMouseDown={stopCanvasEvent}
               aria-label="Remove image"
-              className="absolute -top-1.5 -right-1.5 rounded-full bg-white p-0.5 text-gray-400 shadow-sm ring-1 ring-gray-200 transition-all hover:text-red-500"
+              className="absolute -top-1.5 -right-1.5 rounded-full bg-paper p-0.5 text-gray-400 shadow-sm ring-1 ring-gray-200 transition-all hover:text-red-500"
             >
               <Trash2 size={10} strokeWidth={2} />
             </button>
@@ -446,7 +446,7 @@ function emptyOption(): BuilderDecisionOption {
 }
 
 const editInputClass =
-  'w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-200';
+  'w-full rounded-md border border-line bg-paper px-2 py-1 text-xs text-gray-900 focus:border-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-200';
 
 function stopCanvasEvent(e: React.SyntheticEvent) {
   e.stopPropagation();

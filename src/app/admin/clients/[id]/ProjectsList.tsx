@@ -101,7 +101,7 @@ export function ProjectsList({
 
   if (projects.length === 0) {
     return (
-      <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+      <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
         <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
           <Briefcase size={24} strokeWidth={1.5} />
         </div>
@@ -165,7 +165,7 @@ function ProjectCard({
       : 'bg-brand-gold-50 text-brand-gold-500';
 
   return (
-    <div className="shadow-card overflow-hidden rounded-2xl bg-white">
+    <div className="shadow-soft-md overflow-hidden rounded-2xl bg-paper">
       <button
         type="button"
         onClick={onToggle}
@@ -220,9 +220,9 @@ function ProjectCard({
       </button>
 
       {isOpen && (
-        <div className="border-t border-gray-100 px-5 py-4">
+        <div className="border-t border-line-2 px-5 py-4">
           {project.type === 'remodel' && project.contractCents != null && (
-            <div className="mb-5 grid grid-cols-4 gap-4 border-b border-gray-100 pb-5">
+            <div className="mb-5 grid grid-cols-4 gap-4 border-b border-line-2 pb-5">
               <BudgetStat label="Contract" value={formatCurrency(project.contractCents)} />
               <BudgetStat
                 label="Changes"

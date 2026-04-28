@@ -451,9 +451,9 @@ function StatMini({
           ? 'text-gray-400'
           : 'text-gray-900';
   return (
-    <div className="shadow-card rounded-2xl bg-white p-5">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-5">
       <div className="text-xs font-medium tracking-wider text-gray-500 uppercase">{label}</div>
-      <div className={cn('mt-2 text-2xl font-light tracking-tight', valueClass)}>{value}</div>
+      <div className={cn('mt-2 serif text-2xl font-light tracking-tight', valueClass)}>{value}</div>
     </div>
   );
 }
@@ -495,7 +495,7 @@ function FilterBar({
         <select
           value={projectFilter}
           onChange={(e) => setProjectFilter(e.target.value)}
-          className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-brand-teal-200 focus:outline-none"
+          className="rounded-xl border border-line bg-paper px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-brand-teal-200 focus:outline-none"
         >
           <option value="">All projects</option>
           {projects.map((p) => (
@@ -535,7 +535,7 @@ function ToggleGroup<V extends string>({
             className={cn(
               'rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all',
               isActive
-                ? 'shadow-soft text-brand-teal-500 bg-white'
+                ? 'shadow-soft text-brand-teal-500 bg-paper'
                 : 'hover:text-brand-teal-500 text-gray-500',
             )}
           >
@@ -590,7 +590,7 @@ function PhotoCard({ photo, selected, isActive, onToggleSelect, onOpen }: PhotoC
   return (
     <div
       className={cn(
-        'shadow-card group relative overflow-hidden rounded-2xl bg-white transition-all',
+        'shadow-soft-md group relative overflow-hidden rounded-2xl bg-paper transition-all',
         isPending && 'ring-2 ring-amber-300',
         // Both the bulk-select checkbox and the side-panel selection share
         // the teal ring; they overwrite each other but resolve to the same
@@ -642,7 +642,7 @@ function PhotoCard({ photo, selected, isActive, onToggleSelect, onOpen }: PhotoC
           'absolute top-2 left-2 flex h-7 w-7 items-center justify-center rounded-md border transition-all',
           selected
             ? 'border-brand-teal-500 bg-brand-teal-500 text-white'
-            : 'border-white/80 bg-white/80 text-gray-400 opacity-0 backdrop-blur-sm group-hover:opacity-100',
+            : 'border-white/80 bg-paper/80 text-gray-400 opacity-0 backdrop-blur-sm group-hover:opacity-100',
         )}
       >
         {selected ? <CheckSquare size={16} strokeWidth={2} /> : <Square size={16} strokeWidth={2} />}
@@ -691,7 +691,7 @@ function PhotoCard({ photo, selected, isActive, onToggleSelect, onOpen }: PhotoC
 
 function EmptyState({ onUploadClick }: { onUploadClick: () => void }) {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
         <Camera size={24} strokeWidth={1.5} />
       </div>
@@ -713,7 +713,7 @@ function EmptyState({ onUploadClick }: { onUploadClick: () => void }) {
 
 function FilteredEmptyState() {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center text-sm text-gray-400">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center text-sm text-gray-400">
       No photos match the current filters.
     </div>
   );
@@ -742,7 +742,7 @@ function BulkActionBar({
 }: BulkActionBarProps) {
   return (
     <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
-      <div className="shadow-modal flex items-center gap-2 rounded-2xl border border-gray-100 bg-white py-2 pr-2 pl-4">
+      <div className="shadow-modal flex items-center gap-2 rounded-2xl border border-line-2 bg-paper py-2 pr-2 pl-4">
         <span className="text-sm font-medium text-gray-900">
           {count} selected
           {count < totalVisible && (
@@ -945,7 +945,7 @@ function PhotoDetailModal({
         </div>
 
         {/* Categorization controls */}
-        <div className="space-y-4 border-t border-gray-100 pt-4">
+        <div className="space-y-4 border-t border-line-2 pt-4">
           <Field label="Tag" required>
             <div className="grid grid-cols-3 gap-2">
               {TAG_OPTIONS.map((opt) => {
@@ -959,7 +959,7 @@ function PhotoDetailModal({
                       'flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
                       isActive
                         ? 'border-brand-teal-500 bg-brand-teal-50 text-brand-teal-500'
-                        : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-gray-200 text-gray-600',
+                        : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-line text-gray-600',
                     )}
                   >
                     <span className={cn('rounded px-1.5 py-0.5 text-[10px]', opt.badge)}>
@@ -1144,7 +1144,7 @@ function UploadPhotosModal({ clientId, propertyId, projects, onClose }: UploadPh
                 'flex items-center justify-center rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
                 tag === ''
                   ? 'border-brand-teal-500 bg-brand-teal-50 text-brand-teal-500'
-                  : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-gray-200 text-gray-600',
+                  : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-line text-gray-600',
               )}
             >
               None
@@ -1160,7 +1160,7 @@ function UploadPhotosModal({ clientId, propertyId, projects, onClose }: UploadPh
                     'flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
                     isActive
                       ? 'border-brand-teal-500 bg-brand-teal-50 text-brand-teal-500'
-                      : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-gray-200 text-gray-600',
+                      : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-line text-gray-600',
                   )}
                 >
                   <span className={cn('rounded px-1.5 py-0.5 text-[10px]', opt.badge)}>
@@ -1301,7 +1301,7 @@ function BulkCategorizeModal({
                     'flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
                     isActive
                       ? 'border-brand-teal-500 bg-brand-teal-50 text-brand-teal-500'
-                      : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-gray-200 text-gray-600',
+                      : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-line text-gray-600',
                   )}
                 >
                   <span className={cn('rounded px-1.5 py-0.5 text-[10px]', opt.badge)}>

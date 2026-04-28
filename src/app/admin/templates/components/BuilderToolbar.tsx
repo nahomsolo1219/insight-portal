@@ -42,7 +42,7 @@ export function BuilderToolbar({
   const weeks = totalDays > 0 ? Math.round(totalDays / 7) : null;
 
   return (
-    <div className="shadow-elevated flex items-center gap-4 rounded-2xl border border-gray-100 bg-white px-5 py-3">
+    <div className="shadow-elevated flex items-center gap-4 rounded-2xl border border-line-2 bg-paper px-5 py-3">
       <div className="min-w-[240px]">
         <input
           type="text"
@@ -80,7 +80,7 @@ export function BuilderToolbar({
             className={cn(
               'rounded-md px-3 py-1 text-xs font-medium transition-all',
               t === type
-                ? 'shadow-soft text-brand-teal-500 bg-white'
+                ? 'shadow-soft text-brand-teal-500 bg-paper'
                 : 'hover:text-brand-teal-500 text-gray-500',
             )}
           >

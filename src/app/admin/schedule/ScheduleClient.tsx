@@ -152,7 +152,7 @@ function NavBar({
       : `${formatShortDate(startDate)} – ${formatShortDate(endDate)}`;
 
   return (
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow-card">
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-paper p-4 shadow-soft-md">
       <div className="flex items-center gap-2">
         <Link
           href={urlFor(prevStart, prevEnd, viewMode)}
@@ -194,7 +194,7 @@ function NavBar({
                 className={cn(
                   'rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all',
                   isActive
-                    ? 'shadow-soft text-brand-teal-500 bg-white'
+                    ? 'shadow-soft text-brand-teal-500 bg-paper'
                     : 'hover:text-brand-teal-500 text-gray-500',
                 )}
               >
@@ -260,7 +260,7 @@ function AppointmentCard({
   const { weekdayShort, day } = dateParts(row.date);
 
   return (
-    <div className="shadow-card rounded-2xl bg-white p-5">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-5">
       <div className="flex items-start gap-5">
         {/* Date column */}
         <div className="bg-brand-teal-50 text-brand-teal-500 flex h-14 w-14 flex-shrink-0 flex-col items-center justify-center rounded-xl text-center">
@@ -319,7 +319,7 @@ function AppointmentCard({
                 />
                 Details
               </summary>
-              <div className="mt-2 rounded-xl border border-gray-100 bg-brand-warm-50 px-4 py-3">
+              <div className="mt-2 rounded-xl border border-line-2 bg-brand-warm-50 px-4 py-3">
                 <div className="mb-1 inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-gray-500 uppercase">
                   <ClipboardList size={12} strokeWidth={1.5} />
                   Scope of work
@@ -397,7 +397,7 @@ function StatusBadgeButton({
 
 function EmptyState({ davidOnly }: { davidOnly: boolean }) {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <h3 className="text-base font-semibold text-gray-900">
         {davidOnly ? 'No David-on-site appointments' : 'Nothing on the calendar'}
       </h3>

@@ -19,7 +19,7 @@ export default function ClientDetailLoading() {
 
       <div className="mb-8 grid grid-cols-4 gap-5">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="shadow-card rounded-2xl bg-white p-5">
+          <div key={i} className="shadow-soft-md rounded-2xl bg-paper p-5">
             <SkeletonLine width="60%" height="12px" />
             <div className="mt-2">
               <SkeletonLine width="80%" height="28px" />

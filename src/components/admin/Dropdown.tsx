@@ -109,7 +109,7 @@ export function Dropdown({
           <div
             ref={setFloating}
             style={floatingStyles}
-            className="shadow-modal z-[100] min-w-[160px] overflow-hidden rounded-xl border border-gray-100 bg-white py-1"
+            className="shadow-modal z-[100] min-w-[160px] overflow-hidden rounded-xl border border-line-2 bg-paper py-1"
             {...getFloatingProps()}
           >
             {options.map((opt) => {

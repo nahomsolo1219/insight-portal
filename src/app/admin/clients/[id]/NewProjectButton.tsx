@@ -273,7 +273,7 @@ export function NewProjectButton({
             </select>
           </Field>
 
-          <div className="rounded-xl border border-gray-100 bg-brand-warm-50 p-4">
+          <div className="rounded-xl border border-line-2 bg-brand-warm-50 p-4">
             <label className="flex cursor-pointer items-center gap-3">
               <input
                 type="checkbox"
@@ -349,7 +349,7 @@ export function NewProjectButton({
                       'rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
                       active
                         ? 'border-brand-teal-500 bg-brand-teal-50 text-brand-teal-500'
-                        : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-gray-200 text-gray-600',
+                        : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-line text-gray-600',
                     )}
                   >
                     {t === 'maintenance' ? 'Maintenance' : 'Remodel'}
@@ -453,7 +453,7 @@ function StaffMultiSelect({
 }) {
   if (options.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-200 bg-brand-warm-50 px-4 py-3 text-xs text-gray-500">
+      <div className="rounded-xl border border-dashed border-line bg-brand-warm-50 px-4 py-3 text-xs text-gray-500">
         <Users size={12} strokeWidth={1.5} className="mr-1.5 inline" />
         No active field staff to assign.
       </div>
@@ -469,7 +469,7 @@ function StaffMultiSelect({
   }
 
   return (
-    <div className="max-h-44 overflow-y-auto rounded-xl border border-gray-200 bg-white">
+    <div className="max-h-44 overflow-y-auto rounded-xl border border-line bg-paper">
       <ul className="divide-y divide-gray-50">
         {options.map((staff) => {
           const checked = selectedIds.includes(staff.profileId);
@@ -515,7 +515,7 @@ function TemplatePreview({ template }: { template: TemplateOption }) {
     parts.push(template.duration);
   }
   return (
-    <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs text-gray-500 ring-1 ring-gray-100">
+    <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-paper px-3 py-2 text-xs text-gray-500 ring-1 ring-gray-100">
       <Layers size={12} strokeWidth={1.5} className="text-brand-teal-500" />
       <span className="font-medium text-gray-700">{template.name}</span>
       {parts.length > 0 && <span>· {parts.join(' · ')}</span>}

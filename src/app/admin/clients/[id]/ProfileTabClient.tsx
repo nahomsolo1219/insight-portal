@@ -31,7 +31,7 @@ export function ProfileTabClient({ client, tiers, pms }: ProfileTabClientProps) 
   return (
     <div className="space-y-5">
       {/* Client info card */}
-      <div className="shadow-card rounded-2xl bg-white p-6">
+      <div className="shadow-soft-md rounded-2xl bg-paper p-6">
         <div className="mb-5 flex items-start justify-between">
           <h3 className="text-base font-semibold text-gray-900">Client Information</h3>
           <button
@@ -63,7 +63,7 @@ export function ProfileTabClient({ client, tiers, pms }: ProfileTabClientProps) 
 
       {/* Danger zone — archiving is irreversible-ish, so it sits alone. */}
       {client.status === 'active' && (
-        <div className="shadow-card rounded-2xl border-l-4 border-red-400 bg-white p-6">
+        <div className="shadow-soft-md rounded-2xl border-l-4 border-red-400 bg-paper p-6">
           <h3 className="mb-1 text-base font-semibold text-gray-900">Archive client</h3>
           <p className="mb-4 text-sm text-gray-500">
             Archiving marks this client as inactive. Historical data stays intact. You can restore

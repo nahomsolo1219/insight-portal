@@ -131,7 +131,7 @@ export function MilestonesTabClient({ projectId, clientId, milestones, vendors }
       </div>
 
       {grouped.length === 0 ? (
-        <div className="shadow-card rounded-2xl bg-white p-8 text-center text-sm text-gray-400">
+        <div className="shadow-soft-md rounded-2xl bg-paper p-8 text-center text-sm text-gray-400">
           No milestones yet. Add one to start tracking work.
         </div>
       ) : (
@@ -141,7 +141,7 @@ export function MilestonesTabClient({ projectId, clientId, milestones, vendors }
               <h3 className="mb-2 text-[11px] font-semibold tracking-wider text-gray-400 uppercase">
                 {category}
               </h3>
-              <div className="shadow-card overflow-hidden rounded-2xl bg-white">
+              <div className="shadow-soft-md overflow-hidden rounded-2xl bg-paper">
                 {items.map((m, i) => (
                   <MilestoneRow
                     key={m.id}
@@ -297,7 +297,7 @@ function MilestoneRow({
           onClick={onEdit}
           title="Edit milestone"
           aria-label="Edit milestone"
-          className="hover:bg-brand-warm-100 inline-flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 transition-colors hover:text-gray-700"
+          className="hover:bg-cream inline-flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 transition-colors hover:text-gray-700"
         >
           <Pencil size={13} strokeWidth={1.5} />
         </button>

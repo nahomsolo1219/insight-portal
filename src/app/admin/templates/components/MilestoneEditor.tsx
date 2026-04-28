@@ -79,7 +79,7 @@ export function MilestoneEditor({ phaseId, milestones }: Props) {
         type="button"
         onClick={handleAdd}
         onMouseDown={stopCanvasEvent}
-        className="hover:border-brand-teal-300 hover:text-brand-teal-500 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-200 py-1.5 text-xs font-medium text-gray-500 transition-all"
+        className="hover:border-brand-teal-300 hover:text-brand-teal-500 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line py-1.5 text-xs font-medium text-gray-500 transition-all"
       >
         <Plus size={12} strokeWidth={2} />
         Add milestone
@@ -114,7 +114,7 @@ function MilestoneRowDisplay({
           onClick={onEdit}
           onMouseDown={stopCanvasEvent}
           aria-label="Edit"
-          className="hover:text-brand-teal-500 rounded p-1 text-gray-400 transition-all hover:bg-brand-warm-100"
+          className="hover:text-brand-teal-500 rounded p-1 text-gray-400 transition-all hover:bg-cream"
         >
           <Pencil size={11} strokeWidth={1.5} />
         </button>
@@ -152,7 +152,7 @@ function MilestoneRowEdit({
   }
 
   return (
-    <div className="space-y-2 rounded-lg border border-brand-teal-200 bg-white p-2">
+    <div className="space-y-2 rounded-lg border border-brand-teal-200 bg-paper p-2">
       <div className="grid grid-cols-[2fr_1fr] gap-1.5">
         <input
           type="text"
@@ -218,7 +218,7 @@ function MilestoneRowEdit({
 }
 
 const editInputClass =
-  'w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-brand-teal-300 focus:outline-none focus:ring-2 focus:ring-brand-teal-200';
+  'w-full rounded-md border border-line bg-paper px-2 py-1 text-xs text-gray-900 focus:border-brand-teal-300 focus:outline-none focus:ring-2 focus:ring-brand-teal-200';
 
 /**
  * Swallow mouse / key events so they don't bubble to React Flow's canvas

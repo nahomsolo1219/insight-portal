@@ -130,7 +130,7 @@ export function ProjectPhotosTabClient({ projectId, clientId, photos }: Props) {
 
   if (photos.length === 0) {
     return (
-      <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+      <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
         <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
           <Camera size={24} strokeWidth={1.5} />
         </div>
@@ -186,7 +186,7 @@ function PhotoCard({
       type="button"
       onClick={onClick}
       className={cn(
-        'shadow-card group relative overflow-hidden rounded-2xl bg-white text-left transition-all',
+        'shadow-soft-md group relative overflow-hidden rounded-2xl bg-paper text-left transition-all',
         isPending && 'ring-2 ring-amber-300',
         isActive && 'ring-brand-teal-500 ring-2',
       )}

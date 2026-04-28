@@ -38,7 +38,7 @@ export function DecisionsClient({ rows }: DecisionsClientProps) {
           <select
             value={clientFilter}
             onChange={(e) => setClientFilter(e.target.value)}
-            className="focus:ring-brand-teal-200 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:outline-none"
+            className="focus:ring-brand-teal-200 rounded-xl border border-line bg-paper px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:outline-none"
           >
             <option value="">All clients</option>
             {clientOptions.map((c) => (
@@ -51,7 +51,7 @@ export function DecisionsClient({ rows }: DecisionsClientProps) {
       )}
 
       {filtered.length === 0 ? (
-        <div className="shadow-card rounded-2xl bg-white p-12 text-center text-sm text-gray-400">
+        <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center text-sm text-gray-400">
           No decisions for this client.
         </div>
       ) : (
@@ -73,7 +73,7 @@ function DecisionCard({ row }: { row: DecisionRow }) {
   const typeIcon = typeIconFor(row.questionType);
 
   return (
-    <div className="shadow-card rounded-2xl bg-white p-5">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -112,7 +112,7 @@ function DecisionCard({ row }: { row: DecisionRow }) {
           {options.map((opt, i) => (
             <div
               key={`${row.id}-opt-${i}`}
-              className="bg-brand-warm-50 rounded-xl border border-gray-100 px-3 py-2 text-sm text-gray-700"
+              className="bg-brand-warm-50 rounded-xl border border-line-2 px-3 py-2 text-sm text-gray-700"
             >
               <span className="mr-2 text-xs font-medium text-gray-400">
                 {String.fromCharCode(65 + i)}
@@ -239,7 +239,7 @@ function typeIconFor(t: DecisionRow['questionType']) {
 
 function EmptyState() {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
         <CheckCircle2 size={24} strokeWidth={1.5} />
       </div>

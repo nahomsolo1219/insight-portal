@@ -45,8 +45,8 @@ export default async function VendorDetailPage({ params }: PageProps) {
       <div className="mb-8 flex items-start justify-between gap-5">
         <div className="min-w-0">
           <div className="mb-1 flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-brand-teal-500 text-3xl">{vendor.name}</h1>
-            <span className="bg-brand-warm-100 text-gray-600 rounded-md px-2.5 py-1 text-xs font-medium">
+            <h1 className="serif text-ink-900 text-3xl tracking-tight">{vendor.name}</h1>
+            <span className="bg-cream text-gray-600 rounded-md px-2.5 py-1 text-xs font-medium">
               {vendor.category}
             </span>
             <span
@@ -109,7 +109,7 @@ export default async function VendorDetailPage({ params }: PageProps) {
       </div>
 
       {vendor.notes && (
-        <div className="shadow-card mt-6 rounded-2xl bg-white p-6">
+        <div className="shadow-soft-md mt-6 rounded-2xl bg-paper p-6">
           <h3 className="text-base font-semibold text-gray-900">Notes</h3>
           <p className="mt-2 text-sm whitespace-pre-wrap text-gray-700">{vendor.notes}</p>
         </div>
@@ -140,7 +140,7 @@ function StatCard({ label, value, hint, tone = 'default', icon }: StatCardProps)
         ? 'bg-amber-50 text-amber-500'
         : 'bg-brand-warm-200 text-brand-teal-500';
   return (
-    <div className="shadow-card rounded-2xl bg-white p-5">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-5">
       <div className="flex items-start justify-between">
         <div className="text-xs font-medium tracking-wider text-gray-500 uppercase">
           {label}
@@ -149,7 +149,7 @@ function StatCard({ label, value, hint, tone = 'default', icon }: StatCardProps)
           {icon}
         </div>
       </div>
-      <div className={cn('mt-2 text-2xl font-light tracking-tight', valueClass)}>{value}</div>
+      <div className={cn('mt-2 serif text-2xl font-light tracking-tight', valueClass)}>{value}</div>
       {hint && <div className="mt-1 text-xs text-gray-500">{hint}</div>}
     </div>
   );
@@ -172,7 +172,7 @@ interface Job {
 
 function JobHistorySection({ jobs }: { jobs: Job[] }) {
   return (
-    <section className="shadow-card rounded-2xl bg-white p-6">
+    <section className="shadow-soft-md rounded-2xl bg-paper p-6">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-base font-semibold text-gray-900">Recent jobs</h3>
         {jobs.length > 0 && (

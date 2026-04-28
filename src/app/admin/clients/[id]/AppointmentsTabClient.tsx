@@ -142,7 +142,7 @@ export function AppointmentsTabClient({
           <section>
             <SectionHeader label="Upcoming" count={liveUpcoming.length} />
             {liveUpcoming.length === 0 ? (
-              <div className="shadow-card rounded-2xl bg-white p-6 text-center text-sm text-gray-400">
+              <div className="shadow-soft-md rounded-2xl bg-paper p-6 text-center text-sm text-gray-400">
                 Nothing scheduled ahead
               </div>
             ) : (
@@ -260,7 +260,7 @@ function AppointmentCard({ appointment, tone, onStatusChange, onDelete }: Appoin
   return (
     <div
       className={cn(
-        'shadow-card overflow-hidden rounded-2xl bg-white transition-opacity',
+        'shadow-soft-md overflow-hidden rounded-2xl bg-paper transition-opacity',
         isPast && 'opacity-80',
       )}
     >
@@ -347,7 +347,7 @@ function AppointmentCard({ appointment, tone, onStatusChange, onDelete }: Appoin
       </div>
 
       {hasScope && expanded && (
-        <div className="border-t border-gray-100 bg-brand-warm-50 px-5 py-4">
+        <div className="border-t border-line-2 bg-brand-warm-50 px-5 py-4">
           <div className="mb-1 inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-gray-500 uppercase">
             <ClipboardList size={12} strokeWidth={1.5} />
             Scope of work
@@ -422,7 +422,7 @@ function StatusBadgeButton({ appointmentId, status, onChange }: StatusBadgeButto
 
 function EmptyState({ onNewClick }: { onNewClick: () => void }) {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
         <Calendar size={24} strokeWidth={1.5} />
       </div>
@@ -649,7 +649,7 @@ function NewAppointmentModal({
           </select>
         </Field>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 px-4 py-3 transition-colors hover:bg-brand-warm-50">
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line px-4 py-3 transition-colors hover:bg-brand-warm-50">
           <input
             type="checkbox"
             checked={davidOnSite}

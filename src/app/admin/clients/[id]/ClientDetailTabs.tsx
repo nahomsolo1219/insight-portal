@@ -131,7 +131,7 @@ export function ClientDetailTabs({
               className={cn(
                 'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition-all',
                 isActive
-                  ? 'text-brand-teal-500 shadow-soft bg-white'
+                  ? 'text-brand-teal-500 shadow-soft bg-paper'
                   : 'hover:text-brand-teal-500 text-gray-500',
               )}
             >
@@ -190,7 +190,7 @@ export function ClientDetailTabs({
 
 function EmptyTab({ message }: { message: string }) {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center text-sm text-gray-400">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center text-sm text-gray-400">
       {message}
     </div>
   );
@@ -198,7 +198,7 @@ function EmptyTab({ message }: { message: string }) {
 
 function ComingSoon({ tabLabel }: { tabLabel: string }) {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <h3 className="text-base font-semibold text-gray-900">{tabLabel} tab</h3>
       <p className="mt-2 text-sm text-gray-500">Being built in a follow-up session.</p>
     </div>

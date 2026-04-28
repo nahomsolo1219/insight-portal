@@ -31,7 +31,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <Suspense fallback={null}>
         <NavigationProgress />
       </Suspense>
-      <div className="bg-brand-warm-100 flex h-screen overflow-hidden text-[#444]">
+      <div className="bg-cream flex h-screen overflow-hidden text-ink-700">
         <Sidebar user={user} counts={sidebarCounts} />
         <main className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-[1200px] px-8 py-8">{children}</div>

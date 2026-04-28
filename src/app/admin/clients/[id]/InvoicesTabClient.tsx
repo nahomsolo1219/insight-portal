@@ -185,9 +185,9 @@ function SummaryCard({ label, value, hint, tone = 'default' }: SummaryCardProps)
         ? 'text-amber-600'
         : 'text-gray-900';
   return (
-    <div className="shadow-card rounded-2xl bg-white p-5">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-5">
       <div className="text-xs font-medium tracking-wider text-gray-500 uppercase">{label}</div>
-      <div className={cn('mt-2 text-2xl font-light tracking-tight', toneClass)}>{value}</div>
+      <div className={cn('mt-2 serif text-2xl font-light tracking-tight', toneClass)}>{value}</div>
       {hint && <div className="mt-1 text-xs text-gray-400">{hint}</div>}
     </div>
   );
@@ -205,11 +205,11 @@ interface InvoiceTableProps {
 
 function InvoiceTable({ invoices, onStatusChange, onDelete }: InvoiceTableProps) {
   return (
-    <div className="shadow-card overflow-hidden rounded-2xl bg-white">
+    <div className="shadow-soft-md overflow-hidden rounded-2xl bg-paper">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-100">
+            <tr className="border-b border-line-2">
               <Th>Invoice #</Th>
               <Th>Description</Th>
               <Th align="right">Amount</Th>
@@ -362,7 +362,7 @@ function StatusBadgeButton({ invoiceId, status, onChange }: StatusBadgeButtonPro
 
 function EmptyState({ onUploadClick }: { onUploadClick: () => void }) {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
         <FileText size={24} strokeWidth={1.5} />
       </div>
@@ -595,7 +595,7 @@ function UploadModal({ onClose, clientId, properties, projects }: UploadModalPro
                     'flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
                     isActive
                       ? 'border-brand-teal-500 bg-brand-teal-50 text-brand-teal-500'
-                      : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-gray-200 text-gray-600',
+                      : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-line text-gray-600',
                   )}
                 >
                   <span className={cn('rounded px-1.5 py-0.5 text-[10px]', opt.badge)}>

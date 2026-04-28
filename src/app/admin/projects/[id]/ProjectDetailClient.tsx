@@ -51,7 +51,7 @@ export function ProjectDetailClient({
 
   return (
     <div>
-      <div className="mb-6 flex items-center gap-1 border-b border-gray-100">
+      <div className="mb-6 flex items-center gap-1 border-b border-line-2">
         {TABS.map((t) => {
           const isActive = tab === t.id;
           const Icon = t.icon;

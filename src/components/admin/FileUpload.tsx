@@ -163,7 +163,7 @@ export function FileUpload({
           'relative cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all',
           isDragging
             ? 'border-brand-teal-400 bg-brand-teal-50'
-            : 'hover:border-brand-teal-300 bg-brand-warm-50 border-gray-200',
+            : 'hover:border-brand-teal-300 bg-brand-warm-50 border-line',
           disabled && 'cursor-not-allowed opacity-50',
         )}
       >
@@ -180,7 +180,7 @@ export function FileUpload({
             e.target.value = '';
           }}
         />
-        <div className="text-brand-teal-500 shadow-soft mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white">
+        <div className="text-brand-teal-500 shadow-soft mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-paper">
           <Upload size={18} strokeWidth={1.5} />
         </div>
         <p className="text-sm font-medium text-gray-700">
@@ -232,10 +232,10 @@ function FileCard({ item, onRemove, disabled }: FileCardProps) {
     <div
       className={cn(
         'flex items-center gap-3 rounded-xl border p-3',
-        item.error ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-white',
+        item.error ? 'border-red-200 bg-red-50' : 'border-line-2 bg-paper',
       )}
     >
-      <div className="bg-brand-warm-100 flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg text-gray-400">
+      <div className="bg-cream flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg text-gray-400">
         {isImage && item.preview ? (
           // Object URLs are local-origin and short-lived; next/image would
           // serialise them poorly, so a plain <img> is the right primitive.

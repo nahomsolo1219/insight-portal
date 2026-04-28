@@ -66,7 +66,7 @@ function TemplateCard({
       : 'bg-brand-gold-50 text-brand-gold-600';
 
   return (
-    <div className="shadow-card group flex items-start gap-4 rounded-2xl bg-white p-5 transition-all hover:shadow-elevated">
+    <div className="shadow-soft-md group flex items-start gap-4 rounded-2xl bg-paper p-5 transition-all hover:shadow-elevated">
       <div className="bg-brand-warm-200 text-brand-teal-500 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl">
         <Layers size={18} strokeWidth={1.5} />
       </div>
@@ -118,7 +118,7 @@ function TemplateCard({
 
 function EmptyState() {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
         <FolderPlus size={24} strokeWidth={1.5} />
       </div>

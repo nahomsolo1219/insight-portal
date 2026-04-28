@@ -80,7 +80,7 @@ export function TeamTabClient({ projectId, assignments, pickerOptions }: Props) 
       {assignments.length === 0 ? (
         <EmptyState onAdd={() => setPickerOpen(true)} />
       ) : (
-        <div className="shadow-card overflow-hidden rounded-2xl bg-white">
+        <div className="shadow-soft-md overflow-hidden rounded-2xl bg-paper">
           {assignments.map((a, i) => (
             <AssignmentRow
               key={a.profileId}
@@ -156,7 +156,7 @@ function AssignmentRow({
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
         <Users size={24} strokeWidth={1.5} />
       </div>
@@ -227,7 +227,7 @@ function AddStaffModal({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search by name"
                 autoFocus
-                className="focus:ring-brand-teal-200 focus:border-brand-teal-400 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 pl-9 text-sm transition-all outline-none focus:ring-2"
+                className="focus:ring-brand-teal-200 focus:border-brand-teal-400 w-full rounded-xl border border-line bg-paper px-4 py-3 pl-9 text-sm transition-all outline-none focus:ring-2"
               />
             </div>
           )}

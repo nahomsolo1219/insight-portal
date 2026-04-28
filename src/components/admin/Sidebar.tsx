@@ -96,15 +96,16 @@ export function Sidebar({ user, counts }: SidebarProps) {
   const readableRole = user.role.replace('_', ' ');
 
   return (
-    <aside className="border-brand-warm-300 flex h-full w-64 flex-shrink-0 flex-col border-r bg-white">
-      {/* Teal header band with white logo */}
-      <div className="bg-brand-teal-500 px-5 py-5">
-        {/* External SVG hosted on the marketing CDN — next/image is unnecessary for a 2KB vector. */}
+    <aside className="border-line bg-paper flex h-full w-64 flex-shrink-0 flex-col border-r">
+      {/* Teal header band — kept dark so the dark-background logo stays
+          legible. Padding bumped slightly so the logo floats with breathing
+          room rather than sitting boxed against the edges. */}
+      <div className="bg-brand-teal-500 px-6 py-6">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="https://cdn.prod.website-files.com/6824275111a08fd08762cad9/682450f39c2da996ae7c2f74_4a3e3e9e7263ddc479eb4374e0e0d332_Logo.svg"
+          src="/logo-dark.svg"
           alt="Insight Home Maintenance"
-          className="h-9 w-auto"
+          className="h-7 w-auto"
         />
       </div>
 
@@ -115,7 +116,7 @@ export function Sidebar({ user, counts }: SidebarProps) {
           <input
             type="search"
             placeholder="Search clients, projects…"
-            className="bg-brand-warm-100 focus:border-brand-teal-200 w-full rounded-lg border border-transparent py-2 pr-3 pl-9 text-sm text-[#444] placeholder-[#a3a3a3] transition-colors focus:bg-white focus:outline-none"
+            className="bg-cream focus:border-brand-teal-200 w-full rounded-lg border border-transparent py-2 pr-3 pl-9 text-sm text-[#444] placeholder-[#a3a3a3] transition-colors focus:bg-paper focus:outline-none"
           />
         </div>
       </div>
@@ -124,8 +125,18 @@ export function Sidebar({ user, counts }: SidebarProps) {
       <nav className="flex-1 overflow-y-auto px-3 py-2">
         {sections.map((section) => (
           <div key={section.heading} className="mb-6">
-            <div className="mb-2 px-3 text-[10px] font-semibold tracking-[0.14em] text-[#a3a3a3] uppercase">
-              {section.heading}
+            {/* Section heading: amber hairline + uppercase tracked label —
+                editorial eyebrow pattern at sidebar density. brand-gold-500
+                keeps the admin token system intact (client-portal amber
+                isn't used here). */}
+            <div className="mb-2 flex items-center gap-2 px-3">
+              <span
+                aria-hidden="true"
+                className="bg-brand-gold-500 inline-block h-px w-5 flex-shrink-0"
+              />
+              <span className="text-[10px] font-semibold tracking-[0.18em] text-[#a3a3a3] uppercase">
+                {section.heading}
+              </span>
             </div>
             <ul className="space-y-0.5">
               {section.items.map((item) => {
@@ -140,7 +151,7 @@ export function Sidebar({ user, counts }: SidebarProps) {
                         'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
                         active
                           ? 'text-brand-teal-500 border-brand-teal-100 border bg-[color:var(--color-brand-nav-active)] font-medium'
-                          : 'hover:bg-brand-warm-100 hover:text-brand-teal-500 border border-transparent text-[#555]',
+                          : 'hover:bg-cream hover:text-brand-teal-500 border border-transparent text-[#555]',
                       )}
                     >
                       <Icon
@@ -165,7 +176,7 @@ export function Sidebar({ user, counts }: SidebarProps) {
       </nav>
 
       {/* User footer */}
-      <div className="border-brand-warm-300 flex items-center gap-3 border-t px-4 py-3">
+      <div className="border-line flex items-center gap-3 border-t px-4 py-3">
         <div className="bg-brand-teal-500 flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold text-white">
           {initials || displayName.slice(0, 2).toUpperCase()}
         </div>
@@ -177,7 +188,7 @@ export function Sidebar({ user, counts }: SidebarProps) {
           <button
             type="submit"
             aria-label="Sign out"
-            className="hover:bg-brand-warm-100 hover:text-brand-teal-500 rounded-lg p-2 text-[#8a8a8a] transition-colors"
+            className="hover:bg-cream hover:text-brand-teal-500 rounded-lg p-2 text-[#8a8a8a] transition-colors"
           >
             <LogOut size={16} strokeWidth={1.5} />
           </button>

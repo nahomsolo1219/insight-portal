@@ -306,7 +306,7 @@ function QueuePhotoCard({ photo, selected, isActive, onToggleSelect, onOpen }: Q
   return (
     <div
       className={cn(
-        'shadow-card group relative overflow-hidden rounded-2xl bg-white transition-all ring-2 ring-amber-300',
+        'shadow-soft-md group relative overflow-hidden rounded-2xl bg-paper transition-all ring-2 ring-amber-300',
         // Selection (checkbox) ring trumps the active panel ring — both
         // resolve to the same teal so the visual is consistent either way.
         (selected || isActive) && 'ring-brand-teal-500',
@@ -346,7 +346,7 @@ function QueuePhotoCard({ photo, selected, isActive, onToggleSelect, onOpen }: Q
           'absolute top-2 left-2 flex h-7 w-7 items-center justify-center rounded-md border transition-all',
           selected
             ? 'border-brand-teal-500 bg-brand-teal-500 text-white'
-            : 'border-white/80 bg-white/80 text-gray-400 opacity-0 backdrop-blur-sm group-hover:opacity-100',
+            : 'border-white/80 bg-paper/80 text-gray-400 opacity-0 backdrop-blur-sm group-hover:opacity-100',
         )}
       >
         {selected ? <CheckSquare size={16} strokeWidth={2} /> : <Square size={16} strokeWidth={2} />}
@@ -381,7 +381,7 @@ function BulkActionBar({
 }) {
   return (
     <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
-      <div className="shadow-modal flex items-center gap-2 rounded-2xl border border-gray-100 bg-white py-2 pr-2 pl-4">
+      <div className="shadow-modal flex items-center gap-2 rounded-2xl border border-line-2 bg-paper py-2 pr-2 pl-4">
         <span className="text-sm font-medium text-gray-900">{count} selected</span>
         <div className="mx-2 h-5 w-px bg-gray-200" />
         <button
@@ -522,7 +522,7 @@ function PhotoReviewModal({ photo, onClose, onApprove, onReject }: PhotoReviewMo
           )}
         </div>
 
-        <div className="space-y-4 border-t border-gray-100 pt-4">
+        <div className="space-y-4 border-t border-line-2 pt-4">
           <Field label="Tag" required>
             <div className="grid grid-cols-3 gap-2">
               {TAG_OPTIONS.map((opt) => {
@@ -536,7 +536,7 @@ function PhotoReviewModal({ photo, onClose, onApprove, onReject }: PhotoReviewMo
                       'flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
                       isActive
                         ? 'border-brand-teal-500 bg-brand-teal-50 text-brand-teal-500'
-                        : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-gray-200 text-gray-600',
+                        : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-line text-gray-600',
                     )}
                   >
                     <span className={cn('rounded px-1.5 py-0.5 text-[10px]', opt.badge)}>
@@ -625,7 +625,7 @@ function BulkRejectModal({ selectedByClient, onClose, onConfirm }: BulkRejectMod
 
 function EmptyState() {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
         <CheckCheck size={24} strokeWidth={1.5} />
       </div>

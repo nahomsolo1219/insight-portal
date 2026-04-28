@@ -62,7 +62,7 @@ export function VendorDocumentsSection({ vendorId, documents }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<VendorDocumentRow | null>(null);
 
   return (
-    <section className="shadow-card rounded-2xl bg-white p-6">
+    <section className="shadow-soft-md rounded-2xl bg-paper p-6">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-base font-semibold text-gray-900">Documents</h3>
         <button
@@ -373,7 +373,7 @@ function UploadDocumentModal({
                       'rounded-xl border px-3 py-2 text-sm font-medium transition-all',
                       active
                         ? 'border-brand-teal-500 bg-brand-teal-50 text-brand-teal-500'
-                        : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-gray-200 text-gray-600',
+                        : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-line text-gray-600',
                     )}
                   >
                     {label}

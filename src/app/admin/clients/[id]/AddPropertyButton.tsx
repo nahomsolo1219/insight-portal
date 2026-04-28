@@ -285,7 +285,7 @@ function Trigger({ variant, onClick }: { variant: Props['variant']; onClick: () 
     // First-property empty state. Big card with copy + gold CTA so a freshly
     // created client lands somewhere actionable instead of "no properties".
     return (
-      <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+      <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
         <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
           <Plus size={24} strokeWidth={1.5} />
         </div>
@@ -314,7 +314,7 @@ function Trigger({ variant, onClick }: { variant: Props['variant']; onClick: () 
         type="button"
         onClick={onClick}
         className={cn(
-          'inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-200 px-4 py-3 text-sm font-medium text-gray-500 transition-all',
+          'inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-line px-4 py-3 text-sm font-medium text-gray-500 transition-all',
           'hover:border-brand-teal-300 hover:text-brand-teal-500 hover:bg-brand-warm-50',
         )}
       >
@@ -329,7 +329,7 @@ function Trigger({ variant, onClick }: { variant: Props['variant']; onClick: () 
     <button
       type="button"
       onClick={onClick}
-      className="hover:text-brand-teal-500 hover:bg-brand-warm-50 inline-flex items-center gap-1 rounded-xl border border-dashed border-gray-200 px-3 py-2 text-sm font-medium text-gray-500 transition-all"
+      className="hover:text-brand-teal-500 hover:bg-brand-warm-50 inline-flex items-center gap-1 rounded-xl border border-dashed border-line px-3 py-2 text-sm font-medium text-gray-500 transition-all"
     >
       <Plus size={14} strokeWidth={1.75} />
       Add property

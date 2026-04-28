@@ -233,7 +233,7 @@ export function PhotoReviewPanel({
 
   if (!photo) {
     return (
-      <aside className="shadow-card sticky top-6 hidden h-[calc(100vh-7rem)] flex-col items-center justify-center rounded-2xl bg-white p-8 text-center md:flex">
+      <aside className="shadow-soft-md sticky top-6 hidden h-[calc(100vh-7rem)] flex-col items-center justify-center rounded-2xl bg-paper p-8 text-center md:flex">
         <ImageOff size={28} strokeWidth={1.25} className="mb-3 text-gray-300" />
         <p className="text-sm font-medium text-gray-700">Select a photo to review</p>
         <p className="mt-1 text-xs text-gray-500">
@@ -256,7 +256,7 @@ export function PhotoReviewPanel({
   const datalistId = `photo-categories-${photo.id}`;
 
   return (
-    <aside className="shadow-card sticky top-6 hidden h-[calc(100vh-7rem)] flex-col rounded-2xl bg-white md:flex">
+    <aside className="shadow-soft-md sticky top-6 hidden h-[calc(100vh-7rem)] flex-col rounded-2xl bg-paper md:flex">
       <div className="flex flex-1 flex-col overflow-y-auto p-5">
         <div className="overflow-hidden rounded-xl bg-gray-50">
           {photo.signedUrl ? (
@@ -333,7 +333,7 @@ export function PhotoReviewPanel({
           </div>
         </div>
 
-        <div className="mt-5 space-y-4 border-t border-gray-100 pt-5">
+        <div className="mt-5 space-y-4 border-t border-line-2 pt-5">
           <Field label="Tag" required>
             <div className="grid grid-cols-3 gap-2">
               {TAG_OPTIONS.map((opt) => {
@@ -347,7 +347,7 @@ export function PhotoReviewPanel({
                       'flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
                       isActive
                         ? 'border-brand-teal-500 bg-brand-teal-50 text-brand-teal-500'
-                        : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-gray-200 text-gray-600',
+                        : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-line text-gray-600',
                     )}
                   >
                     <span className={cn('rounded px-1.5 py-0.5 text-[10px]', opt.badge)}>
@@ -397,7 +397,7 @@ export function PhotoReviewPanel({
         </div>
       </div>
 
-      <div className="border-t border-gray-100 p-4">
+      <div className="border-t border-line-2 p-4">
         <div className="flex items-center gap-2">
           {onDelete && (
             <button
@@ -429,7 +429,7 @@ export function PhotoReviewPanel({
           </button>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-gray-100 pt-3">
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line-2 pt-3">
           <div className="flex items-center gap-1">
             <NavArrow label="Previous photo" disabled={selectedIndex <= 0} onClick={prev}>
               <ChevronLeft size={14} strokeWidth={1.75} />

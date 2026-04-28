@@ -25,7 +25,7 @@ const trendClasses: Record<TrendColor, string> = {
 };
 
 const valueClasses: Record<ValueColor, string> = {
-  default: 'text-gray-900',
+  default: 'text-ink-900',
   amber: 'text-amber-600',
 };
 
@@ -40,7 +40,7 @@ export function StatCard({
   className,
 }: StatCardProps) {
   return (
-    <div className={cn('shadow-card flex flex-col gap-3 rounded-2xl bg-white p-6', className)}>
+    <div className={cn('shadow-soft-md flex flex-col gap-3 rounded-2xl bg-paper p-6', className)}>
       <div className="flex items-center justify-between text-[13px] text-[#737373]">
         <span>{label}</span>
         {Icon && (
@@ -58,7 +58,7 @@ export function StatCard({
       </div>
       <div
         className={cn(
-          'text-4xl leading-none font-light tracking-tight',
+          'serif text-4xl leading-none font-light tracking-tight',
           valueClasses[valueColor],
         )}
       >

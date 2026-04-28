@@ -113,8 +113,8 @@ export function DocumentsTabClient({
       ) : (
         <div className="space-y-5">
           {Array.from(grouped.entries()).map(([projectId, group]) => (
-            <div key={projectId} className="shadow-card overflow-hidden rounded-2xl bg-white">
-              <div className="bg-brand-warm-50 border-b border-gray-100 px-5 py-4">
+            <div key={projectId} className="shadow-soft-md overflow-hidden rounded-2xl bg-paper">
+              <div className="bg-brand-warm-50 border-b border-line-2 px-5 py-4">
                 <h3 className="text-sm font-semibold text-gray-900">{group.projectName}</h3>
                 <p className="mt-0.5 text-xs text-gray-500">
                   {group.docs.length} {group.docs.length === 1 ? 'file' : 'files'}
@@ -161,7 +161,7 @@ interface DocumentRowItemProps {
 function DocumentRowItem({ doc, onDelete }: DocumentRowItemProps) {
   return (
     <div className="hover:bg-brand-warm-50 flex items-center gap-4 border-t border-gray-50 px-5 py-4 transition-colors first:border-t-0">
-      <div className="bg-brand-warm-100 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-gray-500">
+      <div className="bg-cream flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-gray-500">
         <DocTypeIcon type={doc.type} />
       </div>
       <div className="min-w-0 flex-1">
@@ -204,7 +204,7 @@ interface EmptyStateProps {
 
 function EmptyState({ hasProjects, onUploadClick }: EmptyStateProps) {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
         <FileBox size={24} strokeWidth={1.5} />
       </div>
@@ -370,7 +370,7 @@ function UploadModal({ onClose, clientId, projects }: UploadModalProps) {
                     'flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
                     isActive
                       ? 'border-brand-teal-500 bg-brand-teal-50 text-brand-teal-500'
-                      : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-gray-200 text-gray-600',
+                      : 'hover:border-brand-teal-200 hover:text-brand-teal-500 border-line text-gray-600',
                   )}
                 >
                   <DocTypeIcon type={t.id} size={14} />

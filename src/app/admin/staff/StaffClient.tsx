@@ -83,7 +83,7 @@ function StaffCard({ member, onEdit }: { member: StaffRow; onEdit: () => void })
   return (
     <div
       className={cn(
-        'shadow-card rounded-2xl bg-white p-5 transition-all',
+        'shadow-soft-md rounded-2xl bg-paper p-5 transition-all',
         isInactive && 'opacity-70',
       )}
     >
@@ -153,7 +153,7 @@ function StaffCard({ member, onEdit }: { member: StaffRow; onEdit: () => void })
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="shadow-card rounded-2xl bg-white p-12 text-center">
+    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
       <div className="bg-brand-warm-200 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400">
         <Users size={24} strokeWidth={1.5} />
       </div>
@@ -315,7 +315,7 @@ function CreateStaffModal({ onClose }: { onClose: () => void }) {
           </select>
         </Field>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 px-4 py-3 transition-colors hover:bg-brand-warm-50">
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line px-4 py-3 transition-colors hover:bg-brand-warm-50">
           <input
             type="checkbox"
             checked={sendInvite}

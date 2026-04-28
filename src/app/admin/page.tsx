@@ -63,7 +63,13 @@ export default async function DashboardPage() {
       {/* Page header */}
       <div className="mb-8 flex items-start justify-between">
         <div>
-          <h1 className="font-display text-brand-teal-500 text-3xl">Dashboard</h1>
+          <div className="mb-3 flex items-center gap-2">
+            <span aria-hidden="true" className="bg-brand-gold-500 inline-block h-px w-8" />
+            <span className="text-ink-500 text-[11px] font-medium uppercase tracking-[0.18em]">
+              Operations
+            </span>
+          </div>
+          <h1 className="serif text-ink-900 text-3xl tracking-tight">Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">{today}</p>
         </div>
         <div className="flex gap-3">
@@ -109,7 +115,7 @@ export default async function DashboardPage() {
       {/* Two-column: schedule + needs attention */}
       <div className="mb-8 grid grid-cols-[1.3fr_1fr] gap-5">
         {/* Today's Schedule */}
-        <div className="shadow-card rounded-2xl bg-white p-6">
+        <div className="shadow-soft-md rounded-2xl bg-paper p-6">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-base font-semibold text-gray-900">Today&apos;s Schedule</h2>
             <Link
@@ -128,7 +134,7 @@ export default async function DashboardPage() {
               {todayAppointments.map((apt) => (
                 <div
                   key={apt.id}
-                  className="flex items-center gap-4 border-t border-gray-100 py-3 first:border-t-0"
+                  className="flex items-center gap-4 border-t border-line-2 py-3 first:border-t-0"
                 >
                   <div className="text-brand-teal-400 w-20 font-mono text-xs font-semibold tracking-wider">
                     {apt.startTime?.slice(0, 5) ?? ''}
@@ -150,7 +156,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Needs Attention */}
-        <div className="shadow-card rounded-2xl bg-white p-6">
+        <div className="shadow-soft-md rounded-2xl bg-paper p-6">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-base font-semibold text-gray-900">Needs Attention</h2>
             {attentionCount > 0 && (
@@ -224,7 +230,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Recent activity */}
-      <div className="shadow-card rounded-2xl bg-white p-6">
+      <div className="shadow-soft-md rounded-2xl bg-paper p-6">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">Recent Activity</h2>
           <span className="text-xs text-gray-400">Audit log</span>
@@ -236,7 +242,7 @@ export default async function DashboardPage() {
             {activity.map((entry) => (
               <div
                 key={entry.id}
-                className="flex items-start gap-3 border-t border-gray-100 py-3 first:border-t-0"
+                className="flex items-start gap-3 border-t border-line-2 py-3 first:border-t-0"
               >
                 <div className="bg-brand-teal-500 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white">
                   {initialsFrom(entry.actorName ?? 'System')}
