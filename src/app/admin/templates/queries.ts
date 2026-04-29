@@ -20,6 +20,11 @@ export interface TemplateListRow {
   createdAt: Date;
   milestoneCount: number;
   usesPhases: boolean;
+  /** Pre-signed URL for the first decision-option image found across this
+   *  template's milestones — used as the editorial cover on the card grid.
+   *  Null when no option has a storage path; callers fall back to a
+   *  gradient cover keyed off the template id. */
+  coverImageUrl: string | null;
 }
 
 export interface TemplateMilestoneRow {
@@ -47,17 +52,64 @@ export async function listTemplates(): Promise<TemplateListRow[]> {
 
   if (templates.length === 0) return [];
 
-  const milestoneCountRows = await db
-    .select({
-      templateId: templateMilestones.templateId,
-      count: count(),
-    })
-    .from(templateMilestones)
-    .groupBy(templateMilestones.templateId);
+  const templateIds = templates.map((t) => t.id);
+
+  // Two parallel reads: milestone counts (for the meta line) and the
+  // jsonb `decisionOptions` payload across every template's milestones
+  // (so we can extract the first option image per template for the
+  // editorial card cover).
+  const [milestoneCountRows, optionRows] = await Promise.all([
+    db
+      .select({
+        templateId: templateMilestones.templateId,
+        count: count(),
+      })
+      .from(templateMilestones)
+      .groupBy(templateMilestones.templateId),
+    db
+      .select({
+        templateId: templateMilestones.templateId,
+        order: templateMilestones.order,
+        decisionOptions: templateMilestones.decisionOptions,
+      })
+      .from(templateMilestones)
+      .where(inArray(templateMilestones.templateId, templateIds))
+      .orderBy(asc(templateMilestones.order)),
+  ]);
 
   const countMap = new Map(milestoneCountRows.map((r) => [r.templateId, Number(r.count)]));
 
-  return templates.map((t) => ({ ...t, milestoneCount: countMap.get(t.id) ?? 0 }));
+  // Walk milestones in order; the first option storage path we hit per
+  // template wins. Anything else gets thrown away — we only need the
+  // single cover candidate.
+  const coverPathByTemplate = new Map<string, string>();
+  for (const m of optionRows) {
+    if (coverPathByTemplate.has(m.templateId)) continue;
+    if (!Array.isArray(m.decisionOptions)) continue;
+    for (const raw of m.decisionOptions) {
+      if (raw && typeof raw === 'object') {
+        const path = (raw as Record<string, unknown>).imageStoragePath;
+        if (typeof path === 'string' && path) {
+          coverPathByTemplate.set(m.templateId, path);
+          break;
+        }
+      }
+    }
+  }
+
+  // Sign all cover paths in one batch.
+  const allPaths = Array.from(coverPathByTemplate.values());
+  const urlByPath =
+    allPaths.length > 0 ? await getSignedUrls(allPaths) : new Map<string, string>();
+
+  return templates.map((t) => {
+    const path = coverPathByTemplate.get(t.id);
+    return {
+      ...t,
+      milestoneCount: countMap.get(t.id) ?? 0,
+      coverImageUrl: path ? urlByPath.get(path) ?? null : null,
+    };
+  });
 }
 
 /**
