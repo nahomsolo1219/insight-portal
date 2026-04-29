@@ -1,12 +1,21 @@
 import { requireAdmin } from '@/lib/auth/current-user';
 import { getSignedUrls } from '@/lib/storage/upload';
+import { InvoiceCategoryPie } from './InvoiceCategoryPie';
 import { InvoicesClient, type InvoiceOverviewWithUrl } from './InvoicesClient';
-import { getAllInvoices, getInvoiceSummaryAll } from './queries';
+import {
+  getAllInvoices,
+  getInvoiceCategoryBreakdown,
+  getInvoiceSummaryAll,
+} from './queries';
 
 export default async function InvoicesPage() {
   await requireAdmin();
 
-  const [rows, summary] = await Promise.all([getAllInvoices(), getInvoiceSummaryAll()]);
+  const [rows, summary, breakdown] = await Promise.all([
+    getAllInvoices(),
+    getInvoiceSummaryAll(),
+    getInvoiceCategoryBreakdown(),
+  ]);
 
   const urlMap =
     rows.length > 0 ? await getSignedUrls(rows.map((r) => r.storagePath)) : new Map<string, string>();
@@ -31,7 +40,11 @@ export default async function InvoicesPage() {
         </p>
       </header>
 
-      <InvoicesClient invoices={invoicesWithUrls} summary={summary} />
+      <InvoicesClient
+        invoices={invoicesWithUrls}
+        summary={summary}
+        breakdownChart={<InvoiceCategoryPie buckets={breakdown} />}
+      />
     </div>
   );
 }

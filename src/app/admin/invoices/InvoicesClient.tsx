@@ -35,9 +35,13 @@ function statusMeta(status: string) {
 interface InvoicesClientProps {
   invoices: InvoiceOverviewWithUrl[];
   summary: InvoiceSummaryAll;
+  /** Pre-rendered category-breakdown pie. Lives in a child component on
+   *  the server side so the recharts dependency only ships when the
+   *  chart is actually visible. */
+  breakdownChart: React.ReactNode;
 }
 
-export function InvoicesClient({ invoices, summary }: InvoicesClientProps) {
+export function InvoicesClient({ invoices, summary, breakdownChart }: InvoicesClientProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const [, startTransition] = useTransition();
@@ -107,7 +111,14 @@ export function InvoicesClient({ invoices, summary }: InvoicesClientProps) {
 
   return (
     <div>
-      <SummaryBar summary={activeSummary} scoped={hasFilters} />
+      {/* Top: pie on the left, summary stats stacked on the right.
+          Below lg the chart sits on top of the summary stats. */}
+      <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="lg:col-span-2">{breakdownChart}</div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1">
+          <SummaryStack summary={activeSummary} scoped={hasFilters} />
+        </div>
+      </div>
 
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <ToggleGroup options={STATUS_FILTER_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
@@ -142,9 +153,12 @@ export function InvoicesClient({ invoices, summary }: InvoicesClientProps) {
 
 // ---------- summary ----------
 
-function SummaryBar({ summary, scoped }: { summary: InvoiceSummaryAll; scoped: boolean }) {
+/** Three summary cards rendered as siblings. The wrapping grid lives at
+ *  the call site so the layout can switch between row (mobile, with the
+ *  pie above) and column (lg+, beside the pie). */
+function SummaryStack({ summary, scoped }: { summary: InvoiceSummaryAll; scoped: boolean }) {
   return (
-    <div className="mb-6 grid grid-cols-3 gap-5">
+    <>
       <SummaryCard
         label={scoped ? 'Filtered invoiced' : 'Total invoiced'}
         value={formatCurrency(summary.totalInvoiced)}
@@ -164,7 +178,7 @@ function SummaryBar({ summary, scoped }: { summary: InvoiceSummaryAll; scoped: b
         value={formatCurrency(summary.totalOutstanding)}
         tone={summary.totalOutstanding > 0 ? 'amber' : 'default'}
       />
-    </div>
+    </>
   );
 }
 

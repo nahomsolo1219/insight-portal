@@ -6,6 +6,18 @@ import { count, desc, eq, sum } from 'drizzle-orm';
 import { db } from '@/db';
 import { clients, invoices, projects, properties } from '@/db/schema';
 
+/** Bucket key for the financial-breakdown chart. The schema has no
+ *  `invoices.category` column, so we infer from the linked project's
+ *  `type` and fall back to `Unassigned` for invoices without a project
+ *  link. Adding a real category column later is a future migration. */
+export type InvoiceCategory = 'Remodel' | 'Maintenance' | 'Unassigned';
+
+export interface InvoiceCategoryBucket {
+  category: InvoiceCategory;
+  totalCents: number;
+  invoiceCount: number;
+}
+
 export interface InvoiceOverviewRow {
   id: string;
   invoiceNumber: string;
@@ -49,6 +61,67 @@ export interface InvoiceSummaryAll {
   totalPaid: number;
   totalOutstanding: number;
   invoiceCount: number;
+}
+
+/**
+ * Total invoiced + invoice count per category (Remodel / Maintenance /
+ * Unassigned). Drives the financial-breakdown pie chart on the
+ * /admin/invoices page. Returns ordered buckets with zero-amount
+ * categories filtered out so the pie never renders an empty slice.
+ *
+ * Schema note: there's no `invoices.category` column. We left-join the
+ * invoice's project and bucket on `projects.type`; invoices without a
+ * project (e.g. one-off renderings, quick estimates) fall into
+ * `Unassigned`.
+ */
+export async function getInvoiceCategoryBreakdown(): Promise<InvoiceCategoryBucket[]> {
+  const rows = await db
+    .select({
+      projectType: projects.type,
+      total: sum(invoices.amountCents).mapWith(Number),
+      count: count(),
+    })
+    .from(invoices)
+    .leftJoin(projects, eq(projects.id, invoices.projectId))
+    .groupBy(projects.type);
+
+  // Project enum is `'maintenance' | 'remodel'`. The left-join can also
+  // surface NULL when the invoice has no project link.
+  const labelFor = (raw: 'maintenance' | 'remodel' | null): InvoiceCategory => {
+    if (raw === 'remodel') return 'Remodel';
+    if (raw === 'maintenance') return 'Maintenance';
+    return 'Unassigned';
+  };
+
+  // Stable order across renders so the pie + legend don't reshuffle —
+  // Remodel first (typically the largest dollar slice), Maintenance,
+  // Unassigned last.
+  const order: InvoiceCategory[] = ['Remodel', 'Maintenance', 'Unassigned'];
+  const totals = new Map<InvoiceCategory, { totalCents: number; invoiceCount: number }>();
+  for (const row of rows) {
+    const label = labelFor(row.projectType);
+    const amount = row.total ?? 0;
+    if (amount === 0) continue;
+    const existing = totals.get(label);
+    if (existing) {
+      existing.totalCents += amount;
+      existing.invoiceCount += Number(row.count);
+    } else {
+      totals.set(label, { totalCents: amount, invoiceCount: Number(row.count) });
+    }
+  }
+
+  return order
+    .map<InvoiceCategoryBucket | null>((category) => {
+      const bucket = totals.get(category);
+      if (!bucket) return null;
+      return {
+        category,
+        totalCents: bucket.totalCents,
+        invoiceCount: bucket.invoiceCount,
+      };
+    })
+    .filter((b): b is InvoiceCategoryBucket => b !== null);
 }
 
 export async function getInvoiceSummaryAll(): Promise<InvoiceSummaryAll> {
