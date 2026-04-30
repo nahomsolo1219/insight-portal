@@ -20,11 +20,15 @@ export interface TemplateListRow {
   createdAt: Date;
   milestoneCount: number;
   usesPhases: boolean;
-  /** Pre-signed URL for the first decision-option image found across this
-   *  template's milestones — used as the editorial cover on the card grid.
-   *  Null when no option has a storage path; callers fall back to a
-   *  gradient cover keyed off the template id. */
+  /** Resolved cover image URL with precedence applied:
+   *    1. Admin-uploaded cover (`projectTemplates.coverStoragePath`)
+   *    2. First decision-option image with an `imageStoragePath`
+   *    3. null → caller renders the deterministic gradient fallback
+   *  Already cache-busted via `?v=` when source 1 wins. */
   coverImageUrl: string | null;
+  /** Surfaced so the cover edit modal can show "Remove cover" only
+   *  when an actual upload exists (vs an option image bleed-through). */
+  hasUploadedCover: boolean;
 }
 
 export interface TemplateMilestoneRow {
@@ -46,6 +50,8 @@ export async function listTemplates(): Promise<TemplateListRow[]> {
       duration: projectTemplates.duration,
       createdAt: projectTemplates.createdAt,
       usesPhases: projectTemplates.usesPhases,
+      coverStoragePath: projectTemplates.coverStoragePath,
+      coverUploadedAt: projectTemplates.coverUploadedAt,
     })
     .from(projectTemplates)
     .orderBy(asc(projectTemplates.name));
@@ -97,19 +103,49 @@ export async function listTemplates(): Promise<TemplateListRow[]> {
     }
   }
 
-  // Sign all cover paths in one batch.
+  // Sign all decision-option image paths (private `insight-files`
+  // bucket) in one batch. The admin-uploaded cover lives in the public
+  // `template-covers` bucket and gets a constructed URL below.
   const allPaths = Array.from(coverPathByTemplate.values());
   const urlByPath =
     allPaths.length > 0 ? await getSignedUrls(allPaths) : new Map<string, string>();
 
   return templates.map((t) => {
-    const path = coverPathByTemplate.get(t.id);
+    // Precedence: uploaded > option image > null (caller renders a
+    // gradient). Cache-busted via `?v={uploaded_at_ms}` so the browser
+    // always picks up replacements at the same path.
+    let coverImageUrl: string | null = null;
+    const hasUploadedCover = Boolean(t.coverStoragePath);
+    if (t.coverStoragePath) {
+      coverImageUrl = buildTemplateCoverUrl(t.coverStoragePath, t.coverUploadedAt);
+    } else {
+      const optPath = coverPathByTemplate.get(t.id);
+      coverImageUrl = optPath ? urlByPath.get(optPath) ?? null : null;
+    }
+
     return {
-      ...t,
+      id: t.id,
+      name: t.name,
+      type: t.type,
+      description: t.description,
+      duration: t.duration,
+      createdAt: t.createdAt,
+      usesPhases: t.usesPhases,
       milestoneCount: countMap.get(t.id) ?? 0,
-      coverImageUrl: path ? urlByPath.get(path) ?? null : null,
+      coverImageUrl,
+      hasUploadedCover,
     };
   });
+}
+
+/** Construct a public URL for an admin-uploaded template cover. The
+ *  bucket is public (per `manual_template_covers_storage.sql`), so no
+ *  signing is needed; the `?v=` query string busts the browser cache
+ *  whenever admin replaces the file. */
+function buildTemplateCoverUrl(path: string, uploadedAt: Date | null): string {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+  const v = uploadedAt ? `?v=${uploadedAt.getTime()}` : '';
+  return `${base}/storage/v1/object/public/template-covers/${path}${v}`;
 }
 
 /**

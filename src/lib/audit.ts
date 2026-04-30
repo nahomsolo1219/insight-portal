@@ -64,7 +64,9 @@ export type AuditAction =
   | 'deleted tier'
   | 'created template'
   | 'updated template'
-  | 'deleted template';
+  | 'deleted template'
+  | 'uploaded template cover photo'
+  | 'removed template cover photo';
 
 export type AuditTargetType =
   | 'client'

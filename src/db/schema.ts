@@ -258,6 +258,15 @@ export const projectTemplates = pgTable('project_templates', {
   // When false, milestones hang directly off the template (legacy flat list).
   // Lets existing templates keep working while new ones adopt phases.
   usesPhases: boolean('uses_phases').notNull().default(false),
+  // Optional admin-uploaded editorial cover photo for the templates
+  // listing card. Stored in the public `template-covers` bucket at
+  // `template-covers/{templateId}.{ext}`. The path stays stable on
+  // replace (overwrite-on-conflict); the `?v={uploaded_at}` query
+  // string at render time is the cache-buster. NULL = no upload, in
+  // which case the listing falls back to the first decision-option
+  // image, then to the deterministic gradient cover.
+  coverStoragePath: text('cover_storage_path'),
+  coverUploadedAt: timestamp('cover_uploaded_at', { withTimezone: true }),
   ...timestamps,
 });
 

@@ -234,6 +234,33 @@ To verify the bucket landed: connect via `DIRECT_URL` and run
 `SELECT id, public FROM storage.buckets;` — should list both
 `insight-files` (public=false) and `property-covers` (public=true).
 
+### `template-covers` (public)
+
+Used by the admin templates listing surface. Each project template's
+optional editorial cover photo lives at
+`template-covers/{templateId}.{ext}` — UUID-based, non-enumerable,
+overwritten on replace so cache busting via the
+`?v={uploaded_at}` query string works the same way it does for
+property covers.
+
+Setup (idempotent — re-running is safe):
+
+```bash
+npx tsx scripts/apply-manual-sql.ts manual_template_covers_storage.sql
+```
+
+Same shape as `property-covers`: bucket creation with
+`INSERT ... ON CONFLICT DO UPDATE` plus four RLS policies on
+`storage.objects` (public SELECT, admin INSERT / UPDATE / DELETE).
+8 MiB file-size cap, JPEG / PNG / WebP / HEIC / HEIF MIME allow-list.
+
+The bucket is **public read** because the URL is non-enumerable and
+editorial covers aren't sensitive; **admin write only** so non-admin
+roles can't upload through this surface.
+
+To verify the bucket landed: `SELECT id, public FROM storage.buckets;`
+— should now also list `template-covers` (public=true).
+
 ---
 
 ## October 2026 incident

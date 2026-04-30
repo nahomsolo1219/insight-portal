@@ -2,6 +2,7 @@
 
 import {
   FolderPlus,
+  Image as ImageIcon,
   ListChecks,
   MoreVertical,
   Pencil,
@@ -11,11 +12,16 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
+import { FileUpload, type FileUploadItem } from '@/components/admin/FileUpload';
 import { LoadingDots } from '@/components/admin/LoadingDots';
 import { Modal } from '@/components/admin/Modal';
 import { useToast } from '@/components/admin/ToastProvider';
 import { cn } from '@/lib/utils';
-import { deleteTemplate } from './actions';
+import {
+  deleteTemplate,
+  removeTemplateCoverPhoto,
+  uploadTemplateCoverPhoto,
+} from './actions';
 import type { TemplateListRow } from './queries';
 
 interface Props {
@@ -24,6 +30,7 @@ interface Props {
 
 export function TemplateList({ templates }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<TemplateListRow | null>(null);
+  const [coverTarget, setCoverTarget] = useState<TemplateListRow | null>(null);
 
   return (
     <div>
@@ -45,7 +52,12 @@ export function TemplateList({ templates }: Props) {
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {templates.map((t) => (
-            <TemplateCard key={t.id} template={t} onDelete={() => setDeleteTarget(t)} />
+            <TemplateCard
+              key={t.id}
+              template={t}
+              onDelete={() => setDeleteTarget(t)}
+              onEditCover={() => setCoverTarget(t)}
+            />
           ))}
         </div>
       )}
@@ -56,6 +68,13 @@ export function TemplateList({ templates }: Props) {
           onClose={() => setDeleteTarget(null)}
         />
       )}
+
+      {coverTarget && (
+        <CoverEditModal
+          template={coverTarget}
+          onClose={() => setCoverTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -63,9 +82,11 @@ export function TemplateList({ templates }: Props) {
 function TemplateCard({
   template,
   onDelete,
+  onEditCover,
 }: {
   template: TemplateListRow;
   onDelete: () => void;
+  onEditCover: () => void;
 }) {
   const editHref = `/admin/templates?mode=builder&id=${template.id}`;
   const typeBadge =
@@ -75,16 +96,38 @@ function TemplateCard({
 
   return (
     <div className="shadow-soft-md group bg-paper relative overflow-hidden rounded-2xl transition-all hover:shadow-elevated">
-      {/* Cover — the whole card is the link target except the actions
-          dropdown, which lives above the cover at top-right. */}
-      <Link href={editHref} className="block">
+      {/* Cover — clicking the cover area opens the cover-edit modal
+          (a discoverable shortcut). The body of the card below is the
+          primary navigation target (link to builder). */}
+      <button
+        type="button"
+        onClick={onEditCover}
+        aria-label={`Edit cover for ${template.name}`}
+        className="group/cover relative block w-full"
+      >
         <TemplateCover
           templateId={template.id}
           coverImageUrl={template.coverImageUrl}
         />
-      </Link>
+        {/* Hover overlay — surfaces the affordance that the cover is
+            editable. Hidden by default; fades in on hover/focus. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center bg-ink-900/55 opacity-0 transition-opacity group-hover/cover:opacity-100 group-focus-visible/cover:opacity-100"
+        >
+          <span className="bg-paper text-ink-900 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium shadow-soft-md">
+            <ImageIcon size={12} strokeWidth={1.75} />
+            Edit cover
+          </span>
+        </span>
+      </button>
 
-      <ActionMenu editHref={editHref} onDelete={onDelete} templateName={template.name} />
+      <ActionMenu
+        editHref={editHref}
+        onDelete={onDelete}
+        onEditCover={onEditCover}
+        templateName={template.name}
+      />
 
       <Link href={editHref} className="block p-5">
         <h3 className="text-ink-900 truncate text-lg font-medium">{template.name}</h3>
@@ -212,10 +255,12 @@ function TemplateCover({
 function ActionMenu({
   editHref,
   onDelete,
+  onEditCover,
   templateName,
 }: {
   editHref: string;
   onDelete: () => void;
+  onEditCover: () => void;
   templateName: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -268,6 +313,18 @@ function ActionMenu({
             role="menuitem"
             onClick={() => {
               setOpen(false);
+              onEditCover();
+            }}
+            className="text-ink-700 hover:bg-cream hover:text-ink-900 flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors"
+          >
+            <ImageIcon size={14} strokeWidth={1.5} className="text-ink-400" />
+            Edit cover
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
               onDelete();
             }}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
@@ -278,6 +335,148 @@ function ActionMenu({
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cover edit modal — FileUpload + Save / Remove cover / Cancel.
+// ---------------------------------------------------------------------------
+
+function CoverEditModal({
+  template,
+  onClose,
+}: {
+  template: TemplateListRow;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [items, setItems] = useState<FileUploadItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const previewUrl = items[0]?.preview ?? template.coverImageUrl ?? null;
+
+  function submitUpload() {
+    setError(null);
+    const item = items[0];
+    if (!item) return setError('Pick an image to upload.');
+
+    const formData = new FormData();
+    formData.append('file', item.file);
+
+    startTransition(async () => {
+      const result = await uploadTemplateCoverPhoto(template.id, formData);
+      if (!result.ok) {
+        setError(result.error);
+        showToast(result.error, 'error');
+        return;
+      }
+      showToast('Cover updated');
+      onClose();
+      router.refresh();
+    });
+  }
+
+  function submitRemove() {
+    setError(null);
+    startTransition(async () => {
+      const result = await removeTemplateCoverPhoto(template.id);
+      if (!result.ok) {
+        setError(result.error);
+        showToast(result.error, 'error');
+        return;
+      }
+      showToast('Cover removed');
+      onClose();
+      router.refresh();
+    });
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Cover photo"
+      description={`Editorial image shown on the templates listing card for ${template.name}.`}
+      size="md"
+      locked={isPending}
+      footer={
+        <>
+          {template.hasUploadedCover && (
+            <button
+              type="button"
+              onClick={submitRemove}
+              disabled={isPending}
+              className="mr-auto inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium text-red-500 transition-all hover:bg-red-50 disabled:opacity-50"
+            >
+              <Trash2 size={14} strokeWidth={1.5} />
+              Remove cover
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isPending}
+            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submitUpload}
+            disabled={isPending || items.length === 0}
+            className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-5 py-2.5 font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isPending ? (
+              <>
+                Saving
+                <LoadingDots />
+              </>
+            ) : (
+              'Save cover'
+            )}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {/* Live preview — the just-picked file when one is staged,
+            otherwise the current cover (uploaded or option-image
+            bleed-through), otherwise the gradient fallback. */}
+        <div className="border-line bg-cream relative aspect-[16/9] w-full overflow-hidden rounded-xl border">
+          {previewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={previewUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <TemplateCover templateId={template.id} coverImageUrl={null} />
+          )}
+        </div>
+
+        <FileUpload
+          kind="image"
+          maxFiles={1}
+          maxSize={8 * 1024 * 1024}
+          onChange={setItems}
+          disabled={isPending}
+        />
+
+        <p className="text-ink-500 text-xs">
+          JPEG, PNG, WebP, or HEIC up to 8&nbsp;MB. Replacing keeps the same
+          path so existing references stay live; the &ldquo;?v=&rdquo; cache-bust
+          query string handles browser refresh.
+        </p>
+
+        {error && (
+          <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
 

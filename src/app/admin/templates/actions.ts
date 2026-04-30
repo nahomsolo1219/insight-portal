@@ -13,6 +13,7 @@ import {
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { decisionOptionImagePath } from '@/lib/storage/paths';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { deleteFile, getSignedUrl, uploadFile } from '@/lib/storage/upload';
 import { getExtension, validateFile } from '@/lib/storage/validation';
 
@@ -563,4 +564,158 @@ export async function deleteTemplate(templateId: string): Promise<ActionResult> 
     console.error('[deleteTemplate]', error);
     return { success: false, error: 'Failed to delete template.' };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Cover photo upload — same shape as `uploadPropertyCoverPhoto`, just
+// scoped to the public `template-covers` bucket. Path stays stable on
+// replace (overwrite-on-conflict); orphan cleanup runs when admin
+// uploads a different extension than the prior file's path.
+// ---------------------------------------------------------------------------
+
+const TEMPLATE_COVER_BUCKET = 'template-covers';
+const TEMPLATE_COVER_MAX_BYTES = 8 * 1024 * 1024;
+
+/** Pick a normalised, lower-case extension. Falls back to MIME if the
+ *  filename has none, then to `jpg` if that's also missing. */
+function pickTemplateCoverExtension(file: File): string {
+  const fromName = file.name.includes('.')
+    ? file.name.split('.').pop()!.toLowerCase().slice(0, 5)
+    : '';
+  if (fromName && /^[a-z0-9]+$/.test(fromName)) return fromName;
+  const mimeExt = file.type.split('/')[1];
+  return mimeExt && /^[a-z0-9]+$/.test(mimeExt) ? mimeExt : 'jpg';
+}
+
+export async function uploadTemplateCoverPhoto(
+  templateId: string,
+  formData: FormData,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const user = await requireAdmin();
+
+  const [template] = await db
+    .select({
+      id: projectTemplates.id,
+      name: projectTemplates.name,
+      coverStoragePath: projectTemplates.coverStoragePath,
+    })
+    .from(projectTemplates)
+    .where(eq(projectTemplates.id, templateId))
+    .limit(1);
+  if (!template) return { ok: false, error: 'Template not found.' };
+
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: 'No file selected.' };
+  }
+  if (!file.type.startsWith('image/')) {
+    return { ok: false, error: 'Cover photo must be an image.' };
+  }
+  if (file.size > TEMPLATE_COVER_MAX_BYTES) {
+    return { ok: false, error: 'Cover photo must be 8 MB or smaller.' };
+  }
+
+  const ext = pickTemplateCoverExtension(file);
+  const path = `${templateId}.${ext}`;
+  const supabase = createAdminClient();
+
+  // Overwrite-on-conflict so admin replacing a cover never accumulates
+  // stale objects under different extensions. The cache-bust query
+  // string on the read path picks up the new file.
+  const { error: uploadError } = await supabase.storage
+    .from(TEMPLATE_COVER_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: true });
+  if (uploadError) {
+    console.error('[uploadTemplateCoverPhoto] upload failed', uploadError);
+    return { ok: false, error: 'Failed to upload cover photo.' };
+  }
+
+  // If the prior cover used a different extension (e.g. .jpg → .png),
+  // the old object is now orphaned at the previous path. Clean up.
+  if (template.coverStoragePath && template.coverStoragePath !== path) {
+    await supabase.storage
+      .from(TEMPLATE_COVER_BUCKET)
+      .remove([template.coverStoragePath])
+      .catch((err: unknown) =>
+        console.error('[uploadTemplateCoverPhoto] orphan cleanup failed', err),
+      );
+  }
+
+  const now = new Date();
+  await db
+    .update(projectTemplates)
+    .set({
+      coverStoragePath: path,
+      coverUploadedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(projectTemplates.id, templateId));
+
+  await logAudit({
+    actor: user,
+    action: 'uploaded template cover photo',
+    targetType: 'template',
+    targetId: templateId,
+    targetLabel: template.name,
+    clientId: null,
+  });
+
+  // The bucket is public; the URL is what the listing card needs to
+  // render the new cover immediately on revalidate. Cache-busted via
+  // `?v=` at the call site.
+  const { data: urlData } = supabase.storage.from(TEMPLATE_COVER_BUCKET).getPublicUrl(path);
+  revalidatePath('/admin/templates');
+  return { ok: true, url: urlData.publicUrl };
+}
+
+export async function removeTemplateCoverPhoto(
+  templateId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireAdmin();
+
+  const [template] = await db
+    .select({
+      id: projectTemplates.id,
+      name: projectTemplates.name,
+      coverStoragePath: projectTemplates.coverStoragePath,
+    })
+    .from(projectTemplates)
+    .where(eq(projectTemplates.id, templateId))
+    .limit(1);
+  if (!template) return { ok: false, error: 'Template not found.' };
+
+  // Best-effort storage delete — if the file is already gone (manual
+  // removal, prior failed upload), still null out the row so the UI
+  // and downstream consumers stop showing a broken cover.
+  if (template.coverStoragePath) {
+    const supabase = createAdminClient();
+    await supabase.storage
+      .from(TEMPLATE_COVER_BUCKET)
+      .remove([template.coverStoragePath])
+      .catch((err: unknown) =>
+        console.error('[removeTemplateCoverPhoto] storage delete failed', err),
+      );
+  }
+
+  const now = new Date();
+  await db
+    .update(projectTemplates)
+    .set({
+      coverStoragePath: null,
+      coverUploadedAt: null,
+      updatedAt: now,
+    })
+    .where(eq(projectTemplates.id, templateId));
+
+  await logAudit({
+    actor: user,
+    action: 'removed template cover photo',
+    targetType: 'template',
+    targetId: templateId,
+    targetLabel: template.name,
+    clientId: null,
+  });
+
+  revalidatePath('/admin/templates');
+  return { ok: true };
 }

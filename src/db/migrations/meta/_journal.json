@@ -71,6 +71,13 @@
       "when": 1777298406955,
       "tag": "0009_nasty_terror",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777526548527,
+      "tag": "0010_many_charles_xavier",
+      "breakpoints": true
     }
   ]
 }

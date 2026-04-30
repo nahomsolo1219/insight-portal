@@ -16,6 +16,8 @@ via either:
 | ---- | ------- |
 | `manual_profile_trigger.sql` | Installs `public.handle_new_user()` + `auth.users` trigger that auto-creates a `profiles` row for every new auth user. |
 | `manual_storage_rls.sql` | RLS policies on `storage.objects` for the `insight-files` bucket: admin full access, clients scoped to their own path prefix (with pending photos admin-only), field staff write to `photos/` + read their own uploads. Idempotent. |
+| `manual_property_covers_storage.sql` | Creates the public `property-covers` bucket + RLS (public SELECT, admin INSERT/UPDATE/DELETE). Used for the per-property editorial cover photos on the redesigned client portal. Idempotent. |
+| `manual_template_covers_storage.sql` | Creates the public `template-covers` bucket + RLS (public SELECT, admin INSERT/UPDATE/DELETE). Used for the per-template editorial cover photos on the admin templates listing. Idempotent. |
 
 Files here are prefixed `manual_` (no numeric `000X_`) so they're visually
 distinct from the drizzle-kit sequence.
