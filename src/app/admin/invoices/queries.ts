@@ -196,11 +196,17 @@ export async function getInvoiceActivity(
   const now = new Date();
   const since = computeWindowStart(now, shape);
 
-  // GROUP BY date_trunc('<unit>', invoice_date). The dialect-agnostic
-  // way to get a Postgres function call through Drizzle is the `sql`
-  // tagged template; both the SELECT expression and the GROUP BY use
-  // the same fragment so the optimizer can elide the redundancy.
-  const trunc = sql<Date>`date_trunc(${shape.unit}, ${invoices.invoiceDate})`;
+  // GROUP BY date_trunc('<unit>', invoice_date). The unit is inlined
+  // via `sql.raw` instead of a parameter — when Drizzle parameterises
+  // the literal, Postgres treats each `$N` placeholder as its own
+  // expression and rejects the GROUP BY with
+  //   column "invoices.invoice_date" must appear in the GROUP BY
+  // because SELECT's `date_trunc($1, …)` and GROUP BY's
+  // `date_trunc($3, …)` are not textually identical at parse time.
+  // Inlining the unit keeps the fragment text identical across the
+  // three clauses; safe because `shape.unit` is constrained to the
+  // 'day' | 'week' | 'month' enum (never user input).
+  const trunc = sql<Date>`date_trunc('${sql.raw(shape.unit)}', ${invoices.invoiceDate})`;
 
   const rows = await db
     .select({
