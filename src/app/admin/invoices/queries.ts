@@ -2,7 +2,7 @@
 // queries but with no client filter — every invoice in the system,
 // joined to its client/property/project for display.
 
-import { count, desc, eq, sum } from 'drizzle-orm';
+import { count, desc, eq, gte, sql, sum } from 'drizzle-orm';
 import { db } from '@/db';
 import { clients, invoices, projects, properties } from '@/db/schema';
 
@@ -148,4 +148,140 @@ export async function getInvoiceSummaryAll(): Promise<InvoiceSummaryAll> {
   }
 
   return { totalInvoiced, totalPaid, totalOutstanding, invoiceCount };
+}
+
+// ---------------------------------------------------------------------------
+// Invoice activity over time — drives the bar+line chart on the
+// /admin/invoices page. Three preset buckets: daily / weekly / monthly.
+// ---------------------------------------------------------------------------
+
+export type InvoiceActivityBucket = 'daily' | 'weekly' | 'monthly';
+
+export interface InvoiceActivityPoint {
+  /** ISO `YYYY-MM-DD` for daily, ISO `YYYY-MM-DD` of the week's Monday
+   *  (ISO week start) for weekly, `YYYY-MM-01` for monthly. */
+  period: string;
+  /** Total invoiced amount in cents for the period. */
+  amount: number;
+  /** Number of invoices in the period. */
+  count: number;
+}
+
+interface BucketShape {
+  /** Postgres `date_trunc` unit. */
+  unit: 'day' | 'week' | 'month';
+  /** How many of `unit` to look back from today (inclusive of today). */
+  windowSize: number;
+}
+
+const BUCKET_CONFIG: Record<InvoiceActivityBucket, BucketShape> = {
+  daily: { unit: 'day', windowSize: 30 },
+  weekly: { unit: 'week', windowSize: 12 },
+  monthly: { unit: 'month', windowSize: 12 },
+};
+
+/**
+ * Aggregate invoiced amounts + counts per bucket. Uses Postgres'
+ * `date_trunc` to canonicalise the period for grouping; the cutoff
+ * boundary is computed in JS (no library) and passed as a parameter.
+ *
+ * Empty periods inside the window are filled in with zero rows so the
+ * chart axis stays evenly spaced even on sparse data — a missing month
+ * reads as a zero bar, not a gap.
+ */
+export async function getInvoiceActivity(
+  bucket: InvoiceActivityBucket,
+): Promise<InvoiceActivityPoint[]> {
+  const shape = BUCKET_CONFIG[bucket];
+  const now = new Date();
+  const since = computeWindowStart(now, shape);
+
+  // GROUP BY date_trunc('<unit>', invoice_date). The dialect-agnostic
+  // way to get a Postgres function call through Drizzle is the `sql`
+  // tagged template; both the SELECT expression and the GROUP BY use
+  // the same fragment so the optimizer can elide the redundancy.
+  const trunc = sql<Date>`date_trunc(${shape.unit}, ${invoices.invoiceDate})`;
+
+  const rows = await db
+    .select({
+      period: trunc,
+      amount: sum(invoices.amountCents).mapWith(Number),
+      count: count(),
+    })
+    .from(invoices)
+    .where(gte(invoices.invoiceDate, isoDate(since)))
+    .groupBy(trunc)
+    .orderBy(trunc);
+
+  // Fill missing periods so the axis stays evenly stepped. The DB
+  // returns whatever periods actually have invoices; we walk forward
+  // from `since` to today and zero-fill anything else.
+  const periods = enumeratePeriods(since, now, shape);
+  const byKey = new Map<string, InvoiceActivityPoint>();
+  for (const r of rows) {
+    const key = isoDate(toDate(r.period));
+    byKey.set(key, {
+      period: key,
+      amount: Number(r.amount ?? 0),
+      count: Number(r.count),
+    });
+  }
+  return periods.map(
+    (p) => byKey.get(p) ?? { period: p, amount: 0, count: 0 },
+  );
+}
+
+/** First day of the window — N units back from `now`, truncated to the
+ *  unit's natural boundary so the GROUP BY periods align with the
+ *  enumeration. */
+function computeWindowStart(now: Date, shape: BucketShape): Date {
+  const d = new Date(now);
+  if (shape.unit === 'day') {
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - (shape.windowSize - 1));
+    return d;
+  }
+  if (shape.unit === 'week') {
+    // Match Postgres' `date_trunc('week', ...)` which anchors to Monday.
+    d.setHours(0, 0, 0, 0);
+    const dow = d.getDay(); // 0=Sun..6=Sat
+    const offsetToMonday = dow === 0 ? -6 : 1 - dow;
+    d.setDate(d.getDate() + offsetToMonday);
+    d.setDate(d.getDate() - 7 * (shape.windowSize - 1));
+    return d;
+  }
+  // Monthly — first of the month, N-1 months back.
+  d.setHours(0, 0, 0, 0);
+  d.setDate(1);
+  d.setMonth(d.getMonth() - (shape.windowSize - 1));
+  return d;
+}
+
+/** Enumerate every period start in [since, now] inclusive. Returns
+ *  ISO `YYYY-MM-DD` strings — same format the GROUP BY's
+ *  `date_trunc` returns when serialised. */
+function enumeratePeriods(since: Date, now: Date, shape: BucketShape): string[] {
+  const out: string[] = [];
+  const cursor = new Date(since);
+  while (cursor.getTime() <= now.getTime()) {
+    out.push(isoDate(cursor));
+    if (shape.unit === 'day') cursor.setDate(cursor.getDate() + 1);
+    else if (shape.unit === 'week') cursor.setDate(cursor.getDate() + 7);
+    else cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return out;
+}
+
+function isoDate(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+  const dd = d.getDate().toString().padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Drizzle returns `date_trunc` results as Date instances when mapped
+ *  via the implicit timestamp coercion; this helper just guards
+ *  against the string-shaped fallback some pg drivers emit. */
+function toDate(value: Date | string): Date {
+  return value instanceof Date ? value : new Date(value);
 }

@@ -39,9 +39,17 @@ interface InvoicesClientProps {
    *  the server side so the recharts dependency only ships when the
    *  chart is actually visible. */
   breakdownChart: React.ReactNode;
+  /** Pre-rendered bar+line activity chart with daily/weekly/monthly
+   *  toggle. Same dependency-isolation rationale as the pie. */
+  activityChart: React.ReactNode;
 }
 
-export function InvoicesClient({ invoices, summary, breakdownChart }: InvoicesClientProps) {
+export function InvoicesClient({
+  invoices,
+  summary,
+  breakdownChart,
+  activityChart,
+}: InvoicesClientProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const [, startTransition] = useTransition();
@@ -111,8 +119,12 @@ export function InvoicesClient({ invoices, summary, breakdownChart }: InvoicesCl
 
   return (
     <div>
-      {/* Top: pie on the left, summary stats stacked on the right.
-          Below lg the chart sits on top of the summary stats. */}
+      {/* Activity chart spans full width — daily/weekly/monthly toggle
+          lives in the chart's own header, no scoped-summary coupling. */}
+      <div className="mb-6">{activityChart}</div>
+
+      {/* Pie on the left, summary stats stacked on the right. Below lg
+          the chart sits on top of the summary stats. */}
       <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">{breakdownChart}</div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1">

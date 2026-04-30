@@ -1,20 +1,31 @@
 import { requireAdmin } from '@/lib/auth/current-user';
 import { getSignedUrls } from '@/lib/storage/upload';
+import { InvoiceActivityChart } from './InvoiceActivityChart';
 import { InvoiceCategoryPie } from './InvoiceCategoryPie';
 import { InvoicesClient, type InvoiceOverviewWithUrl } from './InvoicesClient';
 import {
   getAllInvoices,
+  getInvoiceActivity,
   getInvoiceCategoryBreakdown,
   getInvoiceSummaryAll,
+  type InvoiceActivityBucket,
 } from './queries';
 
-export default async function InvoicesPage() {
-  await requireAdmin();
+interface PageProps {
+  searchParams: Promise<{ activity?: string }>;
+}
 
-  const [rows, summary, breakdown] = await Promise.all([
+export default async function InvoicesPage({ searchParams }: PageProps) {
+  await requireAdmin();
+  const { activity } = await searchParams;
+  const bucket: InvoiceActivityBucket =
+    activity === 'daily' ? 'daily' : activity === 'weekly' ? 'weekly' : 'monthly';
+
+  const [rows, summary, breakdown, activityPoints] = await Promise.all([
     getAllInvoices(),
     getInvoiceSummaryAll(),
     getInvoiceCategoryBreakdown(),
+    getInvoiceActivity(bucket),
   ]);
 
   const urlMap =
@@ -44,6 +55,9 @@ export default async function InvoicesPage() {
         invoices={invoicesWithUrls}
         summary={summary}
         breakdownChart={<InvoiceCategoryPie buckets={breakdown} />}
+        activityChart={
+          <InvoiceActivityChart bucket={bucket} points={activityPoints} />
+        }
       />
     </div>
   );
