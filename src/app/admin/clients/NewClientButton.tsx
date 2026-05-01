@@ -1,7 +1,7 @@
 'use client';
 
 import { Plus } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Field, inputClass } from '@/components/admin/Field';
 import { LoadingDots } from '@/components/admin/LoadingDots';
@@ -9,6 +9,9 @@ import { Modal } from '@/components/admin/Modal';
 import { useToast } from '@/components/admin/ToastProvider';
 import { createClient } from './actions';
 import type { PmOption, TierOption } from './queries';
+
+const CLIENTS_PATH = '/admin/clients';
+const NEW_CLIENT_ACTION = 'new-client';
 
 interface NewClientButtonProps {
   tiers: TierOption[];
@@ -35,17 +38,60 @@ const emptyForm: FormState = {
 };
 
 export function NewClientButton({ tiers, pms, variant = 'standalone' }: NewClientButtonProps) {
-  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { showToast } = useToast();
+
+  // Auto-open driver. The button lives in AdminHeader, which sits in the
+  // admin layout and never unmounts as the user moves between admin
+  // routes — so a useState initialiser alone would only see the URL on
+  // the very first mount, missing later `router.push`'es from other
+  // admin pages.
+  //
+  // We use the React "derive state from props" pattern: compute the URL
+  // intent on every render, and on the renders where it transitions
+  // false→true, set `open=true` during render (guarded by a tracking
+  // state). React discards the in-progress render and re-runs cleanly,
+  // so this avoids the cascading-render footgun that `setState` in
+  // useEffect would have. Once open, user interactions (close button,
+  // backdrop, submit) drive the state independently.
+  const urlWantsOpen =
+    pathname === CLIENTS_PATH && searchParams.get('action') === NEW_CLIENT_ACTION;
+
+  const [open, setOpen] = useState(urlWantsOpen);
+  const [prevUrlWantsOpen, setPrevUrlWantsOpen] = useState(urlWantsOpen);
+  if (urlWantsOpen !== prevUrlWantsOpen) {
+    setPrevUrlWantsOpen(urlWantsOpen);
+    if (urlWantsOpen) setOpen(true);
+  }
+
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
-  const router = useRouter();
-  const { showToast } = useToast();
 
   function closeModal() {
     setOpen(false);
     setForm(emptyForm);
     setError(null);
+    // If we were auto-opened by the URL flag, strip it so a subsequent
+    // navigation back to /admin/clients (or any unrelated query change)
+    // doesn't re-trigger the modal.
+    if (searchParams.get('action') === NEW_CLIENT_ACTION) {
+      router.replace(CLIENTS_PATH);
+    }
+  }
+
+  function handleTriggerClick() {
+    // Already on the clients page → keep current behaviour and open the
+    // modal in place. From any other admin route → navigate to the
+    // clients page with the auto-open flag, mirroring the
+    // DashboardNewProjectButton → ?action=new-project pattern.
+    if (pathname === CLIENTS_PATH) {
+      setOpen(true);
+    } else {
+      router.push(`${CLIENTS_PATH}?action=${NEW_CLIENT_ACTION}`);
+    }
   }
 
   function submit() {
@@ -88,7 +134,7 @@ export function NewClientButton({ tiers, pms, variant = 'standalone' }: NewClien
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleTriggerClick}
         title="New client"
         className={
           variant === 'header'
