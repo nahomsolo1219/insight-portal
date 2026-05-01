@@ -4,7 +4,7 @@
 // summary, and every project across the client's properties (for the
 // property→project cascade in the upload modal).
 
-import { getSignedUrls } from '@/lib/storage/upload';
+import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 import { InvoicesTabClient } from './InvoicesTabClient';
 import {
   getAllProjectsForClient,
@@ -44,7 +44,7 @@ export async function InvoicesTab({ clientId, properties }: InvoicesTabProps) {
 
   const urlMap =
     invoiceRows.length > 0
-      ? await getSignedUrls(pathsToSign)
+      ? await getSignedUrlsAdmin(pathsToSign)
       : new Map<string, string>();
 
   console.log('[InvoicesTab/diag] urlMap size:', urlMap.size);

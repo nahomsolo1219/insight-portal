@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { cn } from '@/lib/utils';
-import { getSignedUrls } from '@/lib/storage/upload';
+import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 import { PhotoQueueClient, type QueuePhotoWithUrl } from './PhotoQueueClient';
 import {
   ReviewedPhotoGrid,
@@ -31,7 +31,7 @@ export default async function PhotoQueuePage({ searchParams }: PageProps) {
     const pending = await getPendingPhotos();
     const urlMap =
       pending.length > 0
-        ? await getSignedUrls(pending.map((p) => p.storagePath))
+        ? await getSignedUrlsAdmin(pending.map((p) => p.storagePath))
         : new Map<string, string>();
     const photosWithUrls: QueuePhotoWithUrl[] = pending.map((p) => ({
       ...p,
@@ -50,7 +50,7 @@ export default async function PhotoQueuePage({ searchParams }: PageProps) {
   const reviewed = await getReviewedPhotos(dbStatus, 50);
   const urlMap =
     reviewed.length > 0
-      ? await getSignedUrls(reviewed.map((p) => p.storagePath))
+      ? await getSignedUrlsAdmin(reviewed.map((p) => p.storagePath))
       : new Map<string, string>();
   const photosWithUrls: ReviewedPhotoWithUrl[] = reviewed.map((p) => ({
     ...p,

@@ -2,7 +2,7 @@
 // rollup + project picker options, then batch-signs every thumbnail URL
 // so the grid can render without a round-trip per image.
 
-import { getSignedUrls } from '@/lib/storage/upload';
+import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 import { PhotosTabClient, type PhotoRowWithUrl } from './PhotosTabClient';
 import {
   getPhotoStats,
@@ -24,7 +24,7 @@ export async function PhotosTab({ clientId, propertyId }: PhotosTabProps) {
 
   const urlMap =
     photoRows.length > 0
-      ? await getSignedUrls(photoRows.map((p) => p.storagePath))
+      ? await getSignedUrlsAdmin(photoRows.map((p) => p.storagePath))
       : new Map<string, string>();
 
   const photosWithUrls: PhotoRowWithUrl[] = photoRows.map((p) => ({

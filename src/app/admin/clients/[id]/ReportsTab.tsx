@@ -2,7 +2,7 @@
 // picker options, then batch-signs every storage path so the client can render
 // download links without a round-trip per file.
 
-import { getSignedUrls } from '@/lib/storage/upload';
+import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 import {
   getProjectsForPropertySelect,
   getReportsForProperty,
@@ -24,7 +24,7 @@ export async function ReportsTab({ clientId, propertyId }: ReportsTabProps) {
 
   const urlMap =
     reportRows.length > 0
-      ? await getSignedUrls(reportRows.map((r) => r.storagePath))
+      ? await getSignedUrlsAdmin(reportRows.map((r) => r.storagePath))
       : new Map<string, string>();
 
   const reportsWithUrls: ReportRowWithUrl[] = reportRows.map((r) => ({

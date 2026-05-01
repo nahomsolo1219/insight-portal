@@ -6,7 +6,7 @@ import { db } from '@/db';
 import { profiles } from '@/db/schema';
 import { requireUser } from '@/lib/auth/current-user';
 import { avatarPath } from '@/lib/storage/paths';
-import { getSignedUrl, uploadFile } from '@/lib/storage/upload';
+import { getSignedUrlAdmin, uploadFile } from '@/lib/storage/upload';
 import { getExtension, validateFile } from '@/lib/storage/validation';
 
 interface UploadAvatarSuccess {
@@ -59,7 +59,7 @@ export async function uploadProfileAvatar(
     .set({ avatarUrl: result.path, updatedAt: new Date() })
     .where(eq(profiles.id, user.id));
 
-  const signedUrl = await getSignedUrl(result.path);
+  const signedUrl = await getSignedUrlAdmin(result.path);
 
   // Revalidate the layouts that show the user chip. Portal uses the
   // layout-mode form so the per-property PortalSidebar (which sits below

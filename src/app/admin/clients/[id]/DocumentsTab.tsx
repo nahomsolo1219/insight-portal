@@ -2,7 +2,7 @@
 // picker options, then batch-signs every storage path so the client component
 // can render download links without a round-trip per file.
 
-import { getSignedUrls } from '@/lib/storage/upload';
+import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 import { DocumentsTabClient, type DocumentRowWithUrl } from './DocumentsTabClient';
 import { getDocumentsForProperty, getProjectsForPropertySelect } from './queries';
 
@@ -20,7 +20,7 @@ export async function DocumentsTab({ clientId, propertyId }: DocumentsTabProps) 
   // One `createSignedUrls` round-trip for every file on this property. If the
   // list ever grows into the thousands we'd want pagination first.
   const urlMap =
-    docs.length > 0 ? await getSignedUrls(docs.map((d) => d.storagePath)) : new Map<string, string>();
+    docs.length > 0 ? await getSignedUrlsAdmin(docs.map((d) => d.storagePath)) : new Map<string, string>();
 
   const documentsWithUrls: DocumentRowWithUrl[] = docs.map((d) => ({
     ...d,

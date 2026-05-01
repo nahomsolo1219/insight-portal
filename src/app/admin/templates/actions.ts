@@ -14,7 +14,7 @@ import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { decisionOptionImagePath } from '@/lib/storage/paths';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { deleteFile, getSignedUrl, uploadFile } from '@/lib/storage/upload';
+import { deleteFile, getSignedUrlAdmin, uploadFile } from '@/lib/storage/upload';
 import { getExtension, validateFile } from '@/lib/storage/validation';
 
 type ActionResult<T = undefined> =
@@ -503,7 +503,7 @@ export async function uploadDecisionOptionImage(
   });
   if ('error' in result) return { success: false, error: result.error };
 
-  const signedUrl = await getSignedUrl(result.path);
+  const signedUrl = await getSignedUrlAdmin(result.path);
   return {
     success: true,
     path: result.path,

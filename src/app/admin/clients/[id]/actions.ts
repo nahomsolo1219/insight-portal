@@ -17,7 +17,7 @@ import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { avatarPath } from '@/lib/storage/paths';
-import { getSignedUrl, uploadFile } from '@/lib/storage/upload';
+import { getSignedUrlAdmin, uploadFile } from '@/lib/storage/upload';
 import { getExtension, validateFile } from '@/lib/storage/validation';
 
 type ActionResult<T = undefined> =
@@ -690,7 +690,7 @@ export async function uploadClientAvatar(
     metadata: { field: 'avatar' },
   });
 
-  const signedUrl = await getSignedUrl(result.path);
+  const signedUrl = await getSignedUrlAdmin(result.path);
 
   revalidatePath(`/admin/clients/${clientId}`);
   revalidatePath('/admin/clients');

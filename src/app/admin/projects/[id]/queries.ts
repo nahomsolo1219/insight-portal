@@ -20,7 +20,7 @@ import {
   hydrateOptionGroups,
   type AdminDecisionOption,
 } from '@/lib/decision-options';
-import { getSignedUrls } from '@/lib/storage/upload';
+import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 
 export type ProjectStatus = 'active' | 'completed' | 'on_hold';
 
@@ -197,7 +197,7 @@ export async function getProjectPhotos(
   if (rows.length === 0) return [];
 
   const paths = rows.map((r) => r.storagePath).filter(Boolean);
-  const urlByPath = paths.length > 0 ? await getSignedUrls(paths) : new Map<string, string>();
+  const urlByPath = paths.length > 0 ? await getSignedUrlsAdmin(paths) : new Map<string, string>();
 
   return rows.map((r) => ({
     ...r,

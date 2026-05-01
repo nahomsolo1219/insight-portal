@@ -4,7 +4,7 @@
 // timeline) can share one batch sign-URLs round-trip per page render.
 
 import 'server-only';
-import { getSignedUrls } from '@/lib/storage/upload';
+import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 
 export interface AdminDecisionOption {
   label: string;
@@ -85,7 +85,7 @@ export async function hydrateOptionGroups<T extends { id: string; options: unkno
   }
 
   const urlByPath =
-    allPaths.length > 0 ? await getSignedUrls(allPaths) : new Map<string, string>();
+    allPaths.length > 0 ? await getSignedUrlsAdmin(allPaths) : new Map<string, string>();
 
   const out = new Map<string, AdminDecisionOption[]>();
   for (const [rowId, parsed] of parsedByRow) {

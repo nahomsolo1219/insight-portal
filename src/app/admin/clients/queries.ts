@@ -6,7 +6,7 @@
 import { and, count, eq, inArray, sql, sum } from 'drizzle-orm';
 import { db } from '@/db';
 import { clients, invoices, membershipTiers, projects, properties, staff } from '@/db/schema';
-import { getSignedUrls } from '@/lib/storage/upload';
+import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 
 export interface ClientRow {
   id: string;
@@ -99,7 +99,7 @@ export async function listClients(): Promise<ClientRow[]> {
     .map((r) => r.avatarStoragePath)
     .filter((p): p is string => Boolean(p));
   const avatarUrls =
-    avatarPaths.length > 0 ? await getSignedUrls(avatarPaths) : new Map<string, string>();
+    avatarPaths.length > 0 ? await getSignedUrlsAdmin(avatarPaths) : new Map<string, string>();
 
   return rows.map((r) => ({
     id: r.id,

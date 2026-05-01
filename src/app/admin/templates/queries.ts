@@ -9,7 +9,7 @@ import {
   templatePhaseDependencies,
   templatePhases,
 } from '@/db/schema';
-import { getSignedUrls } from '@/lib/storage/upload';
+import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 
 export interface TemplateListRow {
   id: string;
@@ -108,7 +108,7 @@ export async function listTemplates(): Promise<TemplateListRow[]> {
   // `template-covers` bucket and gets a constructed URL below.
   const allPaths = Array.from(coverPathByTemplate.values());
   const urlByPath =
-    allPaths.length > 0 ? await getSignedUrls(allPaths) : new Map<string, string>();
+    allPaths.length > 0 ? await getSignedUrlsAdmin(allPaths) : new Map<string, string>();
 
   return templates.map((t) => {
     // Precedence: uploaded > option image > null (caller renders a
@@ -298,7 +298,7 @@ async function hydrateOptionImages(
   // 2. One batch round-trip to Supabase storage instead of N signed-URL
   //    calls. Empty path set short-circuits inside getSignedUrls.
   const urlByPath =
-    allPaths.size > 0 ? await getSignedUrls(Array.from(allPaths)) : new Map<string, string>();
+    allPaths.size > 0 ? await getSignedUrlsAdmin(Array.from(allPaths)) : new Map<string, string>();
 
   // 3. Rebuild the milestones with the hydrated option objects in place.
   return rows.map((m) => {

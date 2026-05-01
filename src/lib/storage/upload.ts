@@ -5,6 +5,7 @@
 
 import 'server-only';
 
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import { BUCKET_NAME } from './paths';
 
@@ -119,6 +120,78 @@ export async function getSignedUrls(
     return new Map();
   }
 
+  const map = new Map<string, string>();
+  data.forEach((item, i) => {
+    const inputPath = paths[i];
+    if (inputPath && item.signedUrl) {
+      map.set(inputPath, item.signedUrl);
+    }
+  });
+  return map;
+}
+
+// ---------------------------------------------------------------------------
+// Admin (service-role) signing variants
+// ---------------------------------------------------------------------------
+//
+// The cookie-bound `getSignedUrl(s)` above runs as the requesting user
+// against `storage.objects` RLS. That's the right behaviour for the
+// client portal and field surfaces — clients should only get URLs for
+// files they own, even if a buggy SQL query somehow surfaces a
+// neighbour's path.
+//
+// On the **admin** side it's a different story: `requireAdmin()` at the
+// page / action level is the canonical authorization gate, and the
+// cookie-bound storage signing has caused intermittent failures in
+// production where the user's JWT didn't propagate through @supabase/ssr
+// to the storage REST request — admin pages would render "No PDF" /
+// broken images even though the data was healthy.
+//
+// These admin variants use the service-role client (no RLS), so as long
+// as the path string was passed in, signing always succeeds. Use ONLY
+// from server-side admin surfaces (admin pages + admin-gated server
+// actions). The cookie-bound originals stay untouched for portal/field.
+
+/** Admin variant of `getSignedUrl` — bypasses RLS via the service-role
+ *  client. Use only from admin surfaces gated by `requireAdmin()`. */
+export async function getSignedUrlAdmin(
+  path: string,
+  expiresIn = 60 * 60,
+): Promise<string | null> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.storage
+    .from(BUCKET_NAME)
+    .createSignedUrl(path, expiresIn);
+  if (error || !data) {
+    console.error('[getSignedUrlAdmin]', error);
+    return null;
+  }
+  return data.signedUrl;
+}
+
+/** Admin variant of `getSignedUrls` — bypasses RLS via the service-role
+ *  client. Returns a `Map<inputPath, signedUrl>`; failed entries are
+ *  omitted. Use only from admin surfaces gated by `requireAdmin()`. */
+export async function getSignedUrlsAdmin(
+  paths: string[],
+  expiresIn = 60 * 60,
+): Promise<Map<string, string>> {
+  if (paths.length === 0) return new Map();
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.storage
+    .from(BUCKET_NAME)
+    .createSignedUrls(paths, expiresIn);
+
+  if (error || !data) {
+    console.error('[getSignedUrlsAdmin]', error);
+    return new Map();
+  }
+
+  // Pair input + response by index — the SDK guarantees order is
+  // preserved and `item.path` echoes the input cleanly when service-role
+  // signs, but keying by input is the helper's documented contract and
+  // makes us robust to any future SDK quirks.
   const map = new Map<string, string>();
   data.forEach((item, i) => {
     const inputPath = paths[i];

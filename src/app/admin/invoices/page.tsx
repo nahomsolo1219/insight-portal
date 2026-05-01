@@ -1,5 +1,5 @@
 import { requireAdmin } from '@/lib/auth/current-user';
-import { getSignedUrls } from '@/lib/storage/upload';
+import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 import { InvoiceActivityChart } from './InvoiceActivityChart';
 import { InvoiceCategoryPie } from './InvoiceCategoryPie';
 import { InvoicesClient, type InvoiceOverviewWithUrl } from './InvoicesClient';
@@ -29,7 +29,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
   ]);
 
   const urlMap =
-    rows.length > 0 ? await getSignedUrls(rows.map((r) => r.storagePath)) : new Map<string, string>();
+    rows.length > 0 ? await getSignedUrlsAdmin(rows.map((r) => r.storagePath)) : new Map<string, string>();
 
   const invoicesWithUrls: InvoiceOverviewWithUrl[] = rows.map((r) => ({
     ...r,

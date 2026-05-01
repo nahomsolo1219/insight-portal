@@ -13,7 +13,7 @@ import {
   vendorDocuments,
   vendors,
 } from '@/db/schema';
-import { getSignedUrls } from '@/lib/storage/upload';
+import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 
 export type VendorDocumentType =
   | 'insurance'
@@ -99,7 +99,7 @@ export async function getVendorDocuments(vendorId: string): Promise<VendorDocume
 
   const paths = rows.map((r) => r.storagePath).filter(Boolean);
   const urlByPath =
-    paths.length > 0 ? await getSignedUrls(paths) : new Map<string, string>();
+    paths.length > 0 ? await getSignedUrlsAdmin(paths) : new Map<string, string>();
 
   return rows.map((r) => ({
     ...r,

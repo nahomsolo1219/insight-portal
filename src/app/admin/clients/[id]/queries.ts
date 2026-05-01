@@ -21,7 +21,7 @@ import {
   templatePhases,
   vendors,
 } from '@/db/schema';
-import { getSignedUrl } from '@/lib/storage/upload';
+import { getSignedUrlAdmin } from '@/lib/storage/upload';
 
 export interface ClientDetailRow {
   id: string;
@@ -139,7 +139,7 @@ export async function getClientDetail(clientId: string): Promise<ClientDetailPay
   // fall through to the initials fallback in the UI without a wasted
   // round-trip to Supabase storage.
   const avatarUrl = clientRow.avatarStoragePath
-    ? await getSignedUrl(clientRow.avatarStoragePath)
+    ? await getSignedUrlAdmin(clientRow.avatarStoragePath)
     : null;
   const client: ClientDetailRow = { ...clientRow, avatarUrl };
 
