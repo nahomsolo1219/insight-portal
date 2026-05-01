@@ -88,33 +88,6 @@ export async function getSignedUrls(
     .from(BUCKET_NAME)
     .createSignedUrls(paths, expiresIn);
 
-  // ──────────────────────────────────────────────────────────────────
-  // TEMP DIAGNOSTIC (remove after diagnosis): dump the raw response
-  // shape from supabase-js so we can see whether the cookie-bound
-  // (user-session) client is hitting an RLS denial, returning empty
-  // data, or echoing back a different `path` shape than the input.
-  // ──────────────────────────────────────────────────────────────────
-  console.log('[getSignedUrls/diag] inputs:', paths);
-  console.log('[getSignedUrls/diag] supabase error:', error);
-  if (data) {
-    console.log(
-      '[getSignedUrls/diag] response items:',
-      data.map((item, i) => {
-        const errField = (item as unknown as Record<string, unknown>).error;
-        return {
-          inputPath: paths[i],
-          responsePath: item.path,
-          signedUrlPresent: Boolean(item.signedUrl),
-          signedUrlPrefix: item.signedUrl ? item.signedUrl.slice(0, 80) + '…' : null,
-          errorField: errField ?? null,
-          inputMatchesEcho: item.path === paths[i],
-        };
-      }),
-    );
-  } else {
-    console.log('[getSignedUrls/diag] response data: null/undefined');
-  }
-
   if (error || !data) {
     console.error('[getSignedUrls]', error);
     return new Map();
