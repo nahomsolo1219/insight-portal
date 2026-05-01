@@ -3,7 +3,7 @@
 // intent is obvious in code review and a misconfigured RLS policy can't
 // leak someone else's data.
 
-import { and, asc, count, desc, eq, gte, inArray, sum } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, isNull, sum } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   appointments,
@@ -142,6 +142,11 @@ export async function getClientDashboardStats(
         and(
           eq(milestones.status, 'awaiting_client'),
           inArray(milestones.projectId, projectIds),
+          // Already-responded decisions stay `awaiting_client` until
+          // admin signs off (per respondToDecision's design); excluding
+          // them here keeps the dashboard stat + portal badge honest
+          // about what *the client* still needs to do.
+          isNull(milestones.clientResponse),
         ),
       );
     pendingDecisions = Number(decisionRow?.count ?? 0);
@@ -534,6 +539,10 @@ export async function getPortalBadgeCounts(
             and(
               inArray(milestones.projectId, projectIds),
               eq(milestones.status, 'awaiting_client'),
+              // See dashboard stats note: filter responded milestones
+              // out so the portal nav badge counts what the client
+              // still owes, not what admin still has to close.
+              isNull(milestones.clientResponse),
             ),
           )
           .then((rows) => Number(rows[0]?.count ?? 0)),

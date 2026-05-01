@@ -1,5 +1,6 @@
 'use client';
 
+import { Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { LoadingDots } from '@/components/admin/LoadingDots';
@@ -54,6 +55,16 @@ export function DecisionResponder({
   const [isPending, startTransition] = useTransition();
   const [selected, setSelected] = useState<string | null>(null);
   const [openText, setOpenText] = useState('');
+  // Optimistic transition. On a successful submit we flip to a local
+  // "submitted" view immediately so the form disappears even before
+  // the server roundtrip + revalidate land. The query layer
+  // (getPropertyDashboardData / portal badge counts) now filters
+  // responded decisions out, so once the data refreshes the parent
+  // either swaps to a different decision or unmounts this component
+  // entirely. Until then this thank-you card is what the client sees
+  // — much less jarring than re-rendering the question form for the
+  // half-second it takes the layout cache to flush.
+  const [submittedResponse, setSubmittedResponse] = useState<string | null>(null);
 
   const isEditorial = variant === 'editorial';
 
@@ -65,8 +76,56 @@ export function DecisionResponder({
         return;
       }
       showToast('Response sent');
+      // Optimistically swap to the "received" state. router.refresh
+      // still fires so the underlying query reruns, the decision
+      // drops out of the featured/badge counts, and (on the project
+      // timeline) the parent renders RespondedSummary on next paint.
+      setSubmittedResponse(response);
       router.refresh();
     });
+  }
+
+  // Local "thanks, we got it" view once the user has submitted.
+  // Renders identically across all questionType branches — the
+  // surrounding decision card / FeaturedDecisionCard handles the
+  // larger layout, this component just owns its own slot.
+  if (submittedResponse) {
+    return (
+      <div
+        className={cn(
+          'flex items-start gap-3 rounded-xl px-4 py-3 text-sm',
+          isEditorial
+            ? 'bg-cream border-line text-ink-700 border'
+            : 'bg-emerald-50 text-emerald-700',
+          !isEditorial && 'mt-4',
+          className,
+        )}
+        role="status"
+        aria-live="polite"
+      >
+        <Check
+          size={16}
+          strokeWidth={2}
+          className={cn(
+            'mt-0.5 flex-shrink-0',
+            isEditorial ? 'text-[var(--amber-600)]' : 'text-emerald-600',
+          )}
+        />
+        <div className="flex-1">
+          <p className={cn('font-medium', isEditorial && 'text-ink-900')}>
+            Response received
+          </p>
+          <p
+            className={cn(
+              'mt-0.5 text-xs',
+              isEditorial ? 'text-ink-500' : 'text-emerald-700/80',
+            )}
+          >
+            Thanks — your project manager has been notified.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   if (questionType === 'acknowledge') {

@@ -19,7 +19,7 @@ import type { LucideIcon } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { Field, inputClass } from '@/components/admin/Field';
 import { LoadingDots } from '@/components/admin/LoadingDots';
 import { Modal } from '@/components/admin/Modal';
@@ -27,9 +27,13 @@ import { NotificationsDropdown } from '@/components/admin/NotificationsDropdown'
 import { useToast } from '@/components/admin/ToastProvider';
 import { PropertyCover } from '@/components/portal/PropertyCover';
 import { updateMyProfile } from '@/app/portal/actions';
+import { getMyNotificationFeed } from '@/app/notifications/actions';
 import type { NotificationListItem } from '@/app/notifications/queries';
 import type { CurrentUser } from '@/lib/auth/current-user';
 import { cn, initialsFrom } from '@/lib/utils';
+
+/** See AdminHeader.tsx for the polling-cadence rationale. */
+const NOTIFICATION_POLL_MS = 30_000;
 
 export interface PortalSidebarClient {
   id: string;
@@ -58,9 +62,10 @@ interface PortalSidebarProps {
    *  when ≥ 2. With one property the pill stays as a static identity
    *  chip. */
   properties: PortalSidebarProperty[];
-  /** Latest notifications + unread count for the bell-row dropdown.
-   *  Threaded through from the layout so the same data warms the badge
-   *  count and the panel content with one round-trip. */
+  /** Initial notifications + unread count for the bell-row dropdown.
+   *  Same shape as AdminHeader: the SSR-passed values seed the bell;
+   *  the bell row polls `getMyNotificationFeed` every 30s + on
+   *  window focus + on dropdown open to keep the badge live. */
   notifications: NotificationListItem[];
   unreadNotificationCount: number;
 }
@@ -231,8 +236,8 @@ export function PortalSidebar({
             by a thin hairline. */}
         <div className="border-paper/10 border-t">
           <NotificationsRow
-            notifications={notifications}
-            unreadCount={unreadNotificationCount}
+            initialNotifications={notifications}
+            initialUnreadCount={unreadNotificationCount}
             onNavigate={closeDrawer}
           />
         </div>
@@ -525,18 +530,68 @@ function PropertySwitcher({
 // ---------------------------------------------------------------------------
 
 function NotificationsRow({
-  notifications,
-  unreadCount,
+  initialNotifications,
+  initialUnreadCount,
   onNavigate,
 }: {
-  notifications: NotificationListItem[];
-  unreadCount: number;
+  initialNotifications: NotificationListItem[];
+  initialUnreadCount: number;
   /** Closes the mobile drawer when one of the dropdown rows navigates. */
   onNavigate: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState(initialNotifications);
+  const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const ref = useRef<HTMLDivElement>(null);
   useDismissOnOutside(ref, open, () => setOpen(false));
+
+  // Polling — see AdminHeader.NotificationBell for the same pattern
+  // and rationale. Keeps the badge live without depending on the
+  // SSR-passed initial values (which only refresh on full page
+  // navigation; that's the Session 7 follow-up bug this fixes).
+  const refetch = useCallback(async () => {
+    try {
+      const feed = await getMyNotificationFeed();
+      setNotifications(feed.notifications);
+      setUnreadCount(feed.unreadCount);
+    } catch (error) {
+      console.error('[NotificationsRow] poll failed', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(refetch, NOTIFICATION_POLL_MS);
+    return () => clearInterval(id);
+  }, [refetch]);
+
+  useEffect(() => {
+    window.addEventListener('focus', refetch);
+    return () => window.removeEventListener('focus', refetch);
+  }, [refetch]);
+
+  // Open-time refetch lives in the click handler rather than an
+  // effect — the lint rule blocks setState inside effects, and a
+  // user click is the right place to kick off a fetch.
+  function toggleOpen() {
+    setOpen((prev) => {
+      const next = !prev;
+      if (next) refetch();
+      return next;
+    });
+  }
+
+  // Optimistic updates — same callbacks the admin bell passes down.
+  const handleMarkOneRead = useCallback((notificationId: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n)),
+    );
+    setUnreadCount((c) => Math.max(0, c - 1));
+  }, []);
+
+  const handleMarkAllRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setUnreadCount(0);
+  }, []);
 
   const hasUnread = unreadCount > 0;
 
@@ -549,7 +604,7 @@ function NotificationsRow({
     <div ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleOpen}
         aria-label={
           hasUnread
             ? `${unreadCount} unread ${unreadCount === 1 ? 'notification' : 'notifications'}`
@@ -577,6 +632,8 @@ function NotificationsRow({
         open={open}
         onClose={close}
         anchor="right-of-bottom"
+        onMarkOneRead={handleMarkOneRead}
+        onMarkAllRead={handleMarkAllRead}
       />
     </div>
   );

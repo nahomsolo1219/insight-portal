@@ -118,7 +118,17 @@ export async function respondToDecision(
       console.error('[respondToDecision] notify failed', error);
     }
 
-    revalidatePath(`/portal/p/${row.propertyId}/projects`);
+    // Wide revalidation. The decision/response pair surfaces in three
+    // distinct portal views (dashboard FeaturedDecisionCard, projects
+    // list badge, project timeline) AND multiple admin pages (admin
+    // decisions list, admin client detail, admin project detail).
+    // The Session 7 follow-up bug — the decision card sticking
+    // around as a question after submit — was caused by revalidating
+    // *only* the projects path; widening to layout-level on both
+    // surfaces guarantees every reader sees the new state on next
+    // render.
+    revalidatePath('/portal', 'layout');
+    revalidatePath('/admin', 'layout');
     return { success: true };
   } catch (error) {
     console.error('[respondToDecision]', error);

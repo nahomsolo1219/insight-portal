@@ -16,6 +16,11 @@ import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
 import { notifications } from '@/db/schema';
 import { requireUser } from '@/lib/auth/current-user';
+import {
+  getUnreadNotificationCount,
+  listMyNotifications,
+  type NotificationListItem,
+} from './queries';
 
 interface ActionResult {
   success: boolean;
@@ -49,6 +54,33 @@ export async function markNotificationRead(notificationId: string): Promise<Acti
   revalidatePath('/portal', 'layout');
 
   return { success: true };
+}
+
+/**
+ * Polling endpoint. The bell button on both surfaces (admin header,
+ * portal sidebar) calls this every 30s and on `window focus` /
+ * dropdown-open to keep its local state fresh — `revalidatePath`
+ * alone doesn't push to a currently-rendered SSR layout, and Session 7's
+ * "bell badge doesn't refresh in real time" follow-up bug was this
+ * exact gap. One round-trip returns both the list (for the dropdown
+ * body) and the unread count (for the badge dot) so the polling
+ * tick is a single network hop.
+ *
+ * Returning `{ notifications, unreadCount }` rather than two separate
+ * actions keeps the polling cadence atomic — the badge can never go
+ * out of sync with the list. RLS still gates the read; the action
+ * just bundles two `requireUser()`-scoped queries.
+ */
+export async function getMyNotificationFeed(): Promise<{
+  notifications: NotificationListItem[];
+  unreadCount: number;
+}> {
+  const user = await requireUser();
+  const [notificationsList, unreadCount] = await Promise.all([
+    listMyNotifications(user.id),
+    getUnreadNotificationCount(user.id),
+  ]);
+  return { notifications: notificationsList, unreadCount };
 }
 
 /**

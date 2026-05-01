@@ -7,7 +7,7 @@
 // but every query also filters by clientId/propertyId explicitly so a bad
 // policy can't leak across properties.
 
-import { and, asc, desc, eq, inArray, isNotNull, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   appointments,
@@ -160,6 +160,16 @@ export async function getPropertyDashboardData(
               and(
                 inArray(milestones.projectId, projectIds),
                 eq(milestones.status, 'awaiting_client'),
+                // Hide milestones the client has already answered.
+                // respondToDecision intentionally keeps `status =
+                // awaiting_client` so admins can review before flipping
+                // complete (the project's progress % only moves on
+                // admin sign-off). Without this filter the
+                // FeaturedDecisionCard would re-render the same
+                // question after the client clicks submit — the source
+                // of the Session 7 "decision card stays as a question"
+                // bug.
+                isNull(milestones.clientResponse),
               ),
             )
             // Oldest first — `awaiting_client_at` doesn't exist on the

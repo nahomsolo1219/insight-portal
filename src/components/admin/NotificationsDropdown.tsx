@@ -5,26 +5,26 @@
 // system convention that "anything used across surfaces stays here"
 // (the directory name is historical — see DESIGN_SYSTEM.md).
 //
-// Pure presentational + interaction-stateful. Parents pass:
-//   - `notifications`: server-fetched list (already sorted desc).
-//   - `unreadCount`: server-fetched scalar; same number drives the
-//     bell-badge dot regardless of which surface mounts us.
-//   - `open` / `onClose`: the parent owns the open/close state so
-//     the bell trigger and the panel can sit in different DOM
-//     subtrees (e.g. fixed-position dropdown anchored to a specific
-//     side of the viewport).
-//   - `anchor`: 'right-below' for the admin header bell, 'right-of'
-//     for the portal sidebar bell. The two surfaces have different
-//     spatial constraints; one component handles both.
+// Presentational + interaction-stateful. Parents pass:
+//   - `notifications`: live list, owned by the bell button (which
+//     polls + caches). The dropdown never refetches itself — that's
+//     the bell's job.
+//   - `unreadCount`: same source.
+//   - `open` / `onClose`: parent owns open/close so the bell
+//     trigger and the panel can sit in different DOM subtrees.
+//   - `anchor`: 'right-below' for the admin header, 'right-of-bottom'
+//     for the portal sidebar.
+//   - `onMarkOneRead(id)` / `onMarkAllRead()`: optimistic-update
+//     callbacks. The dropdown calls them BEFORE the server action
+//     so the badge / row state flips instantly; the server action
+//     fires in parallel for persistence.
 //
-// Click on a row → mark it read (server action, optimistic
-// nothing — the layout revalidates so the badge count drops on
-// next paint) → navigate to the link. Mark-all-read clears every
-// unread row in one round-trip.
+// Click on a row → optimistic flip → server mark-read → navigate
+// to the link. Mark-all-read does the same fan-out.
 
 import { Bell } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useTransition } from 'react';
+import { useTransition } from 'react';
 import {
   markAllNotificationsRead,
   markNotificationRead,
@@ -40,6 +40,11 @@ interface NotificationsDropdownProps {
   open: boolean;
   onClose: () => void;
   anchor: DropdownAnchor;
+  /** Parent-supplied optimistic update — flip a single row to read
+   *  before the server action returns so the badge drops instantly. */
+  onMarkOneRead: (notificationId: string) => void;
+  /** Parent-supplied optimistic update — clear every unread row. */
+  onMarkAllRead: () => void;
 }
 
 const ANCHOR_CLASS: Record<DropdownAnchor, string> = {
@@ -56,17 +61,13 @@ export function NotificationsDropdown({
   open,
   onClose,
   anchor,
+  onMarkOneRead,
+  onMarkAllRead,
 }: NotificationsDropdownProps) {
   // Esc-to-close — same affordance modals + dropdowns elsewhere use.
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [open, onClose]);
-
+  // useTransition lives in the panel-body subcomponents, so we don't
+  // need an effect to register the listener conditionally; rendering
+  // null when !open already gates everything.
   if (!open) return null;
 
   return (
@@ -80,11 +81,18 @@ export function NotificationsDropdown({
       // Stop click-through so click-outside detection at the parent
       // doesn't fire when the user interacts with the panel itself.
       onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
     >
-      <DropdownHeader unreadCount={unreadCount} onClose={onClose} />
+      <DropdownHeader
+        unreadCount={unreadCount}
+        onMarkAllRead={onMarkAllRead}
+      />
       <DropdownBody
         notifications={notifications}
         onClose={onClose}
+        onMarkOneRead={onMarkOneRead}
       />
       <DropdownFooter onClose={onClose} />
     </div>
@@ -97,21 +105,20 @@ export function NotificationsDropdown({
 
 function DropdownHeader({
   unreadCount,
-  onClose,
+  onMarkAllRead,
 }: {
   unreadCount: number;
-  onClose: () => void;
+  onMarkAllRead: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
 
   function markAll() {
     if (unreadCount === 0) return;
+    // Optimistic flip first so the badge drops the instant the user
+    // clicks; server roundtrip happens in parallel.
+    onMarkAllRead();
     startTransition(async () => {
       await markAllNotificationsRead();
-      // Don't close the panel — let the user keep reading. The badge
-      // updates on the next paint via the layout-level revalidate.
-      router.refresh();
     });
   }
 
@@ -134,17 +141,9 @@ function DropdownHeader({
           disabled={isPending}
           className="text-ink-500 hover:text-ink-900 text-xs font-medium transition-colors disabled:opacity-50"
         >
-          {isPending ? 'Marking…' : 'Mark all as read'}
+          Mark all as read
         </button>
       )}
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Close notifications"
-        className="sr-only"
-      >
-        Close
-      </button>
     </div>
   );
 }
@@ -156,9 +155,11 @@ function DropdownHeader({
 function DropdownBody({
   notifications,
   onClose,
+  onMarkOneRead,
 }: {
   notifications: NotificationListItem[];
   onClose: () => void;
+  onMarkOneRead: (id: string) => void;
 }) {
   if (notifications.length === 0) {
     return (
@@ -172,7 +173,12 @@ function DropdownBody({
   return (
     <ul className="divide-line-2 max-h-[420px] divide-y overflow-y-auto">
       {notifications.map((n) => (
-        <NotificationRow key={n.id} notification={n} onClose={onClose} />
+        <NotificationRow
+          key={n.id}
+          notification={n}
+          onClose={onClose}
+          onMarkOneRead={onMarkOneRead}
+        />
       ))}
     </ul>
   );
@@ -181,25 +187,27 @@ function DropdownBody({
 function NotificationRow({
   notification,
   onClose,
+  onMarkOneRead,
 }: {
   notification: NotificationListItem;
   onClose: () => void;
+  onMarkOneRead: (id: string) => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   function onClick() {
+    // Optimistic flip first — the badge drops + the row de-emphasises
+    // before the network roundtrip lands.
+    if (!notification.isRead) {
+      onMarkOneRead(notification.id);
+    }
     startTransition(async () => {
-      // Mark first, then navigate — the unread→read flip is the
-      // user-meaningful state change. Navigation is best-effort: if
-      // there's no link the dropdown just closes.
       if (!notification.isRead) {
         await markNotificationRead(notification.id);
       }
       if (notification.link) {
         router.push(notification.link);
-      } else {
-        router.refresh();
       }
       onClose();
     });

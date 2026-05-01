@@ -8,9 +8,10 @@ import {
   Plus,
   Search,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { DashboardNewProjectButton } from '@/app/admin/DashboardNewProjectButton';
 import { NewClientButton } from '@/app/admin/clients/NewClientButton';
+import { getMyNotificationFeed } from '@/app/notifications/actions';
 import type { ClientPickerRow } from '@/app/admin/queries';
 import type { PmOption, TierOption } from '@/app/admin/clients/queries';
 import type { NotificationListItem } from '@/app/notifications/queries';
@@ -18,6 +19,13 @@ import { EditProfileModal } from '@/components/admin/EditProfileModal';
 import { NotificationsDropdown } from '@/components/admin/NotificationsDropdown';
 import type { CurrentUser } from '@/lib/auth/current-user';
 import { cn, initialsFrom } from '@/lib/utils';
+
+/** Bell-feed polling cadence. 30s is the spec target — fast enough
+ *  that the demo flow ("respond on portal in one tab, see the bell
+ *  light up on admin in the other") feels close to live, slow enough
+ *  that idle tabs don't generate meaningful DB load. The window-focus
+ *  listener handles the "tab back" case below the polling floor. */
+const NOTIFICATION_POLL_MS = 30_000;
 
 interface AdminHeaderProps {
   user: CurrentUser;
@@ -34,10 +42,11 @@ interface AdminHeaderProps {
   pms: PmOption[];
   /** Active clients drive the New Project picker modal. */
   projectPickerClients: ClientPickerRow[];
-  /** Latest notifications for the bell-dropdown panel. Fetched once
-   *  per request in the layout — `revalidatePath('/admin', 'layout')`
-   *  in the mark-read actions keeps both this list and `unreadCount`
-   *  in sync. */
+  /** Initial notifications + unread count, fetched once per request
+   *  in the layout. The bell button polls `getMyNotificationFeed`
+   *  every 30s + on window focus + on dropdown open to keep these
+   *  fresh without a hard refresh — the SSR-passed values are just
+   *  a head start on the first paint. */
   notifications: NotificationListItem[];
   unreadNotificationCount: number;
 }
@@ -114,11 +123,14 @@ export function AdminHeader({
             space is tight. */}
         <span aria-hidden="true" className="bg-line hidden h-8 w-px sm:block" />
 
-        {/* Notifications bell — wired in Session 7. Red dot only when
-            unreadCount > 0; click opens the shared dropdown panel. */}
+        {/* Notifications bell — Session 7 wiring + Session 7
+            follow-up polling. Red dot only when unreadCount > 0;
+            click opens the shared dropdown panel. The bell owns its
+            own state from initial SSR values; polling keeps it
+            fresh without a hard refresh. */}
         <NotificationBell
-          notifications={notifications}
-          unreadCount={unreadNotificationCount}
+          initialNotifications={notifications}
+          initialUnreadCount={unreadNotificationCount}
         />
 
         {/* Avatar dropdown — initials + chevron, opens a small menu
@@ -224,14 +236,59 @@ function SearchInput() {
 // ---------------------------------------------------------------------------
 
 function NotificationBell({
-  notifications,
-  unreadCount,
+  initialNotifications,
+  initialUnreadCount,
 }: {
-  notifications: NotificationListItem[];
-  unreadCount: number;
+  initialNotifications: NotificationListItem[];
+  initialUnreadCount: number;
 }) {
   const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState(initialNotifications);
+  const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Polling fetcher. Stable identity (useCallback with no deps) so
+  // the interval / focus / open effects don't tear down + rebuild
+  // on every render. Errors are swallowed — the next tick will try
+  // again, and the user-visible state stays at whatever it last had.
+  const refetch = useCallback(async () => {
+    try {
+      const feed = await getMyNotificationFeed();
+      setNotifications(feed.notifications);
+      setUnreadCount(feed.unreadCount);
+    } catch (error) {
+      console.error('[NotificationBell] poll failed', error);
+    }
+  }, []);
+
+  // 30s polling. The interval starts at mount and tears down at
+  // unmount — no need to pause on hidden tabs because the work is
+  // tiny (two indexed reads keyed by recipient_user_id) and the
+  // window-focus listener below covers the "tab back" case anyway.
+  useEffect(() => {
+    const id = setInterval(refetch, NOTIFICATION_POLL_MS);
+    return () => clearInterval(id);
+  }, [refetch]);
+
+  // Window focus → immediate refetch. Makes the "respond on portal
+  // → tab back to admin" demo flow feel near-instant rather than
+  // waiting up to 30s for the next polling tick.
+  useEffect(() => {
+    window.addEventListener('focus', refetch);
+    return () => window.removeEventListener('focus', refetch);
+  }, [refetch]);
+
+  // Dropdown open → immediate refetch is wired into `toggleOpen`
+  // below rather than a useEffect — the lint rule blocks `setState`
+  // inside effects, and a user click is exactly the right place
+  // to start a fetch anyway.
+  function toggleOpen() {
+    setOpen((prev) => {
+      const next = !prev;
+      if (next) refetch();
+      return next;
+    });
+  }
 
   // Click-outside dismiss — the panel itself stops propagation, so a
   // click anywhere outside this wrapper closes the dropdown.
@@ -244,11 +301,27 @@ function NotificationBell({
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
+  // Optimistic update helpers — passed down to the dropdown so the
+  // user sees the badge / row state flip the instant they click,
+  // not on the next polling tick. The corresponding server action
+  // runs in parallel inside the dropdown.
+  const handleMarkOneRead = useCallback((notificationId: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n)),
+    );
+    setUnreadCount((c) => Math.max(0, c - 1));
+  }, []);
+
+  const handleMarkAllRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setUnreadCount(0);
+  }, []);
+
   return (
     <div ref={ref} className="relative flex-shrink-0">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleOpen}
         aria-label={
           unreadCount > 0
             ? `${unreadCount} unread ${unreadCount === 1 ? 'notification' : 'notifications'}`
@@ -273,6 +346,8 @@ function NotificationBell({
         open={open}
         onClose={() => setOpen(false)}
         anchor="right-below"
+        onMarkOneRead={handleMarkOneRead}
+        onMarkAllRead={handleMarkAllRead}
       />
     </div>
   );
