@@ -10,6 +10,10 @@
 // a future path will look like.
 
 export const BUCKET_NAME = 'insight-files';
+/** Public bucket for user avatars. See manual_avatars_storage.sql for
+ *  RLS — folder is the auth.users.id, single object per user, public
+ *  read. Cache-bust via `?v={updated_at_ms}` on the URL. */
+export const AVATARS_BUCKET = 'avatars';
 
 /** Every file type that has a dedicated prefix in the bucket. */
 export const FILE_TYPES = ['photos', 'documents', 'invoices', 'reports'] as const;
@@ -42,19 +46,11 @@ export function reportPath(clientId: string, reportId: string): string {
 }
 
 /**
- * Avatar paths. Two layouts so the existing storage RLS picks up
- * client-readable images without any policy changes:
- *
- * - **Client avatars**: `avatars/{clientId}/avatar.{ext}` — segment 2 is
- *   the clientId, which matches the "Clients read own files" policy
- *   (`(storage.foldername(name))[2] = current_user_client_id()::text`).
- *   So a client viewing the portal can fetch their own avatar via a
- *   signed URL with no extra grant.
- * - **Profile avatars** (admin / staff): `avatars/profile/{userId}.{ext}`
- *   — segment 2 is the literal `profile`, which doesn't match any
- *   client. Admin policy covers admin reads; clients can't see these.
- *
- * Same path is used for upload + read. Re-uploading replaces (upsert).
+ * Legacy avatar path inside the private `insight-files` bucket. Kept
+ * only because some older `clients.avatarStoragePath` values were
+ * written under this layout — the `clients/[id]/ClientAvatarUploader`
+ * still drops on it. New per-user avatars (admin profile, Session 7+)
+ * live in the public `avatars` bucket — see `userAvatarPath`.
  */
 export function avatarPath(
   entityType: 'profile' | 'client',
@@ -66,6 +62,20 @@ export function avatarPath(
     return `avatars/${entityId}/avatar.${safeExt}`;
   }
   return `avatars/profile/${entityId}.${safeExt}`;
+}
+
+/**
+ * Path within the public `avatars` bucket for a per-user avatar. The
+ * first segment is the auth.users.id so the bucket's per-user RLS
+ * (in manual_avatars_storage.sql) gates writes to the user's own
+ * folder. Single object per user — overwritten on replace, cache-
+ * busted via `?v={updated_at_ms}` on the URL.
+ *
+ * Returns just the in-bucket path (no `avatars/` prefix); pass it
+ * straight to `supabase.storage.from(AVATARS_BUCKET).upload(path, …)`.
+ */
+export function userAvatarPath(userId: string, ext: string): string {
+  return `${userId}/avatar.${sanitizeExt(ext) || 'jpg'}`;
 }
 
 /**

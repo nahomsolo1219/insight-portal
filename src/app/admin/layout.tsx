@@ -10,6 +10,7 @@ import {
   listMyNotifications,
 } from '@/app/notifications/queries';
 import { getCurrentUser } from '@/lib/auth/current-user';
+import { getAvatarPublicUrl } from '@/lib/storage/upload';
 import { getActiveClientsForProjectPicker } from './queries';
 import { getClientFormOptions } from './clients/queries';
 
@@ -42,6 +43,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     getUnreadNotificationCount(user.id),
   ]);
 
+  // The avatarUrl on `user` is a storage *path*, not a public URL —
+  // compose the URL once here so the header + sidebar can render the
+  // image without each one running its own composition. Cache-bust
+  // off `profiles.updatedAt` (which the upload action bumps), so the
+  // URL changes only when the avatar actually changes — important
+  // for CDN edge rotation and for the lint rule that bans impure
+  // calls (Date.now) during render.
+  const avatarPublicUrl = user.avatarUrl
+    ? getAvatarPublicUrl(user.avatarUrl, user.updatedAt.getTime())
+    : null;
+
   // Date label refreshes on each request — long-open tabs won't see today
   // tick over without a navigation, but admins get a fresh value on every
   // page load. Two parallel formats: the full label sits in the header on
@@ -71,6 +83,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className="bg-cream flex h-screen flex-col overflow-hidden text-ink-700">
         <AdminHeader
           user={user}
+          avatarPublicUrl={avatarPublicUrl}
           dateLabel={dateLabel}
           dateLabelShort={dateLabelShort}
           tiers={formOptions.tiers}
@@ -80,7 +93,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           unreadNotificationCount={unreadNotificationCount}
         />
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <Sidebar user={user} counts={sidebarCounts} />
+          <Sidebar user={user} avatarPublicUrl={avatarPublicUrl} counts={sidebarCounts} />
           <main className="min-w-0 flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-[1200px] px-8 py-8">{children}</div>
           </main>

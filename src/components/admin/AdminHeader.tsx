@@ -4,6 +4,7 @@ import {
   Bell,
   ChevronDown,
   LogOut,
+  Pencil,
   Plus,
   Search,
 } from 'lucide-react';
@@ -13,12 +14,16 @@ import { NewClientButton } from '@/app/admin/clients/NewClientButton';
 import type { ClientPickerRow } from '@/app/admin/queries';
 import type { PmOption, TierOption } from '@/app/admin/clients/queries';
 import type { NotificationListItem } from '@/app/notifications/queries';
+import { EditProfileModal } from '@/components/admin/EditProfileModal';
 import { NotificationsDropdown } from '@/components/admin/NotificationsDropdown';
 import type { CurrentUser } from '@/lib/auth/current-user';
 import { cn, initialsFrom } from '@/lib/utils';
 
 interface AdminHeaderProps {
   user: CurrentUser;
+  /** Resolved public URL of the current admin's avatar (composed once
+   *  in the layout via `getAvatarPublicUrl`); falls back to initials. */
+  avatarPublicUrl: string | null;
   /** Full date label like "Tuesday, April 28, 2026" — shown at sm+. */
   dateLabel: string;
   /** Compact date like "Apr 28, 2026" — shown when the full label
@@ -49,6 +54,7 @@ interface AdminHeaderProps {
  */
 export function AdminHeader({
   user,
+  avatarPublicUrl,
   dateLabel,
   dateLabelShort,
   tiers,
@@ -115,9 +121,11 @@ export function AdminHeader({
           unreadCount={unreadNotificationCount}
         />
 
-        {/* Avatar dropdown — initials + chevron, opens a small Sign out
-            menu (the existing affordance from the prior sidebar footer). */}
-        <AvatarMenu user={user} />
+        {/* Avatar dropdown — initials + chevron, opens a small menu
+            with Edit profile + Sign out. The avatar swaps to a real
+            image once the admin uploads one in the Edit-profile
+            modal. */}
+        <AvatarMenu user={user} avatarPublicUrl={avatarPublicUrl} />
       </div>
     </header>
   );
@@ -274,8 +282,15 @@ function NotificationBell({
 // Avatar dropdown — initials + chevron + Sign out menu.
 // ---------------------------------------------------------------------------
 
-function AvatarMenu({ user }: { user: CurrentUser }) {
+function AvatarMenu({
+  user,
+  avatarPublicUrl,
+}: {
+  user: CurrentUser;
+  avatarPublicUrl: string | null;
+}) {
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const displayName = user.fullName ?? user.email;
   const initials = initialsFrom(displayName);
@@ -308,9 +323,18 @@ function AvatarMenu({ user }: { user: CurrentUser }) {
           'border-line bg-paper hover:bg-cream inline-flex items-center gap-2 rounded-full border py-1 pr-2 pl-1 transition-colors',
         )}
       >
-        <span className="bg-brand-teal-500 flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold text-white">
-          {initials || displayName.slice(0, 2).toUpperCase()}
-        </span>
+        {avatarPublicUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={avatarPublicUrl}
+            alt={displayName}
+            className="h-7 w-7 flex-shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <span className="bg-brand-teal-500 flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold text-white">
+            {initials || displayName.slice(0, 2).toUpperCase()}
+          </span>
+        )}
         <ChevronDown
           size={14}
           strokeWidth={1.5}
@@ -332,6 +356,18 @@ function AvatarMenu({ user }: { user: CurrentUser }) {
               {user.role.replace('_', ' ')}
             </div>
           </div>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              setEditOpen(true);
+            }}
+            className="text-ink-700 hover:bg-cream hover:text-ink-900 flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
+          >
+            <Pencil size={14} strokeWidth={1.5} className="text-ink-400" />
+            Edit profile
+          </button>
           <form action="/logout" method="post">
             <button
               type="submit"
@@ -344,6 +380,17 @@ function AvatarMenu({ user }: { user: CurrentUser }) {
           </form>
         </div>
       )}
+
+      <EditProfileModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        initial={{
+          fullName: user.fullName ?? '',
+          email: user.email,
+          phone: user.phone ?? '',
+          avatarUrl: avatarPublicUrl,
+        }}
+      />
     </div>
   );
 }

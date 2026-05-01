@@ -20,7 +20,15 @@ export interface CurrentUser {
   role: UserRole;
   clientId: string | null;
   staffId: string | null;
+  /** Storage path under the public `avatars` bucket. **Not a URL** —
+   *  the column name is historical (CLAUDE.md calls this out).
+   *  Compose with `getAvatarPublicUrl(path, version)` at render time. */
   avatarUrl: string | null;
+  phone: string | null;
+  /** profiles.updatedAt — used as a stable cache-bust version when
+   *  composing the avatar URL. Changing the avatar bumps this, so
+   *  the URL changes and CDN edges rotate to fresh bytes. */
+  updatedAt: Date;
 }
 
 /**
@@ -52,6 +60,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     clientId: profile.clientId,
     staffId: profile.staffId,
     avatarUrl: profile.avatarUrl,
+    phone: profile.phone,
+    updatedAt: profile.updatedAt,
   };
 }
 

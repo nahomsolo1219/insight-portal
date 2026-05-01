@@ -88,9 +88,18 @@ function StaffCard({ member, onEdit }: { member: StaffRow; onEdit: () => void })
       )}
     >
       <div className="flex items-start gap-4">
-        <div className="bg-brand-teal-500 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white">
-          {initialsFrom(member.name)}
-        </div>
+        {member.avatarPublicUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={member.avatarPublicUrl}
+            alt={member.name}
+            className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <div className="bg-brand-teal-500 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white">
+            {initialsFrom(member.name)}
+          </div>
+        )}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">

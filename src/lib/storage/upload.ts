@@ -7,7 +7,7 @@ import 'server-only';
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
-import { BUCKET_NAME } from './paths';
+import { AVATARS_BUCKET, BUCKET_NAME } from './paths';
 
 export interface UploadInput {
   path: string;
@@ -173,6 +173,39 @@ export async function getSignedUrlsAdmin(
     }
   });
   return map;
+}
+
+// ---------------------------------------------------------------------------
+// Public bucket helpers (avatars)
+// ---------------------------------------------------------------------------
+//
+// The `avatars` bucket is public-read (folder is a UUID so the URL is
+// non-enumerable and the imagery isn't sensitive). For public buckets
+// we don't sign URLs at all — `getPublicUrl` on the supabase client
+// returns a deterministic URL, and a `?v=…` query string handles
+// cache-busting on replace.
+
+/**
+ * Build the public URL for an object in the `avatars` bucket. The
+ * URL is the same on every call for the same path; cache-bust via
+ * the optional `version` (a timestamp ms is the convention used by
+ * property/template covers).
+ *
+ * Returns `null` if the supabase client refuses to compose a URL —
+ * shouldn't happen in practice but the optional return mirrors
+ * `getSignedUrl` so call sites can fall back to initials.
+ */
+export function getAvatarPublicUrl(path: string, version?: number): string | null {
+  if (!path) return null;
+  // `getPublicUrl` is a pure URL-composition call — no network, no
+  // auth. We use the admin client just to avoid the cookie-bound
+  // server client's async constructor for what's a synchronous
+  // operation.
+  const supabase = createAdminClient();
+  const { data } = supabase.storage.from(AVATARS_BUCKET).getPublicUrl(path);
+  const url = data?.publicUrl ?? null;
+  if (!url) return null;
+  return version ? `${url}?v=${version}` : url;
 }
 
 /** Delete a single object from the bucket. Returns true on success. */

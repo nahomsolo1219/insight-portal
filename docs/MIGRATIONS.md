@@ -234,6 +234,33 @@ To verify the bucket landed: connect via `DIRECT_URL` and run
 `SELECT id, public FROM storage.buckets;` — should list both
 `insight-files` (public=false) and `property-covers` (public=true).
 
+### `avatars` (public)
+
+Used by the admin profile-edit modal (Session 7 onward) for user
+avatar uploads on the admin side. Each user's avatar lives at
+`avatars/{userId}/avatar.{ext}` — folder UUID is the auth user id
+so RLS can pin write access to "your own folder only", and the
+single object per user is overwritten on replace so cache busting
+via the `?v={updated_at_ms}` query string works the same way it
+does for property and template covers.
+
+Setup (idempotent — re-running is safe):
+
+```bash
+npx tsx scripts/apply-manual-sql.ts manual_avatars_storage.sql
+```
+
+Same shape as `property-covers` / `template-covers`: bucket
+creation with `INSERT ... ON CONFLICT DO UPDATE` plus four RLS
+policies on `storage.objects`. **Public SELECT** — the URL is
+non-enumerable (folder is a UUID), and avatars aren't sensitive
+relative to the rest of the system. **Per-user INSERT / UPDATE /
+DELETE** keyed off `(storage.foldername(name))[1] = auth.uid()`.
+5 MiB cap, `image/jpeg | image/png | image/webp` MIME allow-list.
+
+To verify the bucket landed: `SELECT id, public FROM storage.buckets;`
+should now also list `avatars` (public=true).
+
 ### `template-covers` (public)
 
 Used by the admin templates listing surface. Each project template's

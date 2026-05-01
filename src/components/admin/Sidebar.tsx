@@ -85,6 +85,10 @@ function countFor(key: BadgeKey | undefined, counts: SidebarCounts): number {
 
 interface SidebarProps {
   user: CurrentUser;
+  /** Resolved public URL of the current admin's avatar; falls back
+   *  to the initials block when null. Composed once per request in
+   *  the admin layout — see /app/admin/layout.tsx. */
+  avatarPublicUrl?: string | null;
   counts: SidebarCounts;
 }
 
@@ -94,7 +98,7 @@ interface SidebarProps {
  * sidebar's column) and the search input (search lives in the header). The
  * nav structure is unchanged; only the chrome above and below shifted.
  */
-export function Sidebar({ user, counts }: SidebarProps) {
+export function Sidebar({ user, avatarPublicUrl, counts }: SidebarProps) {
   const pathname = usePathname();
   const displayName = user.fullName ?? user.email;
   const initials = initialsFrom(displayName);
@@ -160,11 +164,23 @@ export function Sidebar({ user, counts }: SidebarProps) {
       {/* User footer — kept as a compact identity strip. The canonical
           avatar dropdown lives in the header now, but this strip still
           surfaces who's signed in and lets sign-out happen without
-          opening the header menu. */}
+          opening the header menu. The avatar swaps to a real image
+          once the admin uploads one in the header's Edit-profile
+          modal; the rounded-lg shape (vs. the header's rounded-full)
+          keeps the two surfaces visually distinct. */}
       <div className="border-line flex items-center gap-3 border-t px-4 py-3">
-        <div className="bg-brand-teal-500 flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold text-white">
-          {initials || displayName.slice(0, 2).toUpperCase()}
-        </div>
+        {avatarPublicUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={avatarPublicUrl}
+            alt={displayName}
+            className="h-9 w-9 flex-shrink-0 rounded-lg object-cover"
+          />
+        ) : (
+          <div className="bg-brand-teal-500 flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold text-white">
+            {initials || displayName.slice(0, 2).toUpperCase()}
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium text-[#333]">{displayName}</div>
           <div className="truncate text-xs text-[#8a8a8a] capitalize">{readableRole}</div>

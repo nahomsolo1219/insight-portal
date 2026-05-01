@@ -57,6 +57,7 @@ export type AuditAction =
   | 'deleted vendor document'
   | 'invited staff'
   | 'updated staff'
+  | 'updated profile'
   | 'invited client'
   | 'updated settings'
   | 'created tier'
@@ -70,6 +71,7 @@ export type AuditAction =
 
 export type AuditTargetType =
   | 'client'
+  | 'profile'
   | 'property'
   | 'project'
   | 'milestone'
