@@ -13,6 +13,8 @@ import {
 } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { createNotification } from '@/lib/notifications/create';
+import { getClientRecipientUserIds } from '@/lib/notifications/recipients';
 
 type ActionResult<T = undefined> =
   | { success: true; data?: T }
@@ -388,6 +390,31 @@ export async function markDecisionAwaitingClient(
       targetLabel: existing.title,
       clientId: owner.clientId,
     });
+
+    // Bell feed: notify every portal user attached to this client.
+    // Best-effort — `createNotification` swallows DB errors so a
+    // broken feed never blocks the decision push. Link points at the
+    // portal Decisions list (today aggregated across properties on
+    // the dashboard / project timeline; the dedicated route can be
+    // wired up when it ships).
+    try {
+      const recipients = await getClientRecipientUserIds(owner.clientId);
+      await Promise.all(
+        recipients.map((recipientUserId) =>
+          createNotification({
+            recipientUserId,
+            kind: 'decision_pushed',
+            title: 'A new decision needs your input',
+            body: existing.title,
+            link: '/portal',
+            relatedEntityType: 'decision',
+            relatedEntityId: milestoneId,
+          }),
+        ),
+      );
+    } catch (error) {
+      console.error('[markDecisionAwaitingClient] notify failed', error);
+    }
 
     revalidatePath(`/admin/projects/${projectId}`);
     revalidatePath(`/admin/clients/${owner.clientId}`);

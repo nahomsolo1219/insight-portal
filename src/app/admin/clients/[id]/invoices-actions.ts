@@ -7,6 +7,8 @@ import { db } from '@/db';
 import { invoices, projects, properties } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { createNotification } from '@/lib/notifications/create';
+import { getClientRecipientUserIds } from '@/lib/notifications/recipients';
 import { invoicePath } from '@/lib/storage/paths';
 import { deleteFile, uploadFile } from '@/lib/storage/upload';
 import { validateFile } from '@/lib/storage/validation';
@@ -141,6 +143,28 @@ export async function createInvoice(
       clientId,
       metadata: { status: input.status },
     });
+
+    // Bell feed: notify the client(s) so a new invoice doesn't have
+    // to wait for the next portal visit to be discovered. Link goes
+    // to the portal invoices page.
+    try {
+      const recipients = await getClientRecipientUserIds(clientId);
+      await Promise.all(
+        recipients.map((recipientUserId) =>
+          createNotification({
+            recipientUserId,
+            kind: 'invoice_uploaded',
+            title: `New invoice ${input.invoiceNumber.trim()}`,
+            body: input.description.trim(),
+            link: '/portal',
+            relatedEntityType: 'invoice',
+            relatedEntityId: invoiceId,
+          }),
+        ),
+      );
+    } catch (error) {
+      console.error('[createInvoice] notify failed', error);
+    }
 
     revalidatePath(`/admin/clients/${clientId}`);
     revalidatePath('/admin'); // dashboard outstanding stat

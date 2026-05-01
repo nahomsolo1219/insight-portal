@@ -7,6 +7,8 @@ import { db } from '@/db';
 import { photos, properties } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { createNotification } from '@/lib/notifications/create';
+import { getClientRecipientUserIds } from '@/lib/notifications/recipients';
 import { photoPath } from '@/lib/storage/paths';
 import { deleteFile, uploadFile } from '@/lib/storage/upload';
 import { getExtension, validateFile } from '@/lib/storage/validation';
@@ -191,6 +193,28 @@ export async function categorizePhoto(
       metadata: { tag: input.tag, category: input.category ?? null },
     });
 
+    // Bell feed: a single approval = one row per portal user. The
+    // bulk variant below sends one row per batch instead so a
+    // 30-photo approval doesn't spam the client's bell.
+    try {
+      const recipients = await getClientRecipientUserIds(clientId);
+      await Promise.all(
+        recipients.map((recipientUserId) =>
+          createNotification({
+            recipientUserId,
+            kind: 'photo_uploaded',
+            title: 'New photo from your project',
+            body: photo.caption || 'Tap to view in your project gallery.',
+            link: '/portal',
+            relatedEntityType: 'photo_batch',
+            relatedEntityId: photo.id,
+          }),
+        ),
+      );
+    } catch (error) {
+      console.error('[categorizePhoto] notify failed', error);
+    }
+
     revalidatePath(`/admin/clients/${clientId}`);
     revalidatePath('/admin');
     return { success: true };
@@ -251,6 +275,29 @@ export async function bulkCategorizePhotos(
       clientId,
       metadata: { tag: input.tag, category: input.category ?? null, count: ownedIds.length },
     });
+
+    // Bell feed: one row per recipient covering the whole batch —
+    // matches the spec's "group by upload batch" requirement and
+    // avoids drowning the client's bell when the admin approves
+    // 20+ photos at once.
+    try {
+      const recipients = await getClientRecipientUserIds(clientId);
+      const count = ownedIds.length;
+      await Promise.all(
+        recipients.map((recipientUserId) =>
+          createNotification({
+            recipientUserId,
+            kind: 'photo_uploaded',
+            title: `${count} new ${count === 1 ? 'photo' : 'photos'} from your project`,
+            body: 'Tap to view in your project gallery.',
+            link: '/portal',
+            relatedEntityType: 'photo_batch',
+          }),
+        ),
+      );
+    } catch (error) {
+      console.error('[bulkCategorizePhotos] notify failed', error);
+    }
 
     revalidatePath(`/admin/clients/${clientId}`);
     revalidatePath('/admin');

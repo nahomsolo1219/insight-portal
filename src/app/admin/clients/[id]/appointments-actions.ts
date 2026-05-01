@@ -7,6 +7,8 @@ import { db } from '@/db';
 import { appointments, properties } from '@/db/schema';
 import { logAudit, type AuditAction } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { createNotification } from '@/lib/notifications/create';
+import { getClientRecipientUserIds } from '@/lib/notifications/recipients';
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -97,6 +99,29 @@ export async function createAppointment(
       clientId,
       metadata: { date: input.date, startTime: input.startTime },
     });
+
+    // Bell feed: notify the client so a new visit on their calendar
+    // shows up immediately. Link points at the portal appointments
+    // page (top-level — not the per-property route since the bell
+    // doesn't carry property context).
+    try {
+      const recipients = await getClientRecipientUserIds(clientId);
+      await Promise.all(
+        recipients.map((recipientUserId) =>
+          createNotification({
+            recipientUserId,
+            kind: 'appointment_scheduled',
+            title: 'A new visit has been scheduled',
+            body: `${input.title.trim()} — ${input.date}`,
+            link: '/portal',
+            relatedEntityType: 'appointment',
+            relatedEntityId: appointmentId,
+          }),
+        ),
+      );
+    } catch (error) {
+      console.error('[createAppointment] notify failed', error);
+    }
 
     revalidatePath(`/admin/clients/${clientId}`);
     revalidatePath('/admin'); // dashboard today's-schedule card

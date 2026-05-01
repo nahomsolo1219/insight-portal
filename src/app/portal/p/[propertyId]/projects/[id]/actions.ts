@@ -6,6 +6,8 @@ import { db } from '@/db';
 import { milestones, photos, projects, properties } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireUser } from '@/lib/auth/current-user';
+import { createNotification } from '@/lib/notifications/create';
+import { getAdminRecipientUserIds } from '@/lib/notifications/recipients';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { BUCKET_NAME } from '@/lib/storage/paths';
 
@@ -89,6 +91,32 @@ export async function respondToDecision(
       clientId: user.clientId,
       metadata: { response: trimmed },
     });
+
+    // Bell feed: notify every admin so whoever's watching the
+    // dashboard sees the response land. We fan out to all admins
+    // rather than just the project's PM because (a) the
+    // `clients.assignedPmId` may be unset and (b) the team
+    // generally wants visibility into incoming client input. Link
+    // points back at the admin decisions list. Best-effort.
+    try {
+      const responderName = user.fullName?.trim() || user.email;
+      const recipients = await getAdminRecipientUserIds();
+      await Promise.all(
+        recipients.map((recipientUserId) =>
+          createNotification({
+            recipientUserId,
+            kind: 'decision_answered',
+            title: `${responderName} responded to a decision`,
+            body: row.title,
+            link: '/admin/decisions',
+            relatedEntityType: 'decision',
+            relatedEntityId: row.id,
+          }),
+        ),
+      );
+    } catch (error) {
+      console.error('[respondToDecision] notify failed', error);
+    }
 
     revalidatePath(`/portal/p/${row.propertyId}/projects`);
     return { success: true };

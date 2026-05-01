@@ -524,6 +524,46 @@ export const auditLog = pgTable('audit_log', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// notifications — append-only feed surfaced via the bell icon in the
+// admin header and the portal sidebar. One row per "thing the recipient
+// should know about". `recipient_user_id` points at `auth.users.id`
+// rather than `profiles.id` so the table works for any signed-in role
+// (admin / client / field_staff) without a join. RLS makes
+// "see only your own" the only reachable read path.
+//
+// `kind` is intentionally text rather than an enum — adding a new kind
+// later (chat message, daily digest, etc.) shouldn't require a migration
+// + enum-cast dance. The TypeScript union below (`NotificationKind`) is
+// the source of truth at the application layer.
+//
+// `read_at` is the unread/read flag; null = unread. The partial
+// `notifications_recipient_unread_idx` is what makes the bell-badge
+// count query (filter by recipient + unread) cheap even after months
+// of audit-style writes.
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    recipientUserId: uuid('recipient_user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    title: text('title').notNull(),
+    body: text('body'),
+    link: text('link'),
+    relatedEntityType: text('related_entity_type'),
+    relatedEntityId: uuid('related_entity_id'),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('notifications_recipient_idx').on(t.recipientUserId, t.createdAt.desc()),
+    index('notifications_recipient_unread_idx')
+      .on(t.recipientUserId)
+      .where(sql`${t.readAt} is null`),
+  ],
+);
+
 // email_templates
 export const emailTemplates = pgTable('email_templates', {
   id: uuid('id').primaryKey().defaultRandom(),
