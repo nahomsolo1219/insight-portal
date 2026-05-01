@@ -503,7 +503,7 @@ function UploadModal({ onClose, clientId, properties, projects }: UploadModalPro
             type="button"
             onClick={onClose}
             disabled={isPending}
-            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
+            className="bg-paper border border-line text-ink-700 hover:bg-cream rounded-lg px-4 py-2.5 font-medium transition disabled:opacity-50"
           >
             Cancel
           </button>
@@ -511,7 +511,7 @@ function UploadModal({ onClose, clientId, properties, projects }: UploadModalPro
             type="button"
             onClick={submit}
             disabled={isPending}
-            className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-5 py-2.5 font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            className="bg-brand-gold-500 hover:bg-brand-gold-600 text-paper rounded-lg px-4 py-2.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPending ? (
               <>
@@ -717,7 +717,7 @@ function DeleteConfirmModal({ invoice, onClose, clientId }: DeleteConfirmModalPr
             type="button"
             onClick={onClose}
             disabled={isPending}
-            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
+            className="bg-paper border border-line text-ink-700 hover:bg-cream rounded-lg px-4 py-2.5 font-medium transition disabled:opacity-50"
           >
             Cancel
           </button>
@@ -725,7 +725,7 @@ function DeleteConfirmModal({ invoice, onClose, clientId }: DeleteConfirmModalPr
             type="button"
             onClick={submit}
             disabled={isPending}
-            className="shadow-soft rounded-xl bg-red-500 px-5 py-2.5 font-medium text-white transition-all hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="bg-rose-600 hover:bg-rose-700 text-paper rounded-lg px-4 py-2.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPending ? (
               <>

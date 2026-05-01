@@ -159,7 +159,7 @@ export function NewClientButton({ tiers, pms, variant = 'standalone' }: NewClien
               type="button"
               onClick={closeModal}
               disabled={isPending}
-              className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
+              className="bg-paper border border-line text-ink-700 hover:bg-cream rounded-lg px-4 py-2.5 font-medium transition disabled:opacity-50"
             >
               Cancel
             </button>
@@ -167,7 +167,7 @@ export function NewClientButton({ tiers, pms, variant = 'standalone' }: NewClien
               type="button"
               onClick={submit}
               disabled={isPending || !form.name.trim() || !form.email.trim()}
-              className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-5 py-2.5 font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              className="bg-brand-gold-500 hover:bg-brand-gold-600 text-paper rounded-lg px-4 py-2.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isPending ? (
                 <>

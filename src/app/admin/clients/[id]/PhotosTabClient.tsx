@@ -877,7 +877,7 @@ function PhotoDetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100"
+            className="bg-paper border border-line text-ink-700 hover:bg-cream rounded-lg px-4 py-2.5 font-medium transition"
           >
             Close
           </button>
@@ -885,7 +885,7 @@ function PhotoDetailModal({
             type="button"
             onClick={save}
             disabled={!tag}
-            className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-5 py-2.5 font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            className="bg-brand-gold-500 hover:bg-brand-gold-600 text-paper rounded-lg px-4 py-2.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             {photo.status === 'categorized' ? 'Update' : 'Categorize'}
           </button>
@@ -1095,7 +1095,7 @@ function UploadPhotosModal({ clientId, propertyId, projects, onClose }: UploadPh
             type="button"
             onClick={onClose}
             disabled={isPending}
-            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
+            className="bg-paper border border-line text-ink-700 hover:bg-cream rounded-lg px-4 py-2.5 font-medium transition disabled:opacity-50"
           >
             Cancel
           </button>
@@ -1103,7 +1103,7 @@ function UploadPhotosModal({ clientId, propertyId, projects, onClose }: UploadPh
             type="button"
             onClick={submit}
             disabled={isPending || files.length === 0}
-            className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-5 py-2.5 font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            className="bg-brand-gold-500 hover:bg-brand-gold-600 text-paper rounded-lg px-4 py-2.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPending ? (
               <>
@@ -1272,7 +1272,7 @@ function BulkCategorizeModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100"
+            className="bg-paper border border-line text-ink-700 hover:bg-cream rounded-lg px-4 py-2.5 font-medium transition"
           >
             Cancel
           </button>
@@ -1280,7 +1280,7 @@ function BulkCategorizeModal({
             type="button"
             onClick={submit}
             disabled={!tag}
-            className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-5 py-2.5 font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            className="bg-brand-gold-500 hover:bg-brand-gold-600 text-paper rounded-lg px-4 py-2.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             Apply to all
           </button>
@@ -1380,7 +1380,7 @@ function BulkOptimisticConfirmModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100"
+            className="bg-paper border border-line text-ink-700 hover:bg-cream rounded-lg px-4 py-2.5 font-medium transition"
           >
             Cancel
           </button>
@@ -1457,7 +1457,7 @@ function BulkConfirmModal({
             type="button"
             onClick={onClose}
             disabled={isPending}
-            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
+            className="bg-paper border border-line text-ink-700 hover:bg-cream rounded-lg px-4 py-2.5 font-medium transition disabled:opacity-50"
           >
             Cancel
           </button>
@@ -1534,7 +1534,7 @@ function SingleDeleteModal({ photo, clientId, onClose }: SingleDeleteModalProps)
             type="button"
             onClick={onClose}
             disabled={isPending}
-            className="rounded-xl px-5 py-2.5 font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
+            className="bg-paper border border-line text-ink-700 hover:bg-cream rounded-lg px-4 py-2.5 font-medium transition disabled:opacity-50"
           >
             Cancel
           </button>
@@ -1542,7 +1542,7 @@ function SingleDeleteModal({ photo, clientId, onClose }: SingleDeleteModalProps)
             type="button"
             onClick={confirm}
             disabled={isPending}
-            className="shadow-soft rounded-xl bg-red-500 px-5 py-2.5 font-medium text-white transition-all hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="bg-rose-600 hover:bg-rose-700 text-paper rounded-lg px-4 py-2.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPending ? (
               <>

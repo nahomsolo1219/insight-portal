@@ -70,29 +70,29 @@ export function Modal({
     >
       <div
         className={cn(
-          'shadow-modal flex max-h-[85vh] w-full flex-col overflow-hidden rounded-3xl bg-white',
+          'bg-paper border-line shadow-soft-lg flex max-h-[85vh] w-full flex-col overflow-hidden rounded-2xl border',
           sizes[size],
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-8 py-6">
+        <div className="border-line flex items-start justify-between gap-4 border-b px-8 py-6">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
-            {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
+            <h2 className="text-ink-900 text-xl font-medium tracking-tight">{title}</h2>
+            {description && <p className="text-ink-500 mt-1 text-sm">{description}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={locked}
             aria-label="Close"
-            className="rounded-lg p-2 text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="text-ink-500 hover:bg-cream hover:text-ink-700 rounded-lg p-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             <X size={18} strokeWidth={1.5} />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-8 py-6">{children}</div>
         {footer && (
-          <div className="bg-brand-warm-50 flex items-center justify-end gap-3 border-t border-gray-100 px-8 py-5">
+          <div className="bg-cream border-line flex items-center justify-end gap-3 border-t px-8 py-5">
             {footer}
           </div>
         )}

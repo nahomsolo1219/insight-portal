@@ -423,7 +423,7 @@ export function PhotoReviewPanel({
             type="button"
             onClick={approve}
             disabled={!tag}
-            className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-5 py-2.5 text-sm font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            className="bg-brand-gold-500 hover:bg-brand-gold-600 text-paper rounded-lg px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitLabel}
           </button>
