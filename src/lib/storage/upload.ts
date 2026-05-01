@@ -62,7 +62,19 @@ export async function getSignedUrl(path: string, expiresIn = 60 * 60): Promise<s
 
 /**
  * Batch variant. Signs every requested path in one round-trip and returns
- * a `Map<path, url>`. Paths that fail to sign are omitted from the result.
+ * a `Map<path, url>` keyed by the **input** path the caller passed in
+ * (so `urlMap.get(row.storagePath)` always works).
+ *
+ * Paths that fail to sign are omitted from the result.
+ *
+ * Implementation note: supabase-js's `createSignedUrls` returns a
+ * response array in the same order as the input. Each item carries a
+ * `path` field that is *meant* to echo the input, but in practice that
+ * field can be `null` on errored entries and has been observed to drop
+ * to null on otherwise-successful entries on certain API versions —
+ * which would silently break callers that look up by input path.
+ * Pairing input + response by index is the only echo-independent way
+ * to build the map; the order guarantee is documented and stable.
  */
 export async function getSignedUrls(
   paths: string[],
@@ -81,11 +93,12 @@ export async function getSignedUrls(
   }
 
   const map = new Map<string, string>();
-  for (const item of data) {
-    if (item.signedUrl && item.path) {
-      map.set(item.path, item.signedUrl);
+  data.forEach((item, i) => {
+    const inputPath = paths[i];
+    if (inputPath && item.signedUrl) {
+      map.set(inputPath, item.signedUrl);
     }
-  }
+  });
   return map;
 }
 
