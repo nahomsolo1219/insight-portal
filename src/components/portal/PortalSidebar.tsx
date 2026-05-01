@@ -23,9 +23,11 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { Field, inputClass } from '@/components/admin/Field';
 import { LoadingDots } from '@/components/admin/LoadingDots';
 import { Modal } from '@/components/admin/Modal';
+import { NotificationsDropdown } from '@/components/admin/NotificationsDropdown';
 import { useToast } from '@/components/admin/ToastProvider';
 import { PropertyCover } from '@/components/portal/PropertyCover';
 import { updateMyProfile } from '@/app/portal/actions';
+import type { NotificationListItem } from '@/app/notifications/queries';
 import type { CurrentUser } from '@/lib/auth/current-user';
 import { cn, initialsFrom } from '@/lib/utils';
 
@@ -56,8 +58,11 @@ interface PortalSidebarProps {
    *  when ≥ 2. With one property the pill stays as a static identity
    *  chip. */
   properties: PortalSidebarProperty[];
-  /** Drives the notifications row badge count. */
-  pendingDecisionCount: number;
+  /** Latest notifications + unread count for the bell-row dropdown.
+   *  Threaded through from the layout so the same data warms the badge
+   *  count and the panel content with one round-trip. */
+  notifications: NotificationListItem[];
+  unreadNotificationCount: number;
 }
 
 interface NavSpec {
@@ -108,7 +113,8 @@ export function PortalSidebar({
   client,
   propertyId,
   properties,
-  pendingDecisionCount,
+  notifications,
+  unreadNotificationCount,
 }: PortalSidebarProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const activeProperty = properties.find((p) => p.id === propertyId) ?? null;
@@ -225,7 +231,8 @@ export function PortalSidebar({
             by a thin hairline. */}
         <div className="border-paper/10 border-t">
           <NotificationsRow
-            pendingDecisionCount={pendingDecisionCount}
+            notifications={notifications}
+            unreadCount={unreadNotificationCount}
             onNavigate={closeDrawer}
           />
         </div>
@@ -510,51 +517,68 @@ function PropertySwitcher({
 }
 
 // ---------------------------------------------------------------------------
-// Notifications row — smooth-scrolls to the dashboard's
-// `#featured-decision` anchor when there's at least one pending decision.
+// Notifications row — opens the shared NotificationsDropdown anchored to
+// the right of the sidebar (fixed position, bottom-aligned). The badge
+// count comes from real notifications now (not the prior pending-
+// decision proxy), and the dropdown lets a client mark items read
+// without leaving the current page.
 // ---------------------------------------------------------------------------
 
 function NotificationsRow({
-  pendingDecisionCount,
+  notifications,
+  unreadCount,
   onNavigate,
 }: {
-  pendingDecisionCount: number;
+  notifications: NotificationListItem[];
+  unreadCount: number;
+  /** Closes the mobile drawer when one of the dropdown rows navigates. */
   onNavigate: () => void;
 }) {
-  const hasPending = pendingDecisionCount > 0;
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useDismissOnOutside(ref, open, () => setOpen(false));
 
-  function onClick() {
-    if (hasPending) {
-      const target = document.getElementById('featured-decision');
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
+  const hasUnread = unreadCount > 0;
+
+  function close() {
+    setOpen(false);
     onNavigate();
   }
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={
-        hasPending
-          ? `${pendingDecisionCount} ${pendingDecisionCount === 1 ? 'decision' : 'decisions'} waiting`
-          : 'No notifications'
-      }
-      className="text-paper/70 hover:bg-paper/[0.03] hover:text-paper flex w-full items-center gap-3 px-5 py-3 text-sm font-medium transition-colors"
-    >
-      <Bell size={16} strokeWidth={1.5} className="flex-shrink-0" />
-      <span className="flex-1 text-left">Notifications</span>
-      {hasPending && (
-        <span
-          className="text-paper inline-flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold"
-          style={{ backgroundColor: 'var(--amber-500)' }}
-        >
-          {pendingDecisionCount > 9 ? '9+' : pendingDecisionCount}
-        </span>
-      )}
-    </button>
+    <div ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label={
+          hasUnread
+            ? `${unreadCount} unread ${unreadCount === 1 ? 'notification' : 'notifications'}`
+            : 'Notifications'
+        }
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        className="text-paper/70 hover:bg-paper/[0.03] hover:text-paper flex w-full items-center gap-3 px-5 py-3 text-sm font-medium transition-colors"
+      >
+        <Bell size={16} strokeWidth={1.5} className="flex-shrink-0" />
+        <span className="flex-1 text-left">Notifications</span>
+        {hasUnread && (
+          <span
+            className="text-paper inline-flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold"
+            style={{ backgroundColor: 'var(--amber-500)' }}
+          >
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      <NotificationsDropdown
+        notifications={notifications}
+        unreadCount={unreadCount}
+        open={open}
+        onClose={close}
+        anchor="right-of-bottom"
+      />
+    </div>
   );
 }
 

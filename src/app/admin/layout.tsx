@@ -5,6 +5,10 @@ import { NavigationProgress } from '@/components/admin/NavigationProgress';
 import { Sidebar } from '@/components/admin/Sidebar';
 import { ToastProvider } from '@/components/admin/ToastProvider';
 import { getSidebarCounts } from '@/components/admin/queries';
+import {
+  getUnreadNotificationCount,
+  listMyNotifications,
+} from '@/app/notifications/queries';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { getActiveClientsForProjectPicker } from './queries';
 import { getClientFormOptions } from './clients/queries';
@@ -21,11 +25,21 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (user.role !== 'admin') redirect('/');
 
   // Header + sidebar both need server-fetched data once per request.
-  // Promise.all keeps it to a single round-trip.
-  const [sidebarCounts, formOptions, projectPickerClients] = await Promise.all([
+  // Promise.all keeps it to a single round-trip. Notifications are
+  // fetched here so the bell badge + dropdown are warm on every page —
+  // the mark-read actions revalidate this layout to keep them honest.
+  const [
+    sidebarCounts,
+    formOptions,
+    projectPickerClients,
+    notifications,
+    unreadNotificationCount,
+  ] = await Promise.all([
     getSidebarCounts(),
     getClientFormOptions(),
     getActiveClientsForProjectPicker(),
+    listMyNotifications(user.id),
+    getUnreadNotificationCount(user.id),
   ]);
 
   // Date label refreshes on each request — long-open tabs won't see today
@@ -62,6 +76,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           tiers={formOptions.tiers}
           pms={formOptions.pms}
           projectPickerClients={projectPickerClients}
+          notifications={notifications}
+          unreadNotificationCount={unreadNotificationCount}
         />
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <Sidebar user={user} counts={sidebarCounts} />

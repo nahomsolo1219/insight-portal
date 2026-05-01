@@ -12,6 +12,8 @@ import { DashboardNewProjectButton } from '@/app/admin/DashboardNewProjectButton
 import { NewClientButton } from '@/app/admin/clients/NewClientButton';
 import type { ClientPickerRow } from '@/app/admin/queries';
 import type { PmOption, TierOption } from '@/app/admin/clients/queries';
+import type { NotificationListItem } from '@/app/notifications/queries';
+import { NotificationsDropdown } from '@/components/admin/NotificationsDropdown';
 import type { CurrentUser } from '@/lib/auth/current-user';
 import { cn, initialsFrom } from '@/lib/utils';
 
@@ -27,6 +29,12 @@ interface AdminHeaderProps {
   pms: PmOption[];
   /** Active clients drive the New Project picker modal. */
   projectPickerClients: ClientPickerRow[];
+  /** Latest notifications for the bell-dropdown panel. Fetched once
+   *  per request in the layout — `revalidatePath('/admin', 'layout')`
+   *  in the mark-read actions keeps both this list and `unreadCount`
+   *  in sync. */
+  notifications: NotificationListItem[];
+  unreadNotificationCount: number;
 }
 
 /**
@@ -46,6 +54,8 @@ export function AdminHeader({
   tiers,
   pms,
   projectPickerClients,
+  notifications,
+  unreadNotificationCount,
 }: AdminHeaderProps) {
   return (
     <header className="bg-paper border-line flex h-16 flex-shrink-0 border-b">
@@ -98,9 +108,12 @@ export function AdminHeader({
             space is tight. */}
         <span aria-hidden="true" className="bg-line hidden h-8 w-px sm:block" />
 
-        {/* Notifications bell — visual placeholder until Session 7 wires
-            real notifications. */}
-        <NotificationBell />
+        {/* Notifications bell — wired in Session 7. Red dot only when
+            unreadCount > 0; click opens the shared dropdown panel. */}
+        <NotificationBell
+          notifications={notifications}
+          unreadCount={unreadNotificationCount}
+        />
 
         {/* Avatar dropdown — initials + chevron, opens a small Sign out
             menu (the existing affordance from the prior sidebar footer). */}
@@ -195,25 +208,65 @@ function SearchInput() {
 }
 
 // ---------------------------------------------------------------------------
-// Notification bell — static red dot placeholder.
+// Notification bell — opens the shared NotificationsDropdown anchored
+// down-right of the icon. The red dot only renders when there's at
+// least one unread row; clicking through a notification (or "Mark all
+// as read") triggers a layout-level revalidate so the dot disappears
+// without a manual refresh.
 // ---------------------------------------------------------------------------
 
-function NotificationBell() {
+function NotificationBell({
+  notifications,
+  unreadCount,
+}: {
+  notifications: NotificationListItem[];
+  unreadCount: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Click-outside dismiss — the panel itself stops propagation, so a
+  // click anywhere outside this wrapper closes the dropdown.
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
   return (
-    <button
-      type="button"
-      onClick={() => {
-        // No-op until Session 7 wires real notifications.
-      }}
-      aria-label="Notifications"
-      className="text-ink-500 hover:bg-cream relative inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-colors"
-    >
-      <Bell size={18} strokeWidth={1.5} />
-      <span
-        aria-hidden="true"
-        className="ring-paper absolute right-2 top-2 inline-block h-1.5 w-1.5 rounded-full bg-red-500 ring-2"
+    <div ref={ref} className="relative flex-shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label={
+          unreadCount > 0
+            ? `${unreadCount} unread ${unreadCount === 1 ? 'notification' : 'notifications'}`
+            : 'Notifications'
+        }
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        className="text-ink-500 hover:bg-cream relative inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors"
+      >
+        <Bell size={18} strokeWidth={1.5} />
+        {unreadCount > 0 && (
+          <span
+            aria-hidden="true"
+            className="ring-paper absolute right-2 top-2 inline-block h-1.5 w-1.5 rounded-full bg-red-500 ring-2"
+          />
+        )}
+      </button>
+
+      <NotificationsDropdown
+        notifications={notifications}
+        unreadCount={unreadCount}
+        open={open}
+        onClose={() => setOpen(false)}
+        anchor="right-below"
       />
-    </button>
+    </div>
   );
 }
 
