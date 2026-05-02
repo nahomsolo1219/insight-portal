@@ -18,16 +18,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { CurrentUser } from '@/lib/auth/current-user';
 import { cn, initialsFrom } from '@/lib/utils';
-import type { SidebarCounts } from './queries';
-
-type BadgeKey = 'schedule' | 'photos' | 'decisions' | 'invoices';
 
 interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
-  /** Optional key into the counts object supplied by the layout. */
-  badgeKey?: BadgeKey;
 }
 
 interface NavSection {
@@ -47,9 +42,9 @@ const sections: NavSection[] = [
     heading: 'Manage',
     items: [
       { label: 'Clients', href: '/admin/clients', icon: Users },
-      { label: 'Photo Queue', href: '/admin/photo-queue', icon: Images, badgeKey: 'photos' },
-      { label: 'Decisions', href: '/admin/decisions', icon: CircleHelp, badgeKey: 'decisions' },
-      { label: 'Invoices', href: '/admin/invoices', icon: FileText, badgeKey: 'invoices' },
+      { label: 'Photo Queue', href: '/admin/photo-queue', icon: Images },
+      { label: 'Decisions', href: '/admin/decisions', icon: CircleHelp },
+      { label: 'Invoices', href: '/admin/invoices', icon: FileText },
     ],
   },
   {
@@ -68,37 +63,28 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + '/');
 }
 
-function countFor(key: BadgeKey | undefined, counts: SidebarCounts): number {
-  switch (key) {
-    case 'photos':
-      return counts.photosPending;
-    case 'decisions':
-      return counts.decisionsPending;
-    case 'invoices':
-      return counts.invoicesUnpaid;
-    case 'schedule':
-      return 0; // No schedule-count query yet; reserve the slot.
-    default:
-      return 0;
-  }
-}
-
 interface SidebarProps {
   user: CurrentUser;
   /** Resolved public URL of the current admin's avatar; falls back
    *  to the initials block when null. Composed once per request in
    *  the admin layout — see /app/admin/layout.tsx. */
   avatarPublicUrl?: string | null;
-  counts: SidebarCounts;
 }
 
 /**
- * Admin sidebar. After Session 2's header redesign, the sidebar lost the
- * teal logo band (the new header owns the logo panel directly above the
- * sidebar's column) and the search input (search lives in the header). The
- * nav structure is unchanged; only the chrome above and below shifted.
+ * Admin sidebar. Pure navigation surface.
+ *
+ * Earlier sessions threaded "what needs your attention" counts
+ * (`photos pending`, `decisions awaiting client`, `invoices unpaid`)
+ * into amber badges next to the relevant nav items. That moved out
+ * in the Session 7 follow-up — the dashboard's "Needs attention" area
+ * is the single source of truth for "what to do today", and the
+ * sidebar duplicating those signals just made the chrome noisier.
+ * Real notifications still live on the header bell, which polls
+ * every 30s and uses a different visual treatment (red dot, not gold
+ * pill) precisely so the two surfaces don't read as the same thing.
  */
-export function Sidebar({ user, avatarPublicUrl, counts }: SidebarProps) {
+export function Sidebar({ user, avatarPublicUrl }: SidebarProps) {
   const pathname = usePathname();
   const displayName = user.fullName ?? user.email;
   const initials = initialsFrom(displayName);
@@ -127,7 +113,6 @@ export function Sidebar({ user, avatarPublicUrl, counts }: SidebarProps) {
             <ul className="space-y-0.5">
               {section.items.map((item) => {
                 const active = isActive(pathname, item.href);
-                const badgeValue = countFor(item.badgeKey, counts);
                 const Icon = item.icon;
                 return (
                   <li key={item.href}>
@@ -147,11 +132,6 @@ export function Sidebar({ user, avatarPublicUrl, counts }: SidebarProps) {
                         )}
                       />
                       <span className="flex-1">{item.label}</span>
-                      {badgeValue > 0 && (
-                        <span className="bg-brand-gold-400 min-w-[18px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold text-white">
-                          {badgeValue}
-                        </span>
-                      )}
                     </Link>
                   </li>
                 );

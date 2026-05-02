@@ -4,7 +4,6 @@ import { AdminHeader } from '@/components/admin/AdminHeader';
 import { NavigationProgress } from '@/components/admin/NavigationProgress';
 import { Sidebar } from '@/components/admin/Sidebar';
 import { ToastProvider } from '@/components/admin/ToastProvider';
-import { getSidebarCounts } from '@/components/admin/queries';
 import {
   getUnreadNotificationCount,
   listMyNotifications,
@@ -25,18 +24,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (user.role === 'field_staff') redirect('/field');
   if (user.role !== 'admin') redirect('/');
 
-  // Header + sidebar both need server-fetched data once per request.
-  // Promise.all keeps it to a single round-trip. Notifications are
-  // fetched here so the bell badge + dropdown are warm on every page —
-  // the mark-read actions revalidate this layout to keep them honest.
+  // Header chrome data — fetched once per request via Promise.all so
+  // every admin page hits four queries in parallel instead of
+  // serialised. The sidebar used to also fetch pending-photo /
+  // decision / unpaid-invoice counts for amber badges; those moved
+  // out in the Session 7 follow-up (the dashboard's "Needs attention"
+  // surface is the source of truth for "what needs your action
+  // today" — the sidebar is purely navigational now).
   const [
-    sidebarCounts,
     formOptions,
     projectPickerClients,
     notifications,
     unreadNotificationCount,
   ] = await Promise.all([
-    getSidebarCounts(),
     getClientFormOptions(),
     getActiveClientsForProjectPicker(),
     listMyNotifications(user.id),
@@ -93,7 +93,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           unreadNotificationCount={unreadNotificationCount}
         />
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <Sidebar user={user} avatarPublicUrl={avatarPublicUrl} counts={sidebarCounts} />
+          <Sidebar user={user} avatarPublicUrl={avatarPublicUrl} />
           <main className="min-w-0 flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-[1200px] px-8 py-8">{children}</div>
           </main>

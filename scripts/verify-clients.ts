@@ -1,17 +1,12 @@
-// Probe the clients list / form-options queries and the sidebar counts
-// without going through the auth flow. Safe to re-run; reads only.
+// Probe the clients list / form-options queries without going through
+// the auth flow. Safe to re-run; reads only.
 
 import './_env';
 
-import { getSidebarCounts } from '../src/components/admin/queries';
 import { getClientFormOptions, listClients } from '../src/app/admin/clients/queries';
 
 async function main() {
-  const [rows, options, counts] = await Promise.all([
-    listClients(),
-    getClientFormOptions(),
-    getSidebarCounts(),
-  ]);
+  const [rows, options] = await Promise.all([listClients(), getClientFormOptions()]);
 
   console.log('\nlistClients():');
   for (const c of rows) {
@@ -25,11 +20,6 @@ async function main() {
   for (const t of options.tiers) console.log(`    - ${t.name} (${t.id})`);
   console.log(`  pms   (${options.pms.length}):`);
   for (const p of options.pms) console.log(`    - ${p.name} — ${p.role}`);
-
-  console.log('\ngetSidebarCounts():');
-  console.log(`  photos pending    : ${counts.photosPending}`);
-  console.log(`  decisions pending : ${counts.decisionsPending}`);
-  console.log(`  invoices unpaid   : ${counts.invoicesUnpaid}`);
 }
 
 main()
