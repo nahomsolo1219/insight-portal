@@ -4,6 +4,7 @@ import {
   AlertCircle,
   Camera,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -48,6 +49,25 @@ interface Props {
  */
 export function ProjectTimeline({ payload }: Props) {
   const { project, property, pmName, pmEmail, pmPhone, milestones, nextAppointment } = payload;
+
+  // Split milestones into decisions and work items. Decisions get their
+  // own surface above the timeline; work items render in the grouped
+  // timeline below.
+  const { awaitingDecisions, pastDecisions, workMilestones } = useMemo(() => {
+    const awaiting: TimelineMilestone[] = [];
+    const past: TimelineMilestone[] = [];
+    const work: TimelineMilestone[] = [];
+    for (const m of milestones) {
+      if (m.status === 'awaiting_client' && !m.clientResponse) {
+        awaiting.push(m);
+      } else if (m.status === 'awaiting_client' && m.clientResponse) {
+        past.push(m);
+      } else {
+        work.push(m);
+      }
+    }
+    return { awaitingDecisions: awaiting, pastDecisions: past, workMilestones: work };
+  }, [milestones]);
 
   // Aggregate every photo on the project for the lightbox carousel — the
   // user expects swipe to walk across all photos, not just the ones in
@@ -110,31 +130,41 @@ export function ProjectTimeline({ payload }: Props) {
         totalMilestones={payload.stats.totalMilestones}
       />
 
-      {allPhotos.length > 0 && (
-        <PhotoFilterBar
-          projectId={project.id}
-          tagFilter={tagFilter}
-          onTagFilter={setTagFilter}
-          categoryFilter={categoryFilter}
-          onCategoryFilter={setCategoryFilter}
-          categories={categories}
-          visibleCount={visibleIds.size}
-          totalCount={allPhotos.length}
-        />
+      {awaitingDecisions.length > 0 && (
+        <AwaitingDecisionsSection decisions={awaitingDecisions} />
+      )}
+
+      {pastDecisions.length > 0 && (
+        <PastDecisionsSection decisions={pastDecisions} />
       )}
 
       <Timeline
-        milestones={milestones}
+        milestones={workMilestones}
         onPhotoClick={openLightbox}
         visibleIds={visibleIds}
       />
 
       {allPhotos.length > 0 && (
-        <ProjectPhotosSection
-          photos={allPhotos}
-          visibleIds={visibleIds}
-          onPhotoClick={openLightbox}
-        />
+        <section>
+          <SectionLabel>Photos</SectionLabel>
+          <PhotoFilterBar
+            projectId={project.id}
+            tagFilter={tagFilter}
+            onTagFilter={setTagFilter}
+            categoryFilter={categoryFilter}
+            onCategoryFilter={setCategoryFilter}
+            categories={categories}
+            visibleCount={visibleIds.size}
+            totalCount={allPhotos.length}
+          />
+          <div className="mt-4">
+            <ProjectPhotosGrid
+              photos={allPhotos}
+              visibleIds={visibleIds}
+              onPhotoClick={openLightbox}
+            />
+          </div>
+        </section>
       )}
 
       {nextAppointment && (
@@ -367,8 +397,116 @@ function Stat({ value, label, emphasis }: { value: string; label: string; emphas
 }
 
 // ---------------------------------------------------------------------------
-// Timeline
+// Awaiting decisions — milestones with status awaiting_client, no response yet
 // ---------------------------------------------------------------------------
+
+function AwaitingDecisionsSection({ decisions }: { decisions: TimelineMilestone[] }) {
+  return (
+    <section>
+      <SectionLabel>Decisions awaiting your input</SectionLabel>
+      <div className="space-y-4">
+        {decisions.map((m) => (
+          <div
+            key={m.id}
+            className="shadow-card border-brand-gold-300 rounded-2xl border bg-white p-5"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
+                Decision
+                {m.dueDate && (
+                  <span className="ml-2 text-gray-400">· Due {shortDate(m.dueDate)}</span>
+                )}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-brand-gold-100 px-2 py-0.5 text-[11px] font-medium text-brand-gold-800">
+                <AlertCircle size={10} strokeWidth={2.5} />
+                Your input needed
+              </span>
+            </div>
+            <h3 className="mt-1 text-base font-semibold text-gray-900 md:text-lg">
+              {m.questionBody || m.title}
+            </h3>
+            {m.notes && <p className="mt-1 text-sm text-gray-600">{m.notes}</p>}
+            <div className="mt-4">
+              <DecisionResponder
+                milestoneId={m.id}
+                questionType={m.questionType}
+                options={m.options}
+                variant="timeline"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Past decisions — responded, collapsed by default
+// ---------------------------------------------------------------------------
+
+function PastDecisionsSection({ decisions }: { decisions: TimelineMilestone[] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <section>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="hover:text-brand-teal-500 mb-3 inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-gray-500 uppercase transition-colors"
+      >
+        View {decisions.length} past {decisions.length === 1 ? 'decision' : 'decisions'}
+        <ChevronDown
+          size={12}
+          strokeWidth={2}
+          className={cn('transition-transform', expanded && 'rotate-180')}
+        />
+      </button>
+      {expanded && (
+        <div className="space-y-3">
+          {decisions.map((m) => (
+            <div
+              key={m.id}
+              className="shadow-card rounded-2xl border border-emerald-200 bg-white p-5"
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
+                  Decision
+                  {m.dueDate && (
+                    <span className="ml-2 text-gray-400">· {shortDate(m.dueDate)}</span>
+                  )}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                  <Check size={10} strokeWidth={2.5} />
+                  Responded
+                </span>
+              </div>
+              <h3 className="mt-1 text-sm font-semibold text-gray-900">
+                {m.questionBody || m.title}
+              </h3>
+              {m.clientResponse && (
+                <RespondedSummary
+                  response={m.clientResponse}
+                  respondedAt={m.respondedAt}
+                  options={m.options}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Timeline — grouped by category
+// ---------------------------------------------------------------------------
+
+interface CategoryGroup {
+  category: string;
+  milestones: TimelineMilestone[];
+}
 
 function Timeline({
   milestones,
@@ -379,6 +517,20 @@ function Timeline({
   onPhotoClick: (id: string) => void;
   visibleIds: Set<string>;
 }) {
+  // Group milestones by category, preserving order within each group.
+  const groups = useMemo(() => {
+    const map = new Map<string, TimelineMilestone[]>();
+    for (const m of milestones) {
+      const key = m.category?.trim() || 'Other';
+      const existing = map.get(key);
+      if (existing) existing.push(m);
+      else map.set(key, [m]);
+    }
+    return Array.from(map.entries()).map(
+      ([category, items]): CategoryGroup => ({ category, milestones: items }),
+    );
+  }, [milestones]);
+
   if (milestones.length === 0) {
     return (
       <div className="shadow-card rounded-2xl bg-white p-8 text-center text-sm text-gray-500">
@@ -387,25 +539,34 @@ function Timeline({
       </div>
     );
   }
+
   return (
     <section>
       <SectionLabel>Project timeline</SectionLabel>
-      <div className="relative pl-7 md:pl-8">
-        {/* Vertical guideline running the full height of the timeline. We
-            draw it once on the parent so individual cards don't have to
-            stitch their own borders. */}
-        <div className="bg-brand-teal-100 absolute top-2 bottom-2 left-2.5 w-px md:left-3" />
-        <div className="space-y-4">
-          {milestones.map((m, i) => (
-            <PhaseCard
-              key={m.id}
-              milestone={m}
-              number={i + 1}
-              onPhotoClick={onPhotoClick}
-              visibleIds={visibleIds}
-            />
-          ))}
-        </div>
+      <div className="space-y-6">
+        {groups.map((group) => (
+          <div key={group.category}>
+            <div className="mb-3 flex items-center gap-3">
+              <h3 className="text-xs font-semibold tracking-wider text-gray-500 uppercase">
+                {group.category}
+              </h3>
+              <div className="border-brand-gold-200 h-px flex-1 border-t" />
+            </div>
+            <div className="relative pl-7 md:pl-8">
+              <div className="bg-brand-teal-100 absolute top-2 bottom-2 left-2.5 w-px md:left-3" />
+              <div className="space-y-4">
+                {group.milestones.map((m) => (
+                  <PhaseCard
+                    key={m.id}
+                    milestone={m}
+                    onPhotoClick={onPhotoClick}
+                    visibleIds={visibleIds}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -417,93 +578,47 @@ function Timeline({
 
 function PhaseCard({
   milestone,
-  number,
   onPhotoClick,
   visibleIds,
 }: {
   milestone: TimelineMilestone;
-  number: number;
   onPhotoClick: (id: string) => void;
   visibleIds: Set<string>;
 }) {
-  const isDecision = milestone.status === 'awaiting_client';
-  const hasResponse = Boolean(milestone.clientResponse);
   const isComplete = milestone.status === 'complete';
   const isInProgress = milestone.status === 'in_progress';
   const isUpcoming = milestone.status === 'upcoming' || milestone.status === 'pending';
 
+  const dotStatus: PhaseStatus = isComplete
+    ? 'complete'
+    : isInProgress
+      ? 'in_progress'
+      : 'upcoming';
+
   return (
     <div className="relative">
-      <PhaseDot
-        status={
-          isDecision
-            ? hasResponse
-              ? 'responded'
-              : 'decision'
-            : isComplete
-              ? 'complete'
-              : isInProgress
-                ? 'in_progress'
-                : 'upcoming'
-        }
-      />
+      <PhaseDot status={dotStatus} />
 
       <div
         className={cn(
           'shadow-card rounded-2xl bg-white p-5',
           isUpcoming && 'opacity-70',
-          isDecision && !hasResponse && 'border-brand-gold-300 border',
-          isDecision && hasResponse && 'border border-emerald-200',
         )}
       >
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
-            {isDecision ? 'Decision' : `Phase ${number}`}
-            {milestone.dueDate && (
-              <span className="ml-2 text-gray-400">· Due {shortDate(milestone.dueDate)}</span>
-            )}
+            {milestone.dueDate && <>Due {shortDate(milestone.dueDate)}</>}
           </div>
-          <StatusBadge
-            status={
-              isDecision
-                ? hasResponse
-                  ? 'responded'
-                  : 'decision'
-                : isComplete
-                  ? 'complete'
-                  : isInProgress
-                    ? 'in_progress'
-                    : 'upcoming'
-            }
-          />
+          <StatusBadge status={dotStatus} />
         </div>
         <h3 className="mt-1 text-base font-semibold text-gray-900 md:text-lg">
-          {isDecision ? milestone.questionBody || milestone.title : milestone.title}
+          {milestone.title}
         </h3>
         {milestone.notes && (
           <p className="mt-1 text-sm text-gray-600">{milestone.notes}</p>
         )}
-        {milestone.vendorName && !isDecision && (
+        {milestone.vendorName && (
           <p className="mt-1 text-xs text-gray-500">By {milestone.vendorName}</p>
-        )}
-
-        {isDecision && !hasResponse && (
-          <div className="mt-4">
-            <DecisionResponder
-              milestoneId={milestone.id}
-              questionType={milestone.questionType}
-              options={milestone.options}
-              variant="timeline"
-            />
-          </div>
-        )}
-
-        {isDecision && hasResponse && milestone.clientResponse && (
-          <RespondedSummary
-            response={milestone.clientResponse}
-            respondedAt={milestone.respondedAt}
-            options={milestone.options}
-          />
         )}
 
         {milestone.photos.length > 0 && (
@@ -518,11 +633,9 @@ function PhaseCard({
   );
 }
 
-type PhaseStatus = 'complete' | 'in_progress' | 'upcoming' | 'decision' | 'responded';
+type PhaseStatus = 'complete' | 'in_progress' | 'upcoming';
 
 function PhaseDot({ status }: { status: PhaseStatus }) {
-  // The dot sits on the timeline guideline. Sizing chosen so the white
-  // ring fully covers the underlying line.
   const base =
     'absolute -left-7 top-4 flex h-5 w-5 items-center justify-center rounded-full md:-left-8 md:h-6 md:w-6';
   if (status === 'complete') {
@@ -536,20 +649,6 @@ function PhaseDot({ status }: { status: PhaseStatus }) {
     return (
       <div className={cn(base, 'border-brand-gold-400 bg-brand-gold-50 border-2')}>
         <span className="bg-brand-gold-500 h-1.5 w-1.5 rounded-full" />
-      </div>
-    );
-  }
-  if (status === 'decision') {
-    return (
-      <div className={cn(base, 'bg-brand-gold-500 ring-2 ring-brand-gold-100')}>
-        <AlertCircle size={11} strokeWidth={2.5} className="text-white" />
-      </div>
-    );
-  }
-  if (status === 'responded') {
-    return (
-      <div className={cn(base, 'bg-emerald-500')}>
-        <Check size={11} strokeWidth={3} className="text-white" />
       </div>
     );
   }
@@ -572,22 +671,6 @@ function StatusBadge({ status }: { status: PhaseStatus }) {
       <span className="inline-flex items-center gap-1 rounded-full bg-brand-gold-50 px-2 py-0.5 text-[11px] font-medium text-brand-gold-700">
         <Clock size={10} strokeWidth={2} />
         In progress
-      </span>
-    );
-  }
-  if (status === 'decision') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-brand-gold-100 px-2 py-0.5 text-[11px] font-medium text-brand-gold-800">
-        <AlertCircle size={10} strokeWidth={2.5} />
-        Your input needed
-      </span>
-    );
-  }
-  if (status === 'responded') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-        <Check size={10} strokeWidth={2.5} />
-        Responded
       </span>
     );
   }
@@ -645,7 +728,7 @@ function RespondedSummary({
 // Project-wide photos (all categorized shots, regardless of milestone link)
 // ---------------------------------------------------------------------------
 
-function ProjectPhotosSection({
+function ProjectPhotosGrid({
   photos,
   visibleIds,
   onPhotoClick,
@@ -654,18 +737,13 @@ function ProjectPhotosSection({
   visibleIds: Set<string>;
   onPhotoClick: (id: string) => void;
 }) {
-  // Honour the same tag/category filter the page header drives — the
-  // section is meant to surface every photo, but "every photo" still
-  // means "every photo the user is currently looking at".
   const visible = photos.filter((p) => visibleIds.has(p.id));
   if (visible.length === 0) return null;
 
   return (
-    <section>
-      <SectionLabel>Photos</SectionLabel>
-      <div className="shadow-card rounded-2xl bg-white p-5">
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-          {visible.map((photo) => (
+    <div className="shadow-card rounded-2xl bg-white p-5">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+        {visible.map((photo) => (
             <button
               key={photo.id}
               type="button"
@@ -698,7 +776,6 @@ function ProjectPhotosSection({
           Showing {visible.length} {visible.length === 1 ? 'photo' : 'photos'}
         </p>
       </div>
-    </section>
   );
 }
 
