@@ -144,14 +144,14 @@ export function NewClientButton({ tiers, pms, variant = 'standalone' }: NewClien
       >
         <Plus size={16} strokeWidth={2} />
         <span className={variant === 'header' ? 'hidden md:inline' : undefined}>
-          New Client
+          New client
         </span>
       </button>
 
       <Modal
         open={open}
         onClose={closeModal}
-        title="New Client"
+        title="New client"
         locked={isPending}
         footer={
           <>
@@ -228,7 +228,7 @@ export function NewClientButton({ tiers, pms, variant = 'standalone' }: NewClien
               ))}
             </select>
           </Field>
-          <Field label="Assigned Project Manager">
+          <Field label="Assigned project manager">
             <select
               value={form.assignedPmId}
               onChange={(e) => setForm({ ...form, assignedPmId: e.target.value })}

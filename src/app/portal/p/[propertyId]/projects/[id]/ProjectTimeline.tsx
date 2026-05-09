@@ -11,9 +11,7 @@ import {
   Download,
   Hammer,
   Home,
-  Mail,
   MapPin,
-  Phone,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
@@ -1063,32 +1061,26 @@ function PMCard({
   return (
     <section>
       <SectionLabel muted>Your project manager</SectionLabel>
-      <div className="shadow-card flex flex-col gap-3 rounded-2xl bg-white p-5 sm:flex-row sm:items-center">
+      <div className="shadow-card flex items-center gap-3 rounded-2xl bg-white p-5">
         <span className="bg-brand-teal-500 inline-flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white">
           {initialsFrom(name) || 'PM'}
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-gray-900">{name}</div>
-          <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-500">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
             {email && (
-              <a
-                href={`mailto:${email}`}
-                className="hover:text-brand-teal-500 inline-flex items-center gap-1"
-              >
-                <Mail size={11} strokeWidth={1.5} />
+              <a href={`mailto:${email}`} className="hover:text-brand-teal-500 transition-colors">
                 {email}
               </a>
             )}
+            {email && phone && <span className="text-gray-300">·</span>}
             {phone && (
-              <a
-                href={`tel:${phone}`}
-                className="hover:text-brand-teal-500 inline-flex items-center gap-1"
-              >
-                <Phone size={11} strokeWidth={1.5} />
+              <a href={`tel:${phone}`} className="hover:text-brand-teal-500 transition-colors">
                 {phone}
               </a>
             )}
           </div>
+          <p className="mt-0.5 text-xs text-gray-400">Mon–Fri, 8 AM – 5 PM</p>
         </div>
       </div>
     </section>

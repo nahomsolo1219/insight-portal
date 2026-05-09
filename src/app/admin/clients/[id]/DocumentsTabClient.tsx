@@ -36,7 +36,7 @@ const DOCUMENT_TYPES: readonly DocumentTypeOption[] = [
   { id: 'contract', label: 'Contract', icon: FileText },
   { id: 'drawing', label: 'Drawing', icon: FileBox },
   { id: 'permit', label: 'Permit', icon: ScrollText },
-  { id: 'spec_sheet', label: 'Spec Sheet', icon: Wrench },
+  { id: 'spec_sheet', label: 'Spec sheet', icon: Wrench },
   { id: 'warranty', label: 'Warranty', icon: Shield },
   { id: 'other', label: 'Other', icon: FileIcon },
 ] as const;

@@ -18,6 +18,7 @@ export interface ClientAppointmentRow {
   propertyName: string;
   propertyAddress: string | null;
   projectName: string | null;
+  projectType: 'maintenance' | 'remodel' | null;
   vendorName: string | null;
 }
 
@@ -60,6 +61,7 @@ export async function getClientAppointments(
       propertyName: properties.name,
       propertyAddress: properties.address,
       projectName: projects.name,
+      projectType: projects.type,
       vendorName: vendors.name,
     })
     .from(appointments)

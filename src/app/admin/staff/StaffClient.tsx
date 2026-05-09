@@ -15,11 +15,11 @@ const ROLE_OPTIONS: { id: StaffRole; label: string; badge: string }[] = [
   { id: 'founder', label: 'Founder', badge: 'bg-brand-gold-50 text-brand-gold-600' },
   {
     id: 'project_manager',
-    label: 'Project Manager',
+    label: 'Project manager',
     badge: 'bg-brand-teal-50 text-brand-teal-500',
   },
-  { id: 'field_staff', label: 'Field Staff', badge: 'bg-blue-50 text-blue-700' },
-  { id: 'admin_assistant', label: 'Admin Assistant', badge: 'bg-gray-100 text-gray-600' },
+  { id: 'field_staff', label: 'Field staff', badge: 'bg-blue-50 text-blue-700' },
+  { id: 'admin_assistant', label: 'Admin assistant', badge: 'bg-gray-100 text-gray-600' },
 ];
 
 const STATUS_OPTIONS: { id: StaffStatus; label: string; badge: string }[] = [

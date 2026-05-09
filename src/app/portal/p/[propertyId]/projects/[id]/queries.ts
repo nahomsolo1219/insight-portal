@@ -1,7 +1,7 @@
 // Project-detail query for the client portal timeline. Fetches everything
 // the timeline page needs in parallel and signs photo URLs in one batch.
 
-import { and, asc, desc, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, or } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   appointments,
@@ -227,6 +227,7 @@ export async function getProjectTimeline(
       .where(
         and(
           eq(appointments.projectId, projectId),
+          gte(appointments.date, today),
           inArray(appointments.status, ['scheduled', 'confirmed']),
         ),
       )
@@ -296,9 +297,7 @@ export async function getProjectTimeline(
     (m) => m.status === 'awaiting_client' && !m.clientResponse,
   ).length;
 
-  // Suppress unused-variable warning — kept for future "appointment
-  // imminent today" callouts.
-  void today;
+
 
   return {
     project,

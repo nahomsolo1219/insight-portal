@@ -2,11 +2,13 @@
 
 import {
   Briefcase,
+  CalendarClock,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   Clock,
+  Hammer,
   Home,
   MapPin,
   User as UserIcon,
@@ -296,6 +298,12 @@ function AppointmentCard({
               {row.clientName}
             </Link>
             <MetaItem icon={MapPin} label={`${row.propertyName} · ${row.propertyAddress}`} />
+            {row.projectName && (
+              <MetaItem
+                icon={row.projectType === 'maintenance' ? CalendarClock : Hammer}
+                label={row.projectName}
+              />
+            )}
             {row.vendorName && <MetaItem icon={Wrench} label={row.vendorName} />}
             {row.pmName && <MetaItem icon={Briefcase} label={`PM: ${row.pmName}`} />}
             {row.davidOnSite && (

@@ -219,7 +219,7 @@ export function NewProjectButton({
         )}
       >
         <Plus size={16} strokeWidth={2} />
-        New Project
+        New project
       </button>
 
       <Modal

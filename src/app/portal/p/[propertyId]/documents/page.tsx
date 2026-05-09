@@ -46,7 +46,7 @@ export default async function PortalDocumentsPage() {
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-brand-teal-500 text-2xl tracking-tight md:text-3xl">
-          Documents &amp; Reports
+          Documents &amp; reports
         </h1>
         <p className="mt-1 text-sm text-gray-500">
           Contracts, permits, drawings, and assessments — everything we&apos;ve shared with you.

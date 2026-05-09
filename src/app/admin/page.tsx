@@ -102,7 +102,7 @@ export default async function DashboardPage() {
         {/* Today's Schedule */}
         <div className="shadow-soft-md rounded-2xl bg-paper p-6">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">Today&apos;s Schedule</h2>
+            <h2 className="text-base font-semibold text-gray-900">Today&apos;s schedule</h2>
             <Link
               href="/admin/schedule"
               className="text-brand-gold-400 hover:text-brand-gold-500 text-sm font-medium"
@@ -140,10 +140,10 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Needs Attention */}
+        {/* Needs attention */}
         <div className="shadow-soft-md rounded-2xl bg-paper p-6">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">Needs Attention</h2>
+            <h2 className="text-base font-semibold text-gray-900">Needs attention</h2>
             {attentionCount > 0 && (
               <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
                 {attentionCount} {attentionCount === 1 ? 'item' : 'items'}
@@ -217,7 +217,7 @@ export default async function DashboardPage() {
       {/* Recent activity */}
       <div className="shadow-soft-md rounded-2xl bg-paper p-6">
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">Recent Activity</h2>
+          <h2 className="text-base font-semibold text-gray-900">Recent activity</h2>
           <span className="text-xs text-gray-400">Audit log</span>
         </div>
         {activity.length === 0 ? (

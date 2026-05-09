@@ -11,8 +11,8 @@ import { MilestoneEditor } from '../components/MilestoneEditor';
 
 const PHOTO_DOC_LABELS: Record<PhotoDocumentation, string> = {
   none: 'No photos required',
-  before_after: 'Before + After',
-  before_during_after: 'Before + During + After',
+  before_after: 'Before + after',
+  before_during_after: 'Before + during + after',
   during_only: 'During only',
 };
 

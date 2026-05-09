@@ -33,7 +33,7 @@ export function ProfileTabClient({ client, tiers, pms }: ProfileTabClientProps) 
       {/* Client info card */}
       <div className="shadow-soft-md rounded-2xl bg-paper p-6">
         <div className="mb-5 flex items-start justify-between">
-          <h3 className="text-base font-semibold text-gray-900">Client Information</h3>
+          <h3 className="text-base font-semibold text-gray-900">Client information</h3>
           <button
             type="button"
             onClick={() => setEditClientOpen(true)}
@@ -251,7 +251,7 @@ function EditClientModal({ onClose, client, tiers, pms }: EditClientModalProps) 
             ))}
           </select>
         </Field>
-        <Field label="Assigned Project Manager">
+        <Field label="Assigned project manager">
           <select
             value={form.assignedPmId}
             onChange={(e) => setForm({ ...form, assignedPmId: e.target.value })}

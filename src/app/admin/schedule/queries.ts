@@ -4,7 +4,7 @@
 
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import { db } from '@/db';
-import { appointments, clients, properties, staff, vendors } from '@/db/schema';
+import { appointments, clients, projects, properties, staff, vendors } from '@/db/schema';
 
 export interface ScheduleRow {
   id: string;
@@ -23,6 +23,8 @@ export interface ScheduleRow {
   clientName: string;
   vendorName: string | null;
   pmName: string | null;
+  projectName: string | null;
+  projectType: 'maintenance' | 'remodel' | null;
 }
 
 /**
@@ -51,10 +53,13 @@ export async function getSchedule(
       clientName: clients.name,
       vendorName: vendors.name,
       pmName: staff.name,
+      projectName: projects.name,
+      projectType: projects.type,
     })
     .from(appointments)
     .innerJoin(properties, eq(properties.id, appointments.propertyId))
     .innerJoin(clients, eq(clients.id, properties.clientId))
+    .leftJoin(projects, eq(projects.id, appointments.projectId))
     .leftJoin(vendors, eq(vendors.id, appointments.vendorId))
     .leftJoin(staff, eq(staff.id, appointments.assignedPmId))
     .where(and(gte(appointments.date, startDate), lte(appointments.date, endDate)))

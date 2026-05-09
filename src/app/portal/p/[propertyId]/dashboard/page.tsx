@@ -11,8 +11,6 @@ import {
   Hammer,
   ImageOff,
   MapPin,
-  MessageCircle,
-  Phone,
   Receipt,
   Sparkles,
 } from 'lucide-react';
@@ -601,8 +599,6 @@ function NextVisitBody({ visit }: { visit: VisitSummary }) {
 function RailProjectManagerCard({ profile }: { profile: ClientProfile }) {
   if (!profile.assignedPmName) return null;
   const initials = initialsFrom(profile.assignedPmName);
-  const hasEmail = Boolean(profile.assignedPmEmail);
-  const hasPhone = Boolean(profile.assignedPmPhone);
 
   return (
     <section className="shadow-soft-md rounded-2xl bg-paper p-5">
@@ -618,33 +614,24 @@ function RailProjectManagerCard({ profile }: { profile: ClientProfile }) {
           <h4 className="text-ink-900 truncate text-sm font-semibold">
             {profile.assignedPmName}
           </h4>
-          <p className="text-ink-500 mt-0.5 text-xs">Mon–Fri, 8 AM – 5 PM</p>
+          <div className="text-ink-500 mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
+            {profile.assignedPmEmail && (
+              <a href={`mailto:${profile.assignedPmEmail}`} className="hover:text-ink-700 transition-colors">
+                {profile.assignedPmEmail}
+              </a>
+            )}
+            {profile.assignedPmEmail && profile.assignedPmPhone && (
+              <span className="text-ink-300">·</span>
+            )}
+            {profile.assignedPmPhone && (
+              <a href={`tel:${profile.assignedPmPhone}`} className="hover:text-ink-700 transition-colors">
+                {profile.assignedPmPhone}
+              </a>
+            )}
+          </div>
+          <p className="text-ink-400 mt-0.5 text-xs">Mon–Fri, 8 AM – 5 PM</p>
         </div>
       </div>
-
-      {(hasEmail || hasPhone) && (
-        <div className="mt-4 flex gap-2">
-          {hasEmail && (
-            <a
-              href={`mailto:${profile.assignedPmEmail}`}
-              className="text-paper hover:bg-[color:var(--teal-800)] flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors"
-              style={{ backgroundColor: 'var(--teal-900)' }}
-            >
-              <MessageCircle size={14} strokeWidth={1.75} />
-              Message
-            </a>
-          )}
-          {hasPhone && (
-            <a
-              href={`tel:${profile.assignedPmPhone}`}
-              className="bg-cream border-line text-ink-900 hover:bg-ivory flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors"
-            >
-              <Phone size={14} strokeWidth={1.75} />
-              Call
-            </a>
-          )}
-        </div>
-      )}
     </section>
   );
 }

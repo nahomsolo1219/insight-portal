@@ -1,4 +1,4 @@
-import { Briefcase, Calendar, CheckCircle2, Clock, MapPin, Wrench } from 'lucide-react';
+import { Calendar, CalendarClock, CheckCircle2, Clock, Hammer, MapPin, Wrench } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { cn, formatTime } from '@/lib/utils';
@@ -151,7 +151,11 @@ function AppointmentCard({ appointment, tone, anchor }: AppointmentCardProps) {
             </span>
             {appointment.projectName && (
               <span className="inline-flex items-center gap-1">
-                <Briefcase size={11} strokeWidth={1.5} />
+                {appointment.projectType === 'maintenance' ? (
+                  <CalendarClock size={11} strokeWidth={1.5} />
+                ) : (
+                  <Hammer size={11} strokeWidth={1.5} />
+                )}
                 {appointment.projectName}
               </span>
             )}

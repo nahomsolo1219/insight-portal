@@ -62,7 +62,7 @@ export function DashboardNewProjectButton({ clients, variant = 'standalone' }: P
       >
         <Plus size={16} strokeWidth={2} />
         <span className={variant === 'header' ? 'hidden md:inline' : undefined}>
-          New Project
+          New project
         </span>
       </button>
 
