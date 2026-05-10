@@ -6,10 +6,8 @@ import {
   Mail,
   Pencil,
   Plus,
-  RotateCcw,
   Trash2,
   Upload,
-  X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useRef, useState, useTransition } from 'react';
@@ -22,7 +20,6 @@ import type { CompanySettings } from '@/lib/company/queries';
 import {
   createTier,
   deleteTier,
-  resetBrandColors,
   removeFirmLogo,
   updateCompanySettings,
   updateEmailTemplate,
@@ -101,14 +98,6 @@ function CompanySection({ company }: { company: CompanySettings }) {
   const [firmWebsite, setFirmWebsite] = useState(company.firmWebsite ?? '');
   const [businessHours, setBusinessHours] = useState(company.businessHours ?? '');
 
-  // --- Branding ---
-  const [brandPrimary, setBrandPrimary] = useState(company.brandPrimaryColor ?? '');
-  const [brandAccent, setBrandAccent] = useState(company.brandAccentColor ?? '');
-
-  // --- Invoice categories ---
-  const [categories, setCategories] = useState<string[]>(company.defaultInvoiceCategories);
-  const [newCategory, setNewCategory] = useState('');
-
   // --- Email ---
   const [emailFromName, setEmailFromName] = useState(company.emailFromName ?? '');
   const [emailFromAddress, setEmailFromAddress] = useState(company.emailFromAddress ?? '');
@@ -153,35 +142,6 @@ function CompanySection({ company }: { company: CompanySettings }) {
         showToast(result.error, 'error');
       }
     });
-  }
-
-  function handleResetColors() {
-    startTransition(async () => {
-      const result = await resetBrandColors();
-      if (result.success) {
-        setBrandPrimary('');
-        setBrandAccent('');
-        showToast('Brand colors reset to defaults');
-        router.refresh();
-      } else {
-        showToast(result.error, 'error');
-      }
-    });
-  }
-
-  function addCategory() {
-    const trimmed = newCategory.trim();
-    if (!trimmed || categories.includes(trimmed)) return;
-    const updated = [...categories, trimmed];
-    setCategories(updated);
-    setNewCategory('');
-    saveSection({ defaultInvoiceCategories: updated });
-  }
-
-  function removeCategory(cat: string) {
-    const updated = categories.filter((c) => c !== cat);
-    setCategories(updated);
-    saveSection({ defaultInvoiceCategories: updated });
   }
 
   return (
@@ -234,54 +194,6 @@ function CompanySection({ company }: { company: CompanySettings }) {
             <Field label="Business hours"><input className={inputClass} value={businessHours} onChange={(e) => setBusinessHours(e.target.value)} placeholder="Mon–Fri, 8 AM – 5 PM" /></Field>
           </div>
           <SaveButton disabled={isPending} onClick={() => saveSection({ firmEmail: firmEmail || null, firmPhone: firmPhone || null, firmAddress: firmAddress || null, firmWebsite: firmWebsite || null, businessHours: businessHours || null })} isPending={isPending} />
-        </div>
-      </SectionCard>
-
-      {/* Branding */}
-      <SectionCard title="Branding" description="Optional — leave blank to use the default Insight palette.">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Primary color">
-              <div className="flex items-center gap-2">
-                <input type="color" value={brandPrimary || '#1B4F5A'} onChange={(e) => setBrandPrimary(e.target.value)} className="h-10 w-10 cursor-pointer rounded-lg border border-gray-200" />
-                <input className={inputClass} value={brandPrimary} onChange={(e) => setBrandPrimary(e.target.value)} placeholder="#1B4F5A" />
-              </div>
-            </Field>
-            <Field label="Accent color">
-              <div className="flex items-center gap-2">
-                <input type="color" value={brandAccent || '#C8963E'} onChange={(e) => setBrandAccent(e.target.value)} className="h-10 w-10 cursor-pointer rounded-lg border border-gray-200" />
-                <input className={inputClass} value={brandAccent} onChange={(e) => setBrandAccent(e.target.value)} placeholder="#C8963E" />
-              </div>
-            </Field>
-          </div>
-          <div className="flex items-center gap-3">
-            <SaveButton disabled={isPending} onClick={() => saveSection({ brandPrimaryColor: brandPrimary || null, brandAccentColor: brandAccent || null })} isPending={isPending} />
-            {(company.brandPrimaryColor || company.brandAccentColor) && (
-              <button type="button" onClick={handleResetColors} disabled={isPending} className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100">
-                <RotateCcw size={13} strokeWidth={1.5} /> Reset to defaults
-              </button>
-            )}
-          </div>
-        </div>
-      </SectionCard>
-
-      {/* Invoice categories */}
-      <SectionCard title="Invoice categories" description="Default categories for the invoice creation flow.">
-        <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {categories.map((cat) => (
-              <span key={cat} className="bg-brand-warm-200 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700">
-                {cat}
-                <button type="button" onClick={() => removeCategory(cat)} className="text-gray-400 hover:text-red-500 transition-colors"><X size={12} strokeWidth={2} /></button>
-              </span>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <input className={inputClass} value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="Add category…" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCategory(); } }} />
-            <button type="button" onClick={addCategory} disabled={!newCategory.trim()} className="bg-brand-teal-500 hover:bg-brand-teal-600 shadow-soft inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition-all disabled:opacity-50">
-              <Plus size={14} strokeWidth={2} /> Add
-            </button>
-          </div>
         </div>
       </SectionCard>
 
