@@ -9,6 +9,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { SearchOverlay } from '@/components/admin/SearchOverlay';
 import { DashboardNewProjectButton } from '@/app/admin/DashboardNewProjectButton';
 import { NewClientButton } from '@/app/admin/clients/NewClientButton';
 import { getMyNotificationFeed } from '@/app/notifications/actions';
@@ -152,23 +153,23 @@ export function AdminHeader({
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
-// Search input — Cmd+K affordance + global focus shortcut.
+// Search trigger — opens the SearchOverlay (command palette).
 // ---------------------------------------------------------------------------
 
 function SearchInput() {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [overlayOpen, setOverlayOpen] = useState(false);
 
-  // Cmd+K (or Ctrl+K) focuses the search input from anywhere in the admin.
-  // Same pattern most admin tools follow; no actual search routing yet, so
-  // this is purely an affordance until the search query layer ships.
+  // Cmd+K (or Ctrl+K) opens the search overlay from anywhere in /admin.
+  // Skip if the event target is an input/textarea/contentEditable — the
+  // user is typing and pressing K should just type "k".
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        if ((e.target as HTMLElement)?.isContentEditable) return;
         e.preventDefault();
-        setExpanded(true);
-        // Defer focus until after the input renders on mobile.
-        requestAnimationFrame(() => inputRef.current?.focus());
+        setOverlayOpen(true);
       }
     }
     document.addEventListener('keydown', onKey);
@@ -177,59 +178,41 @@ function SearchInput() {
 
   return (
     <div className="flex min-w-0 flex-1 justify-center">
-      {/* Desktop: always visible inline input. */}
+      {/* Desktop: button styled like an input. Click opens the overlay. */}
       <div className="hidden w-full max-w-md md:block">
-        <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOverlayOpen(true)}
+          className="bg-paper border-line text-ink-400 hover:border-brand-teal-300 relative flex w-full items-center rounded-lg border py-2 pr-12 pl-9 text-left text-sm transition-colors"
+        >
           <Search
             size={16}
             strokeWidth={1.5}
             className="text-ink-400 absolute top-1/2 left-3 -translate-y-1/2"
           />
-          <input
-            ref={inputRef}
-            type="search"
-            placeholder="Search clients or projects"
-            // No wiring yet — the previous sidebar search input wasn't
-            // hooked up either. Same affordance, new home.
-            aria-label="Search"
-            className="bg-paper border-line text-ink-900 placeholder:text-ink-400 focus:border-brand-teal-300 focus:ring-brand-teal-100 w-full rounded-lg border py-2 pr-12 pl-9 text-sm transition-colors focus:ring-2 focus:outline-none"
-          />
+          <span>Search clients or projects</span>
           <kbd
             aria-hidden="true"
             className="text-ink-400 border-line bg-cream pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border px-1.5 py-0.5 text-[10px] font-medium tracking-wider"
           >
             ⌘K
           </kbd>
-        </div>
+        </button>
       </div>
 
-      {/* Mobile: icon-only that expands an overlay search. */}
+      {/* Mobile: icon-only button. */}
       <div className="ml-auto md:hidden">
-        {expanded ? (
-          <div className="relative">
-            <input
-              ref={inputRef}
-              type="search"
-              placeholder="Search"
-              aria-label="Search"
-              onBlur={() => setExpanded(false)}
-              className="bg-paper border-line text-ink-900 placeholder:text-ink-400 focus:border-brand-teal-300 w-40 rounded-lg border py-1.5 pr-2 pl-3 text-sm focus:outline-none"
-            />
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              setExpanded(true);
-              requestAnimationFrame(() => inputRef.current?.focus());
-            }}
-            aria-label="Search"
-            className="text-ink-500 hover:bg-cream inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors"
-          >
-            <Search size={18} strokeWidth={1.5} />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setOverlayOpen(true)}
+          aria-label="Search"
+          className="text-ink-500 hover:bg-cream inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors"
+        >
+          <Search size={18} strokeWidth={1.5} />
+        </button>
       </div>
+
+      <SearchOverlay open={overlayOpen} onClose={() => setOverlayOpen(false)} />
     </div>
   );
 }
