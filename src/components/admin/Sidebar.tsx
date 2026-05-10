@@ -12,6 +12,7 @@ import {
   Settings,
   UserCog,
   Users,
+  Wrench,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -42,6 +43,12 @@ const sections: NavSection[] = [
     heading: 'Manage',
     items: [
       { label: 'Clients', href: '/admin/clients', icon: Users },
+      // Maintenance plans are a top-level concept (peers of clients +
+      // schedule) — keeping them in Manage groups them with the rest
+      // of the operate-on-it surfaces. Spec called for "between
+      // Projects and Schedule" but the sidebar has no Projects link;
+      // Manage is the closest semantic match.
+      { label: 'Maintenance', href: '/admin/maintenance', icon: Wrench },
       { label: 'Photo Queue', href: '/admin/photo-queue', icon: Images },
       { label: 'Decisions', href: '/admin/decisions', icon: CircleHelp },
       { label: 'Invoices', href: '/admin/invoices', icon: FileText },

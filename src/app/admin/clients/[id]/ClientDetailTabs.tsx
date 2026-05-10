@@ -10,6 +10,7 @@ import {
   Home,
   MapPin,
   User,
+  Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -23,6 +24,11 @@ const TABS = [
   // right after Projects because most workflow questions ("where does this
   // appointment go?", "what's the gate code?") start at a property.
   { id: 'properties', label: 'Properties', icon: Home },
+  // Maintenance plans live here as a read-only summary; the canonical
+  // home for plan editing is /admin/maintenance/[id]. This tab is a
+  // landing pad so admins working inside a client context can jump to
+  // the plan without bouncing to the top-level section.
+  { id: 'maintenance', label: 'Maintenance', icon: Wrench },
   { id: 'appointments', label: 'Appointments', icon: Calendar },
   { id: 'photos', label: 'Photos', icon: Camera },
   { id: 'reports', label: 'Reports', icon: FileText },
@@ -44,6 +50,7 @@ interface ClientDetailTabsProps {
    */
   projectsSlot: React.ReactNode;
   propertiesSlot: React.ReactNode;
+  maintenanceSlot: React.ReactNode;
   documentsSlot: React.ReactNode;
   reportsSlot: React.ReactNode;
   appointmentsSlot: React.ReactNode;
@@ -58,6 +65,7 @@ export function ClientDetailTabs({
   activePropertyId,
   projectsSlot,
   propertiesSlot,
+  maintenanceSlot,
   documentsSlot,
   reportsSlot,
   appointmentsSlot,
@@ -151,6 +159,9 @@ export function ClientDetailTabs({
       {/* Properties tab is *not* gated on activeProperty — its whole job is
           to show every property + the empty-state CTA when there are none. */}
       {activeTab === 'properties' && propertiesSlot}
+      {/* Maintenance is client-scoped — it lists plans across every
+          property the client owns, so we don't gate on activeProperty. */}
+      {activeTab === 'maintenance' && maintenanceSlot}
       {activeTab === 'documents' && (
         activeProperty
           ? documentsSlot
@@ -176,6 +187,7 @@ export function ClientDetailTabs({
       {activeTab === 'profile' && profileSlot}
       {activeTab !== 'projects' &&
         activeTab !== 'properties' &&
+        activeTab !== 'maintenance' &&
         activeTab !== 'documents' &&
         activeTab !== 'reports' &&
         activeTab !== 'appointments' &&

@@ -5,11 +5,14 @@
 
 import 'server-only';
 
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { db } from '@/db';
 import {
+  auditLog,
   clients,
   maintenancePlans,
+  maintenanceVisits,
+  maintenanceVisitScopeItems,
   profiles,
   properties,
   staff,
@@ -101,6 +104,77 @@ export async function getActiveFieldStaff(): Promise<FieldStaffPickerRow[]> {
     .innerJoin(profiles, eq(profiles.staffId, staff.id))
     .where(and(eq(staff.role, 'field_staff'), eq(staff.status, 'active')))
     .orderBy(asc(staff.name));
+}
+
+export interface PlanAuditEntry {
+  id: string;
+  action: string;
+  targetType: string;
+  targetLabel: string;
+  actorName: string | null;
+  createdAt: Date;
+  metadata: unknown;
+}
+
+/**
+ * Audit-log entries for a plan and its descendants — drives the
+ * History tab on the plan detail page. Pulls the plan row directly,
+ * any visit row whose plan_id matches, and any scope item whose
+ * visit_id belongs to the plan. Returns newest first; capped at
+ * 200 entries since the History tab is meant to summarise, not
+ * paginate.
+ */
+export async function getPlanHistory(planId: string): Promise<PlanAuditEntry[]> {
+  const visitIdRows = await db
+    .select({ id: maintenanceVisits.id })
+    .from(maintenanceVisits)
+    .where(eq(maintenanceVisits.planId, planId));
+  const visitIds = visitIdRows.map((r) => r.id);
+
+  const scopeIdRows =
+    visitIds.length > 0
+      ? await db
+          .select({ id: maintenanceVisitScopeItems.id })
+          .from(maintenanceVisitScopeItems)
+          .where(inArray(maintenanceVisitScopeItems.visitId, visitIds))
+      : [];
+  const scopeIds = scopeIdRows.map((r) => r.id);
+
+  const idClauses = [eq(auditLog.targetId, planId)];
+  if (visitIds.length > 0) idClauses.push(inArray(auditLog.targetId, visitIds));
+  if (scopeIds.length > 0) idClauses.push(inArray(auditLog.targetId, scopeIds));
+
+  const rows = await db
+    .select({
+      id: auditLog.id,
+      action: auditLog.action,
+      targetType: auditLog.targetType,
+      targetLabel: auditLog.targetLabel,
+      actorName: auditLog.actorName,
+      createdAt: auditLog.createdAt,
+      metadata: auditLog.metadata,
+    })
+    .from(auditLog)
+    .where(
+      and(
+        inArray(auditLog.targetType, [
+          'maintenance_plan',
+          'maintenance_visit',
+          'maintenance_scope_item',
+        ]),
+        // Drizzle's or() requires at least one predicate; fall through
+        // to the bare planId clause when no visits exist yet.
+        idClauses.length === 1 ? idClauses[0] : or(...idClauses)!,
+      ),
+    )
+    .orderBy(desc(auditLog.createdAt))
+    .limit(200);
+
+  return rows.map((r) => ({
+    ...r,
+    targetType: r.targetType ?? '',
+    targetLabel: r.targetLabel ?? '',
+  }));
 }
 
 /** Distinct year list for the year filter on the plan list page —

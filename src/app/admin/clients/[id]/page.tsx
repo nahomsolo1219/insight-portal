@@ -9,6 +9,7 @@ import { ClientDetailTabs } from './ClientDetailTabs';
 import { DocumentsTab } from './DocumentsTab';
 import { InviteToPortalButton } from './InviteToPortalButton';
 import { InvoicesTab } from './InvoicesTab';
+import { MaintenanceTab } from './MaintenanceTab';
 import { PhotosTab } from './PhotosTab';
 import { ProfileTab } from './ProfileTab';
 import { ProjectsTab } from './ProjectsTab';
@@ -80,6 +81,9 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
   const propertiesSlot = (
     <PropertiesTab key={id} clientId={id} activePropertyId={activePropertyId} />
   );
+  // Maintenance tab is client-scoped — lists every plan across the
+  // client's properties.
+  const maintenanceSlot = <MaintenanceTab key={id} clientId={id} />;
   const profileSlot = <ProfileTab key={id} client={client} />;
 
   return (
@@ -146,6 +150,7 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
         activePropertyId={activePropertyId}
         projectsSlot={projectsSlot}
         propertiesSlot={propertiesSlot}
+        maintenanceSlot={maintenanceSlot}
         documentsSlot={documentsSlot}
         reportsSlot={reportsSlot}
         appointmentsSlot={appointmentsSlot}

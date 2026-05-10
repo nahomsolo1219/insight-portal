@@ -19,36 +19,17 @@ import {
   vendors,
 } from '@/db/schema';
 
-export type PlanStatus = 'draft' | 'active' | 'archived' | 'completed';
-
-export type VisitStatus =
-  | 'scheduled'
-  | 'in_progress'
-  | 'completed'
-  | 'cancelled';
-
-export const PLAN_STATUSES: readonly PlanStatus[] = [
-  'draft',
-  'active',
-  'archived',
-  'completed',
-] as const;
-
-export const VISIT_STATUSES: readonly VisitStatus[] = [
-  'scheduled',
-  'in_progress',
-  'completed',
-  'cancelled',
-] as const;
-
-export type BillingCadence = 'annual' | 'monthly' | 'quarterly' | 'per_visit';
-
-export const BILLING_CADENCES: readonly BillingCadence[] = [
-  'annual',
-  'monthly',
-  'quarterly',
-  'per_visit',
-] as const;
+// Re-export the pure vocabulary so server-side callers that import
+// `@/lib/maintenance/queries` get the constants alongside the read
+// helpers. Client components should import from `./constants`
+// directly to avoid pulling the postgres driver into the browser
+// bundle.
+export {
+  PLAN_STATUSES,
+  VISIT_STATUSES,
+  BILLING_CADENCES,
+} from './constants';
+export type { PlanStatus, VisitStatus, BillingCadence } from './constants';
 
 export interface PlanListRow {
   id: string;
