@@ -57,6 +57,12 @@ export const appointmentStatusEnum = pgEnum('appointment_status', [
   'completed',
   'cancelled',
 ]);
+// What surface owns this appointment row. `project` is the historical default
+// (every existing row is project-scoped). `maintenance` is the new value
+// added with the maintenance-plans schema — visits in a plan that get
+// scheduled write back through to a row here so the calendar / schedule
+// surface can render them alongside project work without a second source.
+export const appointmentKindEnum = pgEnum('appointment_kind', ['project', 'maintenance']);
 export const photoStatusEnum = pgEnum('photo_status', ['pending', 'categorized', 'rejected']);
 export const photoTagEnum = pgEnum('photo_tag', ['before', 'during', 'after']);
 export const invoiceStatusEnum = pgEnum('invoice_status', ['paid', 'unpaid', 'partial']);
@@ -412,11 +418,152 @@ export const appointments = pgTable('appointments', {
   startTime: time('start_time'),
   endTime: time('end_time'),
   status: appointmentStatusEnum('status').notNull().default('scheduled'),
+  // Which surface this appointment belongs to. Default 'project' covers
+  // every legacy row; maintenance-visit syncs (see maintenanceVisits)
+  // write 'maintenance'. The schedule + calendar pages can branch on
+  // this to render appropriate context (project name vs plan name).
+  kind: appointmentKindEnum('kind').notNull().default('project'),
   davidOnSite: boolean('david_on_site').notNull().default(false),
   scopeOfWork: text('scope_of_work'),
   assignedPmId: uuid('assigned_pm_id').references(() => staff.id, { onDelete: 'set null' }),
   ...timestamps,
 });
+
+// ---------- Maintenance plans (new in 0012) ----------
+//
+// David sells annual maintenance plans to luxury home clients; plans live
+// at the property level (Client → Property → Plan), each plan has many
+// visits, each visit has many scope items (HVAC, plumbing, etc.) and an
+// optional appointment row that backs it on the calendar. This is
+// distinct from the project surface — a plan isn't a project, doesn't
+// have milestones, and doesn't appear in /admin/projects. It gets its
+// own /admin/maintenance section.
+//
+// Status fields are typed as text (matching the user spec for this
+// session) and enforced at the application layer via constants in
+// src/lib/maintenance/. The decision was driven by anticipated churn
+// in vocabulary — admin will likely add states like "paused" or
+// "renewal_pending" as the product matures, and pgEnum changes carry
+// the recast-column overhead from incident 0007 (see docs/MIGRATIONS.md).
+
+export const maintenancePlans = pgTable(
+  'maintenance_plans',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    propertyId: uuid('property_id')
+      .notNull()
+      .references(() => properties.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    startDate: date('start_date').notNull(),
+    endDate: date('end_date').notNull(),
+    /** Total contracted price for the plan period, stored in cents to
+     *  match the rest of the codebase (invoices, projects). NULL when
+     *  pricing hasn't been agreed yet (draft plans). */
+    billingTotalCents: integer('billing_total_cents'),
+    /** 'annual' | 'monthly' | 'quarterly' | 'per_visit'. Free text so
+     *  new cadences ("biannual", etc.) don't need a migration. */
+    billingCadence: text('billing_cadence'),
+    /** 'draft' | 'active' | 'archived' | 'completed'. */
+    status: text('status').notNull().default('draft'),
+    notes: text('notes'),
+    /** Storage path inside the insight-files bucket — sign at read
+     *  time. The home assessment is a one-page summary of property
+     *  systems collected at plan onboarding. */
+    homeAssessmentUrl: text('home_assessment_url'),
+    /** Storage path; the playbook is the operating-procedure document
+     *  shared with field staff who service the property. */
+    playbookUrl: text('playbook_url'),
+    createdBy: uuid('created_by').references(() => profiles.id, {
+      onDelete: 'set null',
+    }),
+    ...timestamps,
+  },
+  (t) => [
+    index('maintenance_plans_property_idx').on(t.propertyId),
+    index('maintenance_plans_status_idx').on(t.status),
+    index('maintenance_plans_property_status_idx').on(t.propertyId, t.status),
+  ],
+);
+
+export const maintenanceVisits = pgTable(
+  'maintenance_visits',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    planId: uuid('plan_id')
+      .notNull()
+      .references(() => maintenancePlans.id, { onDelete: 'cascade' }),
+    /** Display title — admin authors this. e.g. "Q1 Visit",
+     *  "HVAC Spring Service", "Mid-year emergency". */
+    title: text('title').notNull(),
+    /** Target date for the visit. Required even on draft plans so the
+     *  builder's auto-distribute helper has something to populate. */
+    scheduledDate: date('scheduled_date').notNull(),
+    /** 'scheduled' | 'in_progress' | 'completed' | 'cancelled'. */
+    status: text('status').notNull().default('scheduled'),
+    visitOrder: integer('visit_order').notNull().default(0),
+    /** True when admin adds this mid-plan as an extra (e.g. emergency
+     *  call-out). Distinguishes the row from the auto-generated
+     *  cadence visits when reporting later. */
+    isAdHoc: boolean('is_ad_hoc').notNull().default(false),
+    /** Primary vendor for the visit. Per-scope-item overrides live on
+     *  maintenance_visit_scope_items.vendorId. */
+    vendorId: uuid('vendor_id').references(() => vendors.id, {
+      onDelete: 'set null',
+    }),
+    assignedFieldStaffId: uuid('assigned_field_staff_id').references(
+      () => profiles.id,
+      { onDelete: 'set null' },
+    ),
+    /** When the visit is on the calendar, this points at the row in
+     *  appointments that backs it (so /admin/schedule and the client's
+     *  upcoming-visits widget render it without a second source). */
+    appointmentId: uuid('appointment_id').references(() => appointments.id, {
+      onDelete: 'set null',
+    }),
+    notes: text('notes'),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    index('maintenance_visits_plan_idx').on(t.planId),
+    index('maintenance_visits_scheduled_date_idx').on(t.scheduledDate),
+    index('maintenance_visits_plan_order_idx').on(t.planId, t.visitOrder),
+    index('maintenance_visits_status_idx').on(t.status),
+  ],
+);
+
+export const maintenanceVisitScopeItems = pgTable(
+  'maintenance_visit_scope_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    visitId: uuid('visit_id')
+      .notNull()
+      .references(() => maintenanceVisits.id, { onDelete: 'cascade' }),
+    /** Controlled vocabulary; see SCOPE_TYPES in src/lib/maintenance/scope-types.ts.
+     *  Stored as text rather than an enum so admin can add new types
+     *  without a migration. The application validates against the
+     *  constant. */
+    scopeType: text('scope_type').notNull(),
+    /** Human-readable label used when scope_type === 'custom'. Null
+     *  for built-in types (the label comes from SCOPE_TYPES). */
+    customLabel: text('custom_label'),
+    /** Per-item vendor override. NULL = inherit visit.vendorId. */
+    vendorId: uuid('vendor_id').references(() => vendors.id, {
+      onDelete: 'set null',
+    }),
+    completed: boolean('completed').notNull().default(false),
+    completionNotes: text('completion_notes'),
+    itemOrder: integer('item_order').notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [
+    index('maintenance_visit_scope_items_visit_idx').on(t.visitId),
+    index('maintenance_visit_scope_items_visit_order_idx').on(
+      t.visitId,
+      t.itemOrder,
+    ),
+  ],
+);
 
 // photos
 export const photos = pgTable('photos', {
@@ -843,6 +990,52 @@ export const emailTemplatesRelations = relations(emailTemplates, ({ one }) => ({
     references: [staff.id],
   }),
 }));
+
+export const maintenancePlansRelations = relations(maintenancePlans, ({ one, many }) => ({
+  property: one(properties, {
+    fields: [maintenancePlans.propertyId],
+    references: [properties.id],
+  }),
+  creator: one(profiles, {
+    fields: [maintenancePlans.createdBy],
+    references: [profiles.id],
+  }),
+  visits: many(maintenanceVisits),
+}));
+
+export const maintenanceVisitsRelations = relations(maintenanceVisits, ({ one, many }) => ({
+  plan: one(maintenancePlans, {
+    fields: [maintenanceVisits.planId],
+    references: [maintenancePlans.id],
+  }),
+  vendor: one(vendors, {
+    fields: [maintenanceVisits.vendorId],
+    references: [vendors.id],
+  }),
+  assignedFieldStaff: one(profiles, {
+    fields: [maintenanceVisits.assignedFieldStaffId],
+    references: [profiles.id],
+  }),
+  appointment: one(appointments, {
+    fields: [maintenanceVisits.appointmentId],
+    references: [appointments.id],
+  }),
+  scopeItems: many(maintenanceVisitScopeItems),
+}));
+
+export const maintenanceVisitScopeItemsRelations = relations(
+  maintenanceVisitScopeItems,
+  ({ one }) => ({
+    visit: one(maintenanceVisits, {
+      fields: [maintenanceVisitScopeItems.visitId],
+      references: [maintenanceVisits.id],
+    }),
+    vendor: one(vendors, {
+      fields: [maintenanceVisitScopeItems.vendorId],
+      references: [vendors.id],
+    }),
+  }),
+);
 
 // Suppress an unused-import warning if nothing in this file ends up using sql.
 // (Kept around for future raw-SQL helpers in this module.)
