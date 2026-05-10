@@ -13,6 +13,8 @@ import {
 } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { sendEmail } from '@/lib/email/send';
+import { getClientEmail, getDecisionEmailVars } from '@/lib/email/variables';
 import { createNotification } from '@/lib/notifications/create';
 import { getClientRecipientUserIds } from '@/lib/notifications/recipients';
 
@@ -414,6 +416,21 @@ export async function markDecisionAwaitingClient(
       );
     } catch (error) {
       console.error('[markDecisionAwaitingClient] notify failed', error);
+    }
+
+    // Email: send decision-awaiting email to the client.
+    try {
+      const clientEmail = await getClientEmail(owner.clientId);
+      if (clientEmail) {
+        const vars = await getDecisionEmailVars(milestoneId, owner.clientId);
+        await sendEmail({
+          key: 'decision_awaiting_client',
+          to: clientEmail,
+          variables: vars,
+        });
+      }
+    } catch (error) {
+      console.error('[markDecisionAwaitingClient] email failed', error);
     }
 
     revalidatePath(`/admin/projects/${projectId}`);

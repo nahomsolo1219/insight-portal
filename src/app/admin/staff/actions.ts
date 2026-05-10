@@ -6,6 +6,8 @@ import { db } from '@/db';
 import { profiles, staff } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { sendEmail } from '@/lib/email/send';
+import { getWelcomeEmailVars } from '@/lib/email/variables';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 type ActionResult<T = undefined> =
@@ -84,6 +86,21 @@ export async function inviteUser(params: InviteUserParams): Promise<InviteUserRe
         updatedAt: new Date(),
       })
       .where(eq(profiles.id, data.user.id));
+  }
+
+  // Email: send welcome email for client invites.
+  if (params.role === 'client' && params.clientId) {
+    try {
+      const vars = await getWelcomeEmailVars(params.clientId);
+      await sendEmail({
+        key: 'welcome_client',
+        to: params.email,
+        recipientUserId: data.user?.id,
+        variables: vars,
+      });
+    } catch (error) {
+      console.error('[inviteUser] welcome email failed', error);
+    }
   }
 
   revalidatePath('/admin/staff');

@@ -711,14 +711,44 @@ export const notifications = pgTable(
   ],
 );
 
-// email_templates
+// email_templates — stores both general-purpose templates (legacy rows
+// without a key) and trigger-based templates (rows with a unique key
+// like 'decision_awaiting_client' that the email system dispatches from).
 export const emailTemplates = pgTable('email_templates', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
+  /** Stable trigger identifier — unique among trigger templates but
+   *  NULL for legacy general-purpose templates. */
+  key: text('key'),
   subject: text('subject').notNull(),
+  /** Plaintext email body (fallback for clients that don't render HTML). */
   body: text('body').notNull(),
+  /** Rich HTML body — inline-styled table layout for email client compat.
+   *  NULL on legacy templates that predate the trigger system. */
+  bodyHtml: text('body_html'),
+  /** JSON array of variable names available for substitution (e.g.
+   *  ['client_name', 'firm_name', 'cta_url']). Admin reference only. */
+  variables: jsonb('variables'),
+  /** When false, the trigger skips sending — admin can disable any
+   *  trigger without deleting the template. */
+  enabled: boolean('enabled').notNull().default(true),
   lastEditedBy: uuid('last_edited_by').references(() => staff.id, { onDelete: 'set null' }),
   ...timestamps,
+});
+
+// email_log — append-only record of every email dispatch attempt. Used
+// for debugging "did the client actually get the email?" queries. Admin-
+// only RLS. No updatedAt since rows are never modified.
+export const emailLog = pgTable('email_log', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  templateKey: text('template_key'),
+  recipientEmail: text('recipient_email').notNull(),
+  recipientUserId: uuid('recipient_user_id').references(() => profiles.id, { onDelete: 'set null' }),
+  subject: text('subject').notNull(),
+  status: text('status').notNull(), // 'sent' | 'failed' | 'skipped_disabled'
+  error: text('error'),
+  resendId: text('resend_id'),
+  sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 // company_settings — single-row table for firm-level configuration.

@@ -7,6 +7,8 @@ import { db } from '@/db';
 import { invoices, projects, properties } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { sendEmail } from '@/lib/email/send';
+import { getClientEmail, getInvoiceEmailVars } from '@/lib/email/variables';
 import { createNotification } from '@/lib/notifications/create';
 import { getClientRecipientUserIds } from '@/lib/notifications/recipients';
 import { invoicePath } from '@/lib/storage/paths';
@@ -164,6 +166,23 @@ export async function createInvoice(
       );
     } catch (error) {
       console.error('[createInvoice] notify failed', error);
+    }
+
+    // Email: send invoice-issued email to the client.
+    try {
+      const clientEmail = await getClientEmail(clientId);
+      if (clientEmail) {
+        const vars = await getInvoiceEmailVars(
+          clientId,
+          input.invoiceNumber.trim(),
+          input.amountCents,
+          input.dueDate,
+          input.description.trim(),
+        );
+        await sendEmail({ key: 'invoice_issued', to: clientEmail, variables: vars });
+      }
+    } catch (error) {
+      console.error('[createInvoice] email failed', error);
     }
 
     revalidatePath(`/admin/clients/${clientId}`);

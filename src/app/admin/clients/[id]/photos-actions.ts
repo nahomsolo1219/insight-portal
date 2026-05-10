@@ -7,6 +7,8 @@ import { db } from '@/db';
 import { photos, properties } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { sendEmail } from '@/lib/email/send';
+import { getClientEmail, getPhotosEmailVars } from '@/lib/email/variables';
 import { createNotification } from '@/lib/notifications/create';
 import { getClientRecipientUserIds } from '@/lib/notifications/recipients';
 import { photoPath } from '@/lib/storage/paths';
@@ -297,6 +299,28 @@ export async function bulkCategorizePhotos(
       );
     } catch (error) {
       console.error('[bulkCategorizePhotos] notify failed', error);
+    }
+
+    // Email: send photos-categorized digest email to the client.
+    try {
+      const clientEmail = await getClientEmail(clientId);
+      if (clientEmail) {
+        // Use the first photo's propertyId + projectId for context.
+        const [sample] = await db
+          .select({ propertyId: photos.propertyId, projectId: photos.projectId })
+          .from(photos)
+          .where(eq(photos.id, ownedIds[0]))
+          .limit(1);
+        const vars = await getPhotosEmailVars(
+          clientId,
+          sample?.projectId ?? null,
+          sample?.propertyId ?? '',
+          ownedIds.length,
+        );
+        await sendEmail({ key: 'photos_categorized', to: clientEmail, variables: vars });
+      }
+    } catch (error) {
+      console.error('[bulkCategorizePhotos] email failed', error);
     }
 
     revalidatePath(`/admin/clients/${clientId}`);

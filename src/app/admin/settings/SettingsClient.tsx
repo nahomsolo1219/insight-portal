@@ -696,7 +696,7 @@ function EmailTemplatesSection({ templates }: { templates: EmailTemplateRow[] })
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-gray-900">Email templates</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Saved copy for automated emails. Stored only — sending is wired up in a future session.
+          Automated emails sent when events happen (decisions, invoices, photos, etc). Edit the subject and body per trigger.
         </p>
       </div>
 
@@ -707,7 +707,7 @@ function EmailTemplatesSection({ templates }: { templates: EmailTemplateRow[] })
           </div>
           <h3 className="text-base font-semibold text-gray-900">No email templates yet</h3>
           <p className="mx-auto mt-2 max-w-sm text-sm text-gray-500">
-            Templates are seeded by migrations. Once one exists, you can edit it here.
+            Templates are seeded by migrations. Run the latest migration to populate them.
           </p>
         </div>
       ) : (
@@ -749,36 +749,42 @@ function EmailTemplateCard({
   const [error, setError] = useState<string | null>(null);
   const [subject, setSubject] = useState(template.subject);
   const [body, setBody] = useState(template.body);
+  const [bodyHtml, setBodyHtml] = useState(template.bodyHtml ?? '');
+  const [enabled, setEnabled] = useState(template.enabled);
+  const [activeTab, setActiveTab] = useState<'plaintext' | 'html'>('plaintext');
 
   function save() {
     setError(null);
-    if (!subject.trim()) {
-      setError('Subject is required.');
-      return;
-    }
-    if (!body.trim()) {
-      setError('Body is required.');
-      return;
-    }
+    if (!subject.trim()) { setError('Subject is required.'); return; }
+    if (!body.trim()) { setError('Body (plaintext) is required.'); return; }
     startTransition(async () => {
       const result = await updateEmailTemplate(template.id, {
         subject: subject.trim(),
         body: body.trim(),
+        bodyHtml: bodyHtml.trim() || null,
+        enabled,
       });
-      if (!result.success) {
-        setError(result.error);
-        showToast(result.error, 'error');
-        return;
-      }
+      if (!result.success) { setError(result.error); showToast(result.error, 'error'); return; }
       showToast('Email template saved');
       onSaved();
       router.refresh();
     });
   }
 
+  function testSend() {
+    startTransition(async () => {
+      const { sendTestEmail } = await import('./actions');
+      const result = await sendTestEmail(template.id);
+      if (result.success) showToast('Test email sent to your address');
+      else showToast(result.error, 'error');
+    });
+  }
+
   function cancel() {
     setSubject(template.subject);
     setBody(template.body);
+    setBodyHtml(template.bodyHtml ?? '');
+    setEnabled(template.enabled);
     setError(null);
     onCancel();
   }
@@ -787,80 +793,83 @@ function EmailTemplateCard({
     <div className="shadow-soft-md rounded-2xl bg-paper p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-gray-900">{template.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-gray-900">{template.name}</h3>
+            {!template.enabled && (
+              <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">Disabled</span>
+            )}
+          </div>
+          {template.key && (
+            <p className="mt-0.5 font-mono text-[11px] text-gray-400">{template.key}</p>
+          )}
           {!editing && (
             <p className="mt-1 truncate text-xs text-gray-500">{template.subject}</p>
           )}
-          <div className="mt-1 text-[11px] text-gray-400">
-            Last edited {template.updatedAt.toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })}
-            {template.lastEditedByName ? ` by ${template.lastEditedByName}` : ''}
-          </div>
         </div>
         {!editing && (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="hover:text-brand-teal-500 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-500 transition-all hover:bg-brand-warm-50"
-          >
-            <Pencil size={12} strokeWidth={1.5} />
-            Edit
+          <button type="button" onClick={onEdit} className="hover:text-brand-teal-500 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-500 transition-all hover:bg-brand-warm-50">
+            <Pencil size={12} strokeWidth={1.5} /> Edit
           </button>
         )}
       </div>
 
       {editing && (
         <div className="mt-4 space-y-4 border-t border-line-2 pt-4">
+          {/* Enabled toggle */}
+          <label className="flex items-center gap-3 text-sm">
+            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
+            <span className="font-medium text-gray-700">Enabled</span>
+            <span className="text-xs text-gray-400">— when off, this trigger won&apos;t send emails</span>
+          </label>
+
           <Field label="Subject" required>
-            <input
-              type="text"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Body" required hint="Plain text for now; rich formatting comes later.">
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={8}
-              className={textareaClass}
-            />
+            <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} className={inputClass} />
           </Field>
 
-          {error && (
-            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
-              {error}
+          {/* Body tabs */}
+          <div>
+            <div className="mb-2 flex items-center gap-1">
+              {(['plaintext', 'html'] as const).map((tab) => (
+                <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={cn('rounded-lg px-3 py-1.5 text-xs font-medium transition-all', activeTab === tab ? 'bg-brand-teal-50 text-brand-teal-500' : 'text-gray-500 hover:text-brand-teal-500')}>
+                  {tab === 'plaintext' ? 'Plaintext' : 'HTML'}
+                </button>
+              ))}
+            </div>
+            {activeTab === 'plaintext' ? (
+              <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={8} className={cn(textareaClass, 'font-mono text-xs')} />
+            ) : (
+              <textarea value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} rows={12} className={cn(textareaClass, 'font-mono text-xs')} placeholder="HTML body (inline styles for email clients)" />
+            )}
+          </div>
+
+          {/* Variables reference */}
+          {template.variables.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold tracking-wider text-gray-500 uppercase">Available variables</p>
+              <div className="flex flex-wrap gap-1.5">
+                {template.variables.map((v) => (
+                  <span key={v} className="bg-brand-warm-200 rounded-md px-2 py-0.5 font-mono text-[11px] text-gray-600">{`{{${v}}}`}</span>
+                ))}
+              </div>
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={cancel}
-              disabled={isPending}
-              className="rounded-xl px-4 py-2 text-sm font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={save}
-              disabled={isPending}
-              className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-4 py-2 text-sm font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isPending ? (
-                <>
-                  Saving
-                  <LoadingDots />
-                </>
-              ) : (
-                'Save'
-              )}
-            </button>
+          {error && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>
+          )}
+
+          <div className="flex items-center justify-between">
+            {template.key && (
+              <button type="button" onClick={testSend} disabled={isPending} className="text-brand-teal-500 hover:text-brand-teal-600 inline-flex items-center gap-1 text-xs font-medium transition-colors disabled:opacity-50">
+                <Mail size={12} strokeWidth={1.5} /> Send test to me
+              </button>
+            )}
+            <div className="flex items-center gap-2 ml-auto">
+              <button type="button" onClick={cancel} disabled={isPending} className="rounded-xl px-4 py-2 text-sm font-medium text-gray-700 transition-all hover:bg-gray-100 disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={save} disabled={isPending} className="bg-brand-gold-400 hover:bg-brand-gold-500 shadow-soft rounded-xl px-4 py-2 text-sm font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50">
+                {isPending ? <>Saving<LoadingDots /></> : 'Save'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -7,6 +7,8 @@ import { db } from '@/db';
 import { appointments, properties } from '@/db/schema';
 import { logAudit, type AuditAction } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { sendEmail } from '@/lib/email/send';
+import { getAppointmentEmailVars, getClientEmail } from '@/lib/email/variables';
 import { createNotification } from '@/lib/notifications/create';
 import { getClientRecipientUserIds } from '@/lib/notifications/recipients';
 
@@ -121,6 +123,23 @@ export async function createAppointment(
       );
     } catch (error) {
       console.error('[createAppointment] notify failed', error);
+    }
+
+    // Email: send appointment-scheduled email to the client.
+    try {
+      const clientEmail = await getClientEmail(clientId);
+      if (clientEmail) {
+        const vars = await getAppointmentEmailVars(
+          clientId,
+          input.title.trim(),
+          input.date,
+          input.startTime,
+          propertyId,
+        );
+        await sendEmail({ key: 'appointment_scheduled', to: clientEmail, variables: vars });
+      }
+    } catch (error) {
+      console.error('[createAppointment] email failed', error);
     }
 
     revalidatePath(`/admin/clients/${clientId}`);
@@ -240,6 +259,52 @@ export async function deleteAppointment(
   } catch (error) {
     console.error('[deleteAppointment]', error);
     return { success: false, error: 'Failed to delete appointment.' };
+  }
+}
+
+/**
+ * Send appointment reminder email. Designed to be called manually
+ * (admin "Send reminder" button) or by a future cron job. Does NOT
+ * create an in-app notification — just the email. Idempotent: sending
+ * twice is harmless (duplicates land in email_log but don't confuse
+ * the recipient beyond an extra email).
+ */
+export async function sendAppointmentReminder(
+  appointmentId: string,
+  clientId: string,
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  try {
+    const [appt] = await db
+      .select({
+        title: appointments.title,
+        date: appointments.date,
+        startTime: appointments.startTime,
+        propertyId: appointments.propertyId,
+      })
+      .from(appointments)
+      .where(eq(appointments.id, appointmentId))
+      .limit(1);
+
+    if (!appt) return { success: false, error: 'Appointment not found.' };
+
+    const clientEmail = await getClientEmail(clientId);
+    if (!clientEmail) return { success: false, error: 'Client has no email on file.' };
+
+    const vars = await getAppointmentEmailVars(
+      clientId,
+      appt.title,
+      appt.date,
+      appt.startTime,
+      appt.propertyId,
+    );
+    await sendEmail({ key: 'appointment_reminder', to: clientEmail, variables: vars });
+
+    return { success: true };
+  } catch (error) {
+    console.error('[sendAppointmentReminder]', error);
+    return { success: false, error: 'Failed to send reminder.' };
   }
 }
 

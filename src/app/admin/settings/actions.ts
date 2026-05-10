@@ -150,6 +150,8 @@ export async function deleteTier(tierId: string): Promise<ActionResult> {
 export interface UpdateEmailTemplateInput {
   subject: string;
   body: string;
+  bodyHtml?: string | null;
+  enabled?: boolean;
 }
 
 export async function updateEmailTemplate(
@@ -159,18 +161,21 @@ export async function updateEmailTemplate(
   const user = await requireAdmin();
 
   if (!input.subject?.trim()) return { success: false, error: 'Subject is required.' };
-  if (!input.body?.trim()) return { success: false, error: 'Body is required.' };
+  if (!input.body?.trim()) return { success: false, error: 'Body (plaintext) is required.' };
 
   try {
+    const patch: Record<string, unknown> = {
+      subject: input.subject.trim(),
+      body: input.body.trim(),
+      lastEditedBy: user.staffId,
+      updatedAt: new Date(),
+    };
+    if (input.bodyHtml !== undefined) patch.bodyHtml = input.bodyHtml?.trim() || null;
+    if (input.enabled !== undefined) patch.enabled = input.enabled;
+
     const [updated] = await db
       .update(emailTemplates)
-      .set({
-        subject: input.subject.trim(),
-        body: input.body.trim(),
-        // user.staffId may be null for admins who aren't linked to a staff
-        // row — the column is nullable, so that's fine.
-        lastEditedBy: user.staffId,
-      })
+      .set(patch)
       .where(eq(emailTemplates.id, templateId))
       .returning({ id: emailTemplates.id, name: emailTemplates.name });
 
@@ -189,6 +194,56 @@ export async function updateEmailTemplate(
   } catch (error) {
     console.error('[updateEmailTemplate]', error);
     return { success: false, error: 'Failed to update email template.' };
+  }
+}
+
+/**
+ * Send a test email to the requesting admin's own address using the
+ * template's current saved content + placeholder variable values.
+ */
+export async function sendTestEmail(templateId: string): Promise<ActionResult> {
+  const user = await requireAdmin();
+
+  try {
+    const [template] = await db
+      .select({
+        key: emailTemplates.key,
+        subject: emailTemplates.subject,
+        body: emailTemplates.body,
+        bodyHtml: emailTemplates.bodyHtml,
+        variables: emailTemplates.variables,
+      })
+      .from(emailTemplates)
+      .where(eq(emailTemplates.id, templateId))
+      .limit(1);
+
+    if (!template) return { success: false, error: 'Template not found.' };
+    if (!template.key) return { success: false, error: 'Only trigger templates support test sends.' };
+
+    // Build placeholder variables.
+    const vars: Record<string, string> = {};
+    const varList = Array.isArray(template.variables) ? (template.variables as string[]) : [];
+    for (const v of varList) {
+      vars[v] = `[${v}]`;
+    }
+    // Override a few for readability.
+    vars.client_name = 'Test Client';
+    vars.firm_name = 'Insight Home Maintenance';
+    vars.cta_url = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
+    const { sendEmail } = await import('@/lib/email/send');
+    const result = await sendEmail({
+      key: template.key as import('@/lib/email/types').EmailTemplateKey,
+      to: user.email,
+      recipientUserId: user.id,
+      variables: vars,
+    });
+
+    if (!result.success) return { success: false, error: result.error ?? 'Send failed.' };
+    return { success: true };
+  } catch (error) {
+    console.error('[sendTestEmail]', error);
+    return { success: false, error: 'Failed to send test email.' };
   }
 }
 

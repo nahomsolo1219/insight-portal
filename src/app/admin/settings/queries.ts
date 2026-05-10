@@ -42,23 +42,38 @@ export async function listMembershipTiers(): Promise<MembershipTierRow[]> {
 export interface EmailTemplateRow {
   id: string;
   name: string;
+  key: string | null;
   subject: string;
   body: string;
+  bodyHtml: string | null;
+  variables: string[];
+  enabled: boolean;
   lastEditedByName: string | null;
   updatedAt: Date;
 }
 
 export async function listEmailTemplates(): Promise<EmailTemplateRow[]> {
-  return db
+  const rows = await db
     .select({
       id: emailTemplates.id,
       name: emailTemplates.name,
+      key: emailTemplates.key,
       subject: emailTemplates.subject,
       body: emailTemplates.body,
+      bodyHtml: emailTemplates.bodyHtml,
+      variables: emailTemplates.variables,
+      enabled: emailTemplates.enabled,
       lastEditedByName: staff.name,
       updatedAt: emailTemplates.updatedAt,
     })
     .from(emailTemplates)
     .leftJoin(staff, eq(staff.id, emailTemplates.lastEditedBy))
     .orderBy(asc(emailTemplates.name));
+
+  return rows.map((r) => ({
+    ...r,
+    variables: Array.isArray(r.variables)
+      ? (r.variables as string[])
+      : [],
+  }));
 }
