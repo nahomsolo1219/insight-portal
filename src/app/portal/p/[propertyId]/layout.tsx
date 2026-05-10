@@ -8,6 +8,7 @@ import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { db } from '@/db';
 import { clients, properties } from '@/db/schema';
 import { requireUser } from '@/lib/auth/current-user';
+import { getCompanySettings } from '@/lib/company/queries';
 import { getSignedUrl } from '@/lib/storage/upload';
 
 interface Props {
@@ -47,7 +48,7 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
   // pair drives the bell badge + dropdown panel (real data as of
   // Session 7 — replaces the prior pending-decision proxy); the
   // client row hydrates the sidebar profile chip.
-  const [clientRow, propertyRows, notifications, unreadNotificationCount] =
+  const [clientRow, propertyRows, notifications, unreadNotificationCount, companySettings] =
     await Promise.all([
       db
         .select({
@@ -76,6 +77,7 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
         .orderBy(asc(properties.name)),
       listMyNotifications(user.id),
       getUnreadNotificationCount(user.id),
+      getCompanySettings(),
     ]);
 
   const avatarUrl = clientRow?.avatarStoragePath
@@ -105,6 +107,8 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
         properties={propertyRows}
         notifications={notifications}
         unreadNotificationCount={unreadNotificationCount}
+        firmName={companySettings.firmName}
+        logoLightUrl={companySettings.logoLightUrl}
       />
       <main className="mx-auto max-w-[1200px] px-6 pt-10 pb-24 md:pb-10">{children}</main>
     </div>

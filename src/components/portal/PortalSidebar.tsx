@@ -17,7 +17,6 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
@@ -69,6 +68,10 @@ interface PortalSidebarProps {
    *  window focus + on dropdown open to keep the badge live. */
   notifications: NotificationListItem[];
   unreadNotificationCount: number;
+  /** Company settings: firm name + optional custom light logo path.
+   *  Falls back to /logo-dark.svg + 'Insight HM' when not provided. */
+  firmName?: string;
+  logoLightUrl?: string | null;
 }
 
 interface NavSpec {
@@ -124,6 +127,8 @@ export function PortalSidebar({
   properties,
   notifications,
   unreadNotificationCount,
+  firmName,
+  logoLightUrl,
 }: PortalSidebarProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const activeProperty = properties.find((p) => p.id === propertyId) ?? null;
@@ -195,17 +200,15 @@ export function PortalSidebar({
         <div className="px-6 pt-7 pb-6">
           <Link
             href="/portal"
-            aria-label="Insight HM — back to all homes"
+            aria-label={`${firmName || 'Insight HM'} — back to all homes`}
             onClick={closeDrawer}
             className="inline-flex items-center"
           >
-            <Image
-              src="/logo-dark.svg"
-              alt="Insight HM"
-              width={140}
-              height={32}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logoLightUrl || '/logo-dark.svg'}
+              alt={firmName || 'Insight HM'}
               className="h-8 w-auto"
-              priority
             />
           </Link>
         </div>

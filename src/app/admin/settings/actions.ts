@@ -3,9 +3,11 @@
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
-import { emailTemplates, membershipTiers } from '@/db/schema';
+import { companySettings, emailTemplates, membershipTiers } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { BUCKET_NAME } from '@/lib/storage/paths';
 
 type ActionResult<T = undefined> =
   | { success: true; data?: T }
@@ -187,5 +189,208 @@ export async function updateEmailTemplate(
   } catch (error) {
     console.error('[updateEmailTemplate]', error);
     return { success: false, error: 'Failed to update email template.' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Company settings
+// ---------------------------------------------------------------------------
+
+export interface CompanySettingsInput {
+  firmName?: string;
+  firmTagline?: string | null;
+  firmEmail?: string | null;
+  firmPhone?: string | null;
+  firmAddress?: string | null;
+  firmWebsite?: string | null;
+  businessHours?: string | null;
+  brandPrimaryColor?: string | null;
+  brandAccentColor?: string | null;
+  defaultInvoiceCategories?: string[] | null;
+  emailFromName?: string | null;
+  emailFromAddress?: string | null;
+  emailReplyTo?: string | null;
+}
+
+export async function updateCompanySettings(
+  input: CompanySettingsInput,
+): Promise<ActionResult> {
+  const user = await requireAdmin();
+
+  try {
+    // Get the single row's id.
+    const [existing] = await db
+      .select({ id: companySettings.id })
+      .from(companySettings)
+      .limit(1);
+    if (!existing) return { success: false, error: 'Company settings row not found.' };
+
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (input.firmName !== undefined) patch.firmName = input.firmName.trim() || 'Insight Home Maintenance';
+    if (input.firmTagline !== undefined) patch.firmTagline = input.firmTagline?.trim() || null;
+    if (input.firmEmail !== undefined) patch.firmEmail = input.firmEmail?.trim() || null;
+    if (input.firmPhone !== undefined) patch.firmPhone = input.firmPhone?.trim() || null;
+    if (input.firmAddress !== undefined) patch.firmAddress = input.firmAddress?.trim() || null;
+    if (input.firmWebsite !== undefined) patch.firmWebsite = input.firmWebsite?.trim() || null;
+    if (input.businessHours !== undefined) patch.businessHours = input.businessHours?.trim() || null;
+    if (input.brandPrimaryColor !== undefined) patch.brandPrimaryColor = input.brandPrimaryColor?.trim() || null;
+    if (input.brandAccentColor !== undefined) patch.brandAccentColor = input.brandAccentColor?.trim() || null;
+    if (input.defaultInvoiceCategories !== undefined) {
+      patch.defaultInvoiceCategories = input.defaultInvoiceCategories;
+    }
+    if (input.emailFromName !== undefined) patch.emailFromName = input.emailFromName?.trim() || null;
+    if (input.emailFromAddress !== undefined) patch.emailFromAddress = input.emailFromAddress?.trim() || null;
+    if (input.emailReplyTo !== undefined) patch.emailReplyTo = input.emailReplyTo?.trim() || null;
+
+    await db
+      .update(companySettings)
+      .set(patch)
+      .where(eq(companySettings.id, existing.id));
+
+    await logAudit({
+      actor: user,
+      action: 'updated settings',
+      targetType: 'settings',
+      targetLabel: 'Company settings',
+    });
+
+    revalidatePath('/admin/settings');
+    revalidatePath('/admin');
+    revalidatePath('/portal');
+    return { success: true };
+  } catch (error) {
+    console.error('[updateCompanySettings]', error);
+    return { success: false, error: 'Failed to update company settings.' };
+  }
+}
+
+export async function uploadFirmLogo(
+  formData: FormData,
+  kind: 'light' | 'dark',
+): Promise<ActionResult<{ url: string }>> {
+  const user = await requireAdmin();
+
+  const file = formData.get('file') as File | null;
+  if (!file || file.size === 0) return { success: false, error: 'No file provided.' };
+  if (file.size > 5 * 1024 * 1024) return { success: false, error: 'File must be under 5 MB.' };
+
+  const allowedTypes = ['image/png', 'image/svg+xml', 'image/jpeg', 'image/webp'];
+  if (!allowedTypes.includes(file.type)) {
+    return { success: false, error: 'Logo must be PNG, SVG, JPEG, or WebP.' };
+  }
+
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+  const storagePath = `company/logo-${kind}.${ext}`;
+
+  try {
+    const supabase = createAdminClient();
+    const arrayBuffer = await file.arrayBuffer();
+    const { error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(storagePath, arrayBuffer, {
+        contentType: file.type,
+        upsert: true,
+      });
+    if (error) throw error;
+
+    // Get public URL (the bucket is private, but admin always signs).
+    // Store the path, not the URL — same as other file references.
+    const [existing] = await db
+      .select({ id: companySettings.id })
+      .from(companySettings)
+      .limit(1);
+    if (!existing) return { success: false, error: 'Settings row not found.' };
+
+    const field = kind === 'light' ? 'logoLightUrl' : 'logoDarkUrl';
+    await db
+      .update(companySettings)
+      .set({ [field]: storagePath, updatedAt: new Date() })
+      .where(eq(companySettings.id, existing.id));
+
+    await logAudit({
+      actor: user,
+      action: 'updated settings',
+      targetType: 'settings',
+      targetLabel: `Uploaded ${kind} logo`,
+    });
+
+    revalidatePath('/admin/settings');
+    revalidatePath('/admin');
+    revalidatePath('/portal');
+    return { success: true, data: { url: storagePath } };
+  } catch (error) {
+    console.error('[uploadFirmLogo]', error);
+    return { success: false, error: 'Failed to upload logo.' };
+  }
+}
+
+export async function removeFirmLogo(kind: 'light' | 'dark'): Promise<ActionResult> {
+  const user = await requireAdmin();
+
+  try {
+    const [existing] = await db
+      .select({ id: companySettings.id, logoLightUrl: companySettings.logoLightUrl, logoDarkUrl: companySettings.logoDarkUrl })
+      .from(companySettings)
+      .limit(1);
+    if (!existing) return { success: false, error: 'Settings row not found.' };
+
+    const path = kind === 'light' ? existing.logoLightUrl : existing.logoDarkUrl;
+    if (path) {
+      const supabase = createAdminClient();
+      await supabase.storage.from(BUCKET_NAME).remove([path]);
+    }
+
+    const field = kind === 'light' ? 'logoLightUrl' : 'logoDarkUrl';
+    await db
+      .update(companySettings)
+      .set({ [field]: null, updatedAt: new Date() })
+      .where(eq(companySettings.id, existing.id));
+
+    await logAudit({
+      actor: user,
+      action: 'updated settings',
+      targetType: 'settings',
+      targetLabel: `Removed ${kind} logo`,
+    });
+
+    revalidatePath('/admin/settings');
+    revalidatePath('/admin');
+    revalidatePath('/portal');
+    return { success: true };
+  } catch (error) {
+    console.error('[removeFirmLogo]', error);
+    return { success: false, error: 'Failed to remove logo.' };
+  }
+}
+
+export async function resetBrandColors(): Promise<ActionResult> {
+  const user = await requireAdmin();
+
+  try {
+    const [existing] = await db
+      .select({ id: companySettings.id })
+      .from(companySettings)
+      .limit(1);
+    if (!existing) return { success: false, error: 'Settings row not found.' };
+
+    await db
+      .update(companySettings)
+      .set({ brandPrimaryColor: null, brandAccentColor: null, updatedAt: new Date() })
+      .where(eq(companySettings.id, existing.id));
+
+    await logAudit({
+      actor: user,
+      action: 'updated settings',
+      targetType: 'settings',
+      targetLabel: 'Reset brand colors to defaults',
+    });
+
+    revalidatePath('/admin/settings');
+    revalidatePath('/admin');
+    revalidatePath('/portal');
+    return { success: true };
+  } catch (error) {
+    console.error('[resetBrandColors]', error);
+    return { success: false, error: 'Failed to reset brand colors.' };
   }
 }

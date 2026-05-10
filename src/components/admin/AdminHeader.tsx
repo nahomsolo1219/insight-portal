@@ -49,6 +49,11 @@ interface AdminHeaderProps {
    *  a head start on the first paint. */
   notifications: NotificationListItem[];
   unreadNotificationCount: number;
+  /** Company settings: firm name + optional custom dark logo path.
+   *  Falls back to /logo-dark.svg + 'Insight Home Maintenance' when
+   *  not provided or when the path is null. */
+  firmName?: string;
+  logoDarkUrl?: string | null;
 }
 
 /**
@@ -71,6 +76,8 @@ export function AdminHeader({
   projectPickerClients,
   notifications,
   unreadNotificationCount,
+  firmName,
+  logoDarkUrl,
 }: AdminHeaderProps) {
   return (
     <header className="bg-paper border-line flex h-16 flex-shrink-0 border-b">
@@ -80,8 +87,8 @@ export function AdminHeader({
       <div className="bg-brand-teal-500 hidden w-64 flex-shrink-0 items-center px-6 md:flex">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/logo-dark.svg"
-          alt="Insight Home Maintenance"
+          src={logoDarkUrl || '/logo-dark.svg'}
+          alt={firmName || 'Insight Home Maintenance'}
           className="h-7 w-auto"
         />
       </div>
@@ -90,8 +97,8 @@ export function AdminHeader({
       <div className="bg-brand-teal-500 flex w-14 flex-shrink-0 items-center justify-center md:hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/logo-dark.svg"
-          alt="Insight"
+          src={logoDarkUrl || '/logo-dark.svg'}
+          alt={firmName || 'Insight'}
           className="h-5 w-auto"
         />
       </div>

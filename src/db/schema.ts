@@ -721,6 +721,30 @@ export const emailTemplates = pgTable('email_templates', {
   ...timestamps,
 });
 
+// company_settings — single-row table for firm-level configuration.
+// Only one row ever exists (enforced via a CHECK on id = fixed UUID or
+// simply by the application layer never inserting a second row). Admin-
+// only RLS. The row is seeded by the migration; the settings page UPDATEs.
+export const companySettings = pgTable('company_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  firmName: text('firm_name').notNull().default('Insight Home Maintenance'),
+  firmTagline: text('firm_tagline'),
+  firmEmail: text('firm_email'),
+  firmPhone: text('firm_phone'),
+  firmAddress: text('firm_address'),
+  firmWebsite: text('firm_website'),
+  businessHours: text('business_hours'),
+  logoLightUrl: text('logo_light_url'),
+  logoDarkUrl: text('logo_dark_url'),
+  brandPrimaryColor: text('brand_primary_color'),
+  brandAccentColor: text('brand_accent_color'),
+  defaultInvoiceCategories: jsonb('default_invoice_categories'),
+  emailFromName: text('email_from_name'),
+  emailFromAddress: text('email_from_address'),
+  emailReplyTo: text('email_reply_to'),
+  ...timestamps,
+});
+
 // ---------- Relations ----------
 // Drizzle's `relations()` are runtime metadata for the query API
 // (db.query.x.findMany({ with: { ... } })). They do not create FKs — those

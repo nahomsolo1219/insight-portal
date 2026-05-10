@@ -9,6 +9,7 @@ import {
   listMyNotifications,
 } from '@/app/notifications/queries';
 import { getCurrentUser } from '@/lib/auth/current-user';
+import { getCompanySettings } from '@/lib/company/queries';
 import { getAvatarPublicUrl } from '@/lib/storage/upload';
 import { getActiveClientsForProjectPicker } from './queries';
 import { getClientFormOptions } from './clients/queries';
@@ -36,11 +37,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     projectPickerClients,
     notifications,
     unreadNotificationCount,
+    companySettings,
   ] = await Promise.all([
     getClientFormOptions(),
     getActiveClientsForProjectPicker(),
     listMyNotifications(user.id),
     getUnreadNotificationCount(user.id),
+    getCompanySettings(),
   ]);
 
   // The avatarUrl on `user` is a storage *path*, not a public URL —
@@ -91,6 +94,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           projectPickerClients={projectPickerClients}
           notifications={notifications}
           unreadNotificationCount={unreadNotificationCount}
+          firmName={companySettings.firmName}
+          logoDarkUrl={companySettings.logoDarkUrl}
         />
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <Sidebar user={user} avatarPublicUrl={avatarPublicUrl} />

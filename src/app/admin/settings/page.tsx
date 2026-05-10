@@ -1,12 +1,14 @@
 import { requireAdmin } from '@/lib/auth/current-user';
+import { getCompanySettings } from '@/lib/company/queries';
 import { SettingsClient } from './SettingsClient';
 import { listEmailTemplates, listMembershipTiers } from './queries';
 
 export default async function SettingsPage() {
   await requireAdmin();
-  const [tiers, emailTemplates] = await Promise.all([
+  const [tiers, emailTemplates, company] = await Promise.all([
     listMembershipTiers(),
     listEmailTemplates(),
+    getCompanySettings(),
   ]);
 
   return (
@@ -24,7 +26,7 @@ export default async function SettingsPage() {
         </p>
       </header>
 
-      <SettingsClient tiers={tiers} emailTemplates={emailTemplates} />
+      <SettingsClient tiers={tiers} emailTemplates={emailTemplates} company={company} />
     </div>
   );
 }
