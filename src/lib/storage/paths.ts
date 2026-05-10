@@ -79,6 +79,24 @@ export function userAvatarPath(userId: string, ext: string): string {
 }
 
 /**
+ * Path for a maintenance-plan document (home assessment, playbook).
+ *
+ * Plans live outside the per-fileType tree the storage RLS uses for
+ * client visibility. For Session B-1 (admin-only) the path is signed
+ * via the admin service-role helper — RLS is bypassed. Session B-2
+ * (client portal restructure) will extend `manual_storage_rls.sql`
+ * to grant clients read on `maintenance/{theirClientId}/...`.
+ */
+export function maintenancePlanDocumentPath(
+  clientId: string,
+  planId: string,
+  kind: 'home_assessment' | 'playbook',
+  ext: string,
+): string {
+  return `maintenance/${clientId}/${planId}/${kind}.${sanitizeExt(ext) || 'pdf'}`;
+}
+
+/**
  * Path for a vendor document (insurance certificate, W-9, license, etc.).
  * Vendor docs sit in their own top-level prefix because they're admin-only
  * — clients never need to see them, and the path layout keeps them

@@ -67,7 +67,16 @@ export type AuditAction =
   | 'updated template'
   | 'deleted template'
   | 'uploaded template cover photo'
-  | 'removed template cover photo';
+  | 'removed template cover photo'
+  | 'created maintenance plan'
+  | 'updated maintenance plan'
+  | 'archived maintenance plan'
+  | 'added maintenance visit'
+  | 'updated maintenance visit'
+  | 'deleted maintenance visit'
+  | 'updated maintenance scope'
+  | 'completed maintenance scope item'
+  | 'uploaded maintenance plan document';
 
 export type AuditTargetType =
   | 'client'
@@ -86,7 +95,10 @@ export type AuditTargetType =
   | 'staff'
   | 'tier'
   | 'template'
-  | 'settings';
+  | 'settings'
+  | 'maintenance_plan'
+  | 'maintenance_visit'
+  | 'maintenance_scope_item';
 
 export interface LogAuditParams {
   actor: Pick<CurrentUser, 'id' | 'fullName'>;
