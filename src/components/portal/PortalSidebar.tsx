@@ -12,6 +12,7 @@ import {
   Pencil,
   Receipt,
   Settings,
+  ShieldCheck,
   Wrench,
   X,
 } from 'lucide-react';
@@ -71,17 +72,20 @@ interface PortalSidebarProps {
 }
 
 interface NavSpec {
-  segment: 'dashboard' | 'projects' | 'appointments' | 'documents' | 'invoices';
+  segment: 'dashboard' | 'projects' | 'maintenance' | 'appointments' | 'documents' | 'invoices';
   label: string;
   icon: LucideIcon;
 }
 
 /** Sidebar nav items in priority order — what's happening at this home,
  *  then secondary references. Same ordering the Session-3 top-tab strip
- *  used; only the chrome shape changed. */
+ *  used; only the chrome shape changed. Maintenance sits between Projects
+ *  and Appointments (per B-2 spec — David flagged it as confusing to nest
+ *  inside Projects). */
 const NAV_ITEMS: ReadonlyArray<NavSpec> = [
   { segment: 'dashboard', label: 'Dashboard', icon: Home },
   { segment: 'projects', label: 'Projects', icon: Wrench },
+  { segment: 'maintenance', label: 'Maintenance', icon: ShieldCheck },
   { segment: 'appointments', label: 'Appointments', icon: CalendarClock },
   { segment: 'documents', label: 'Documents', icon: FileText },
   { segment: 'invoices', label: 'Invoices', icon: Receipt },

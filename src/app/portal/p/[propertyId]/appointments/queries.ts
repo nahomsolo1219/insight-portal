@@ -13,6 +13,8 @@ export interface ClientAppointmentRow {
   startTime: string | null;
   endTime: string | null;
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
+  /** 'project' | 'maintenance' — used to pick the right icon and link target. */
+  kind: 'project' | 'maintenance';
   scopeOfWork: string | null;
   davidOnSite: boolean;
   propertyName: string;
@@ -56,6 +58,7 @@ export async function getClientAppointments(
       startTime: appointments.startTime,
       endTime: appointments.endTime,
       status: appointments.status,
+      kind: appointments.kind,
       scopeOfWork: appointments.scopeOfWork,
       davidOnSite: appointments.davidOnSite,
       propertyName: properties.name,

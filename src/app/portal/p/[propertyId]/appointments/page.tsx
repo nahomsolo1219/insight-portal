@@ -149,16 +149,17 @@ function AppointmentCard({ appointment, tone, anchor }: AppointmentCardProps) {
               <MapPin size={11} strokeWidth={1.5} />
               {appointment.propertyName}
             </span>
-            {appointment.projectName && (
+            {appointment.kind === 'maintenance' ? (
               <span className="inline-flex items-center gap-1">
-                {appointment.projectType === 'maintenance' ? (
-                  <CalendarClock size={11} strokeWidth={1.5} />
-                ) : (
-                  <Hammer size={11} strokeWidth={1.5} />
-                )}
+                <CalendarClock size={11} strokeWidth={1.5} />
+                Maintenance
+              </span>
+            ) : appointment.projectName ? (
+              <span className="inline-flex items-center gap-1">
+                <Hammer size={11} strokeWidth={1.5} />
                 {appointment.projectName}
               </span>
-            )}
+            ) : null}
             {appointment.vendorName && (
               <span className="inline-flex items-center gap-1">
                 <Wrench size={11} strokeWidth={1.5} />

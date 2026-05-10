@@ -19,6 +19,7 @@
 -- applied. (Policy names are per-table, so the ON clause is required.)
 DROP POLICY IF EXISTS "Admin full storage access" ON storage.objects;
 DROP POLICY IF EXISTS "Clients read own files" ON storage.objects;
+DROP POLICY IF EXISTS "Clients read own maintenance docs" ON storage.objects;
 DROP POLICY IF EXISTS "Field staff upload photos" ON storage.objects;
 DROP POLICY IF EXISTS "Field staff read own uploads" ON storage.objects;
 
@@ -53,6 +54,20 @@ USING (
       AND p.status = 'pending'
     )
   )
+);
+
+-- Client: read maintenance documents (playbook, home assessment) under their
+-- own maintenance/{clientId}/... prefix. Same pattern as the file-type reads
+-- above, but maintenance docs live outside the standard {fileType}/{clientId}
+-- tree. The path is maintenance/{clientId}/{planId}/{kind}.{ext}.
+CREATE POLICY "Clients read own maintenance docs"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (
+  bucket_id = 'insight-files'
+  AND public.current_user_role() = 'client'
+  AND (storage.foldername(name))[1] = 'maintenance'
+  AND (storage.foldername(name))[2] = public.current_user_client_id()::text
 );
 
 -- Field staff: may INSERT into the photos/ prefix only. Never anywhere else.

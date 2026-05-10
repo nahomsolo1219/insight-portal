@@ -14,6 +14,8 @@ export interface ScheduleRow {
   startTime: string | null;
   endTime: string | null;
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
+  /** 'project' | 'maintenance' — drives which icon/link the card shows. */
+  kind: 'project' | 'maintenance';
   davidOnSite: boolean;
   scopeOfWork: string | null;
   propertyId: string;
@@ -44,6 +46,7 @@ export async function getSchedule(
       startTime: appointments.startTime,
       endTime: appointments.endTime,
       status: appointments.status,
+      kind: appointments.kind,
       davidOnSite: appointments.davidOnSite,
       scopeOfWork: appointments.scopeOfWork,
       propertyId: appointments.propertyId,

@@ -18,6 +18,9 @@ import {
   auditLog,
   clients,
   invoices,
+  maintenancePlans,
+  maintenanceVisitScopeItems,
+  maintenanceVisits,
   membershipTiers,
   milestones,
   photos,
@@ -39,6 +42,9 @@ function localDateString(d: Date = new Date()): string {
 }
 
 async function clearSeededTables() {
+  await db.execute(sql`DELETE FROM maintenance_visit_scope_items`);
+  await db.execute(sql`DELETE FROM maintenance_visits`);
+  await db.execute(sql`DELETE FROM maintenance_plans`);
   await db.execute(sql`DELETE FROM weekly_updates`);
   await db.execute(sql`DELETE FROM documents`);
   await db.execute(sql`DELETE FROM reports`);
@@ -311,11 +317,6 @@ async function seed() {
   // PROJECTS — created then instantiated from templates
   // =========================================================================
 
-  const [annualPlan] = await db
-    .insert(projects)
-    .values({ propertyId: larkinSt.id, name: 'Annual maintenance plan 2026', type: 'maintenance', status: 'active', startDate: '2026-01-01', endDate: '2026-12-31', progress: 0, description: 'Year-long comprehensive home care' })
-    .returning();
-
   const [kitchenRemodel] = await db
     .insert(projects)
     .values({ propertyId: larkinSt.id, name: 'Kitchen remodel', type: 'remodel', status: 'active', startDate: '2026-03-10', endDate: '2026-07-15', progress: 0, description: 'Full kitchen renovation — custom cabinets, new tile, updated plumbing and electrical.', contractCents: 18500000, changesCents: 1240000, paidCents: 7896000 })
@@ -328,7 +329,6 @@ async function seed() {
 
   // --- Instantiate from templates ---
   console.log('  Instantiating milestones from templates...');
-  await applyTemplateToProject(annualPlan.id, maintenanceTemplate.id);
   await applyTemplateToProject(kitchenRemodel.id, kitchenTemplate.id);
   await applyTemplateToProject(bathroomRefresh.id, bathroomTemplate.id);
 
@@ -336,14 +336,6 @@ async function seed() {
   // LAYER ON per-milestone state (applyTemplateToProject sets all to
   // pending/upcoming — we now set real statuses, dates, vendors, responses)
   // =========================================================================
-
-  // --- Annual Maintenance Plan ---
-  await patchMs(annualPlan.id, 'HVAC annual service', { status: 'complete', dueDate: '2026-01-15', vendorId: bayAir.id });
-  await patchMs(annualPlan.id, 'Spring plumbing check', { status: 'complete', dueDate: '2026-04-20', vendorId: sfPlumbing.id });
-  await patchMs(annualPlan.id, 'Summer system inspection', { dueDate: '2026-07-20', vendorId: bayAir.id });
-  await patchMs(annualPlan.id, 'Fall electrical & weatherization', { dueDate: '2026-10-15', vendorId: bayElectric.id });
-  await patchMs(annualPlan.id, 'Winter system check', { dueDate: '2026-12-15', vendorId: bayAir.id });
-  await db.update(projects).set({ progress: 40 }).where(eq(projects.id, annualPlan.id)); // 2/5
 
   // --- Kitchen Remodel ---
   // Pre-construction
@@ -420,10 +412,15 @@ async function seed() {
   // Appointments
   // =========================================================================
 
+  // Maintenance visit appointments are created below alongside the
+  // maintenance plan — this slot is now handled by visit Q3's backing
+  // appointment row.
+
+  // Kitchen remodel site visit
   await db.insert(appointments).values({
-    propertyId: larkinSt.id, projectId: annualPlan.id, title: 'HVAC filter replacement',
-    vendorId: bayAir.id, date: localDateString(), startTime: '09:00:00', endTime: '10:00:00',
-    status: 'confirmed', davidOnSite: true, scopeOfWork: 'Replace main filter, inspect compressor.',
+    propertyId: larkinSt.id, projectId: kitchenRemodel.id, title: 'Cabinet delivery inspection',
+    vendorId: bayAreaCabinets.id, date: localDateString(), startTime: '09:00:00', endTime: '10:00:00',
+    status: 'confirmed', davidOnSite: true, scopeOfWork: 'Inspect cabinet delivery, confirm all pieces match PO.',
     assignedPmId: david.id,
   });
 
@@ -463,13 +460,170 @@ async function seed() {
   // =========================================================================
 
   await db.insert(auditLog).values([
-    { actorName: david.name, action: 'marked milestone complete', targetType: 'milestone', targetLabel: 'HVAC annual service', clientId: andersons.id },
-    { actorName: david.name, action: 'marked milestone complete', targetType: 'milestone', targetLabel: 'Spring plumbing check', clientId: andersons.id },
     { actorName: sarah.name, action: 'created project', targetType: 'project', targetLabel: 'Kitchen remodel', clientId: andersons.id },
     { actorName: david.name, action: 'marked milestone complete', targetType: 'milestone', targetLabel: 'Final design walkthrough', clientId: andersons.id },
     { actorName: david.name, action: 'marked milestone complete', targetType: 'milestone', targetLabel: 'Permit pulled', clientId: andersons.id },
     { actorName: sarah.name, action: 'created project', targetType: 'project', targetLabel: 'Bathroom refresh', clientId: andersons.id },
+    { actorName: david.name, action: 'created maintenance plan', targetType: 'maintenance_plan', targetLabel: '2026 Annual Maintenance Plan', clientId: andersons.id },
   ]);
+
+  // =========================================================================
+  // Maintenance plan — real plan on the new maintenance_plans schema
+  // =========================================================================
+
+  console.log('  Creating maintenance plan...');
+
+  const [maintenancePlan] = await db
+    .insert(maintenancePlans)
+    .values({
+      propertyId: larkinSt.id,
+      name: '2026 Annual Maintenance Plan',
+      startDate: '2026-01-01',
+      endDate: '2026-12-31',
+      billingTotalCents: 480000, // $4,800
+      billingCadence: 'monthly',
+      status: 'active',
+      notes: 'Premium tier client — prioritise morning time slots. Dog is friendly but keep gate closed.',
+      homeAssessmentUrl: `maintenance/${andersons.id}/PLAN_ID/home_assessment.pdf`,
+      playbookUrl: `maintenance/${andersons.id}/PLAN_ID/playbook.pdf`,
+    })
+    .returning();
+
+  // Patch the placeholder PLAN_ID in the document URLs now that we have the real id.
+  await db
+    .update(maintenancePlans)
+    .set({
+      homeAssessmentUrl: `maintenance/${andersons.id}/${maintenancePlan.id}/home_assessment.pdf`,
+      playbookUrl: `maintenance/${andersons.id}/${maintenancePlan.id}/playbook.pdf`,
+    })
+    .where(eq(maintenancePlans.id, maintenancePlan.id));
+
+  // --- Q1: HVAC service (completed) ---
+  const [q1Appt] = await db.insert(appointments).values({
+    propertyId: larkinSt.id,
+    title: 'Q1 — HVAC service',
+    vendorId: bayAir.id,
+    date: '2026-01-15',
+    startTime: '09:00:00',
+    endTime: '10:30:00',
+    status: 'completed',
+    kind: 'maintenance',
+    davidOnSite: false,
+    scopeOfWork: 'HVAC filter replacement and system check.',
+    assignedPmId: david.id,
+  }).returning();
+
+  const [q1Visit] = await db.insert(maintenanceVisits).values({
+    planId: maintenancePlan.id,
+    title: 'Q1 — HVAC service',
+    scheduledDate: '2026-01-15',
+    status: 'completed',
+    visitOrder: 0,
+    vendorId: bayAir.id,
+    appointmentId: q1Appt.id,
+    notes: 'Filter replaced, no issues.',
+    completedAt: new Date('2026-01-15T11:00:00Z'),
+  }).returning();
+
+  await db.insert(maintenanceVisitScopeItems).values({
+    visitId: q1Visit.id,
+    scopeType: 'hvac',
+    completed: true,
+    completionNotes: 'Filter replaced, no issues',
+    itemOrder: 0,
+  });
+
+  // --- Q2: Spring plumbing & electrical (completed) ---
+  const [q2Appt] = await db.insert(appointments).values({
+    propertyId: larkinSt.id,
+    title: 'Q2 — Spring plumbing & electrical',
+    vendorId: sfPlumbing.id,
+    date: '2026-04-20',
+    startTime: '10:00:00',
+    endTime: '12:00:00',
+    status: 'completed',
+    kind: 'maintenance',
+    davidOnSite: true,
+    scopeOfWork: 'Full plumbing inspection and electrical panel check.',
+    assignedPmId: david.id,
+  }).returning();
+
+  const [q2Visit] = await db.insert(maintenanceVisits).values({
+    planId: maintenancePlan.id,
+    title: 'Q2 — Spring plumbing & electrical',
+    scheduledDate: '2026-04-20',
+    status: 'completed',
+    visitOrder: 1,
+    vendorId: sfPlumbing.id,
+    appointmentId: q2Appt.id,
+    completedAt: new Date('2026-04-20T12:30:00Z'),
+  }).returning();
+
+  await db.insert(maintenanceVisitScopeItems).values([
+    {
+      visitId: q2Visit.id,
+      scopeType: 'plumbing',
+      completed: true,
+      completionNotes: 'All faucets tested, no leaks',
+      itemOrder: 0,
+    },
+    {
+      visitId: q2Visit.id,
+      scopeType: 'electrical',
+      completed: true,
+      completionNotes: 'GFCI outlets all functional',
+      itemOrder: 1,
+    },
+  ]);
+
+  // --- Q3: Summer system inspection (scheduled — future) ---
+  const [q3Appt] = await db.insert(appointments).values({
+    propertyId: larkinSt.id,
+    title: 'Q3 — Summer system inspection',
+    vendorId: bayAir.id,
+    date: '2026-07-20',
+    startTime: '09:00:00',
+    endTime: '11:00:00',
+    status: 'scheduled',
+    kind: 'maintenance',
+    davidOnSite: false,
+    scopeOfWork: 'HVAC performance check and roof / exterior inspection.',
+    assignedPmId: sarah.id,
+  }).returning();
+
+  const [q3Visit] = await db.insert(maintenanceVisits).values({
+    planId: maintenancePlan.id,
+    title: 'Q3 — Summer system inspection',
+    scheduledDate: '2026-07-20',
+    status: 'scheduled',
+    visitOrder: 2,
+    vendorId: bayAir.id,
+    appointmentId: q3Appt.id,
+  }).returning();
+
+  await db.insert(maintenanceVisitScopeItems).values([
+    { visitId: q3Visit.id, scopeType: 'hvac', completed: false, itemOrder: 0 },
+    { visitId: q3Visit.id, scopeType: 'roof_exterior', completed: false, itemOrder: 1 },
+  ]);
+
+  // --- Q4: Fall weatherization (scheduled — future) ---
+  const [q4Visit] = await db.insert(maintenanceVisits).values({
+    planId: maintenancePlan.id,
+    title: 'Q4 — Fall weatherization',
+    scheduledDate: '2026-10-15',
+    status: 'scheduled',
+    visitOrder: 3,
+    // No vendor assigned yet — "TBD"
+  }).returning();
+
+  await db.insert(maintenanceVisitScopeItems).values([
+    { visitId: q4Visit.id, scopeType: 'hvac', completed: false, itemOrder: 0 },
+    { visitId: q4Visit.id, scopeType: 'plumbing', completed: false, itemOrder: 1 },
+    { visitId: q4Visit.id, scopeType: 'roof_exterior', completed: false, itemOrder: 2 },
+    { visitId: q4Visit.id, scopeType: 'custom', customLabel: 'Winterize outdoor faucets', completed: false, itemOrder: 3 },
+  ]);
+
+  console.log('  Maintenance plan: 1 plan, 4 visits, 9 scope items');
 
   // =========================================================================
   // Summary
@@ -478,10 +632,11 @@ async function seed() {
   console.log('Seed complete.');
   console.log('  Properties: 2 (Larkin St, Tahoe cabin)');
   console.log('  Templates: 3 (Kitchen remodel, Bathroom refresh, Annual maintenance)');
-  console.log('  Projects: 3 (instantiated from templates)');
-  console.log('  Milestones: 31 (5 + 19 + 7)');
+  console.log('  Projects: 2 (Kitchen remodel, Bathroom refresh)');
+  console.log('  Milestones: 26 (19 + 7)');
+  console.log('  Maintenance plans: 1 (2026 Annual — 4 visits, 9 scope items)');
   console.log('  Photos: 7');
-  console.log('  Appointments: 3');
+  console.log('  Appointments: 6 (3 project + 3 maintenance)');
   console.log('  Invoices: 1');
 }
 

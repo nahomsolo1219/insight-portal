@@ -298,7 +298,13 @@ function AppointmentCard({
               {row.clientName}
             </Link>
             <MetaItem icon={MapPin} label={`${row.propertyName} · ${row.propertyAddress}`} />
-            {row.projectName && (
+            {row.kind === 'maintenance' && (
+              <span className="bg-brand-teal-50 text-brand-teal-500 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium">
+                <CalendarClock size={11} strokeWidth={1.5} />
+                Maintenance
+              </span>
+            )}
+            {row.projectName && row.kind !== 'maintenance' && (
               <MetaItem
                 icon={row.projectType === 'maintenance' ? CalendarClock : Hammer}
                 label={row.projectName}

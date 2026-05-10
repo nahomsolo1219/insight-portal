@@ -11,6 +11,8 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, lte } from 'drizzle-orm
 import { db } from '@/db';
 import {
   appointments,
+  maintenancePlans,
+  maintenanceVisits,
   milestones,
   photos,
   projects,
@@ -373,4 +375,60 @@ function pickFirstName(...candidates: Array<string | null | undefined>): string 
     }
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Maintenance plan summary — fuels the dashboard's right-rail card.
+// ---------------------------------------------------------------------------
+
+export interface MaintenancePlanSummary {
+  id: string;
+  name: string;
+  completedVisits: number;
+  totalVisits: number;
+  nextVisitDate: string | null;
+}
+
+/**
+ * Fetch the active maintenance plan summary for a property — plan name,
+ * visit progress, and next scheduled visit date. Returns null when no
+ * active plan exists.
+ */
+export async function getMaintenancePlanSummary(
+  propertyId: string,
+): Promise<MaintenancePlanSummary | null> {
+  const [plan] = await db
+    .select({ id: maintenancePlans.id, name: maintenancePlans.name })
+    .from(maintenancePlans)
+    .where(
+      and(
+        eq(maintenancePlans.propertyId, propertyId),
+        eq(maintenancePlans.status, 'active'),
+      ),
+    )
+    .limit(1);
+
+  if (!plan) return null;
+
+  const visits = await db
+    .select({
+      status: maintenanceVisits.status,
+      scheduledDate: maintenanceVisits.scheduledDate,
+    })
+    .from(maintenanceVisits)
+    .where(eq(maintenanceVisits.planId, plan.id))
+    .orderBy(asc(maintenanceVisits.visitOrder));
+
+  const completedVisits = visits.filter((v) => v.status === 'completed').length;
+  const nextVisit = visits.find(
+    (v) => v.status === 'scheduled' || v.status === 'in_progress',
+  );
+
+  return {
+    id: plan.id,
+    name: plan.name,
+    completedVisits,
+    totalVisits: visits.length,
+    nextVisitDate: nextVisit?.scheduledDate ?? null,
+  };
 }

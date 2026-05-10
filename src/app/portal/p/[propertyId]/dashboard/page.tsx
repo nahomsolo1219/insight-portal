@@ -30,7 +30,9 @@ import {
 } from '../../../queries';
 import { selectDashboardHeroCopy } from './heroCopy';
 import {
+  getMaintenancePlanSummary,
   getPropertyDashboardData,
+  type MaintenancePlanSummary,
   type RecentPhotoTile,
   type VisitSummary,
 } from './queries';
@@ -54,12 +56,13 @@ export default async function PortalDashboardPage({
   // single round-trip — fewer network hops than fanning out the photo +
   // visit reads separately. The client-wide rollups still come from the
   // legacy /portal queries module.
-  const [profile, stats, activeProjects, activity, propertyData] = await Promise.all([
+  const [profile, stats, activeProjects, activity, propertyData, maintenanceSummary] = await Promise.all([
     getMyClientProfile(clientId),
     getClientDashboardStats(clientId),
     getClientActiveProjects(clientId),
     getClientRecentActivity(clientId, 8),
     getPropertyDashboardData(clientId, propertyId),
+    getMaintenancePlanSummary(propertyId),
   ]);
 
   const firstName = pickFirstName(user.fullName, profile?.name);
@@ -132,6 +135,9 @@ export default async function PortalDashboardPage({
         </div>
 
         <aside className="space-y-6">
+          {maintenanceSummary && (
+            <RailMaintenanceCard propertyId={propertyId} summary={maintenanceSummary} />
+          )}
           <NextVisitCard
             visit={propertyData.nextScheduledVisit}
           />
@@ -541,6 +547,52 @@ function relativeDate(iso: string): string {
   const diffDay = Math.floor(diffHr / 24);
   if (diffDay < 7) return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
   return formatDate(iso.slice(0, 10));
+}
+
+// ---------------------------------------------------------------------------
+// Right rail — Maintenance summary card.
+// ---------------------------------------------------------------------------
+
+function RailMaintenanceCard({
+  propertyId,
+  summary,
+}: {
+  propertyId: string;
+  summary: MaintenancePlanSummary;
+}) {
+  const progressPct = summary.totalVisits > 0
+    ? Math.round((summary.completedVisits / summary.totalVisits) * 100)
+    : 0;
+
+  return (
+    <Link
+      href={`/portal/p/${propertyId}/maintenance`}
+      className="shadow-soft-md hover:shadow-elevated group block rounded-2xl bg-paper p-5 transition-all"
+    >
+      <RailEyebrow>Maintenance</RailEyebrow>
+      <h4 className="text-ink-900 truncate text-sm font-semibold">{summary.name}</h4>
+      <div className="bg-cream mt-3 h-1.5 overflow-hidden rounded-full">
+        <div
+          className="h-full rounded-full transition-all duration-300"
+          style={{ width: `${progressPct}%`, backgroundColor: 'var(--teal-700)' }}
+        />
+      </div>
+      <div className="text-ink-500 mt-2 flex items-center justify-between text-xs">
+        <span>{summary.completedVisits} of {summary.totalVisits} visits complete</span>
+        {summary.nextVisitDate && (
+          <span className="text-ink-400">Next: {formatShortMonthDay(summary.nextVisitDate)}</span>
+        )}
+      </div>
+      <div className="text-ink-400 mt-3 inline-flex items-center gap-1 text-xs">
+        View plan
+        <ArrowRight
+          size={11}
+          strokeWidth={2}
+          className="-translate-x-0.5 transition-transform group-hover:translate-x-0"
+        />
+      </div>
+    </Link>
+  );
 }
 
 // ---------------------------------------------------------------------------
