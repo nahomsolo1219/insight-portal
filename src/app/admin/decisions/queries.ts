@@ -2,7 +2,7 @@
 // asked a client to decide but hasn't heard back on. Joined to the full
 // client chain so cards can link straight to the relevant client.
 
-import { and, asc, desc, eq, gte, isNotNull, lte } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, isNotNull, isNull, lte, ne } from 'drizzle-orm';
 import { db } from '@/db';
 import { clients, milestones, projects, properties } from '@/db/schema';
 import {
@@ -54,10 +54,57 @@ export async function getPendingDecisions(): Promise<DecisionRow[]> {
     .innerJoin(projects, eq(projects.id, milestones.projectId))
     .innerJoin(properties, eq(properties.id, projects.propertyId))
     .innerJoin(clients, eq(clients.id, properties.clientId))
-    .where(eq(milestones.status, 'awaiting_client'))
+    .where(
+      and(eq(milestones.status, 'awaiting_client'), isNull(milestones.clientResponse)),
+    )
     .orderBy(asc(milestones.dueDate), desc(milestones.createdAt));
 
   // Sign every option image across every milestone in one batch.
+  const optionsByRow = await hydrateOptionGroups(rows);
+
+  return rows.map((row) => ({
+    ...row,
+    options: optionsByRow.get(row.id) ?? [],
+  }));
+}
+
+// ---------- needs review (client has answered, admin must close out) ----------
+
+/**
+ * Milestones where the client has already responded but the decision
+ * hasn't been closed out by admin yet — status is still `awaiting_client`.
+ * David sees these in the "Needs your review" tab so he can mark them
+ * complete (or fold the answer into follow-up work).
+ */
+export async function getDecisionsAwaitingReview(): Promise<DecisionRow[]> {
+  const rows = await db
+    .select({
+      id: milestones.id,
+      title: milestones.title,
+      dueDate: milestones.dueDate,
+      questionType: milestones.questionType,
+      questionBody: milestones.questionBody,
+      options: milestones.options,
+      clientResponse: milestones.clientResponse,
+      respondedAt: milestones.respondedAt,
+      projectId: projects.id,
+      projectName: projects.name,
+      propertyId: properties.id,
+      propertyName: properties.name,
+      clientId: clients.id,
+      clientName: clients.name,
+      createdAt: milestones.createdAt,
+    })
+    .from(milestones)
+    .innerJoin(projects, eq(projects.id, milestones.projectId))
+    .innerJoin(properties, eq(properties.id, projects.propertyId))
+    .innerJoin(clients, eq(clients.id, properties.clientId))
+    .where(
+      and(eq(milestones.status, 'awaiting_client'), isNotNull(milestones.clientResponse)),
+    )
+    .orderBy(desc(milestones.respondedAt))
+    .limit(50);
+
   const optionsByRow = await hydrateOptionGroups(rows);
 
   return rows.map((row) => ({
@@ -95,7 +142,12 @@ const PAST_DECISIONS_LIMIT = 50;
 export async function getPastDecisions(
   filters: PastDecisionFilters = {},
 ): Promise<DecisionRow[]> {
-  const conditions = [isNotNull(milestones.clientResponse)];
+  // `awaiting_client` + responded lives in the "Needs your review" tab —
+  // exclude it here so the three tabs are mutually exclusive.
+  const conditions = [
+    isNotNull(milestones.clientResponse),
+    ne(milestones.status, 'awaiting_client'),
+  ];
 
   if (filters.clientId) {
     conditions.push(eq(clients.id, filters.clientId));
@@ -162,8 +214,58 @@ export async function getPastDecisionClients(): Promise<PastDecisionClientOption
     .innerJoin(projects, eq(projects.id, milestones.projectId))
     .innerJoin(properties, eq(properties.id, projects.propertyId))
     .innerJoin(clients, eq(clients.id, properties.clientId))
-    .where(isNotNull(milestones.clientResponse))
+    .where(
+      and(
+        isNotNull(milestones.clientResponse),
+        ne(milestones.status, 'awaiting_client'),
+      ),
+    )
     .orderBy(asc(clients.name));
 
   return rows;
+}
+
+// ---------- tab counts ----------
+
+export interface DecisionTabCounts {
+  awaiting: number;
+  review: number;
+  past: number;
+}
+
+/**
+ * Three lightweight COUNT(*) queries — drives the badge numbers on the
+ * tab pills. No joins, no option hydration; this should be fast enough
+ * to run on every page render without caching.
+ */
+export async function getDecisionTabCounts(): Promise<DecisionTabCounts> {
+  const [awaitingRow, reviewRow, pastRow] = await Promise.all([
+    db
+      .select({ count: count() })
+      .from(milestones)
+      .where(
+        and(eq(milestones.status, 'awaiting_client'), isNull(milestones.clientResponse)),
+      ),
+    db
+      .select({ count: count() })
+      .from(milestones)
+      .where(
+        and(eq(milestones.status, 'awaiting_client'), isNotNull(milestones.clientResponse)),
+      ),
+    db
+      .select({ count: count() })
+      .from(milestones)
+      .where(
+        and(
+          isNotNull(milestones.clientResponse),
+          ne(milestones.status, 'awaiting_client'),
+        ),
+      ),
+  ]);
+
+  return {
+    awaiting: Number(awaitingRow[0]?.count ?? 0),
+    review: Number(reviewRow[0]?.count ?? 0),
+    past: Number(pastRow[0]?.count ?? 0),
+  };
 }
