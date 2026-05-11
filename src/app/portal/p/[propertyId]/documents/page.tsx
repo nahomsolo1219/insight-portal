@@ -225,7 +225,7 @@ function EmptyState() {
       </div>
       <h3 className="text-base font-semibold text-gray-900">No documents yet</h3>
       <p className="mx-auto mt-2 max-w-sm text-sm text-gray-500">
-        Your project manager will share contracts, permits, and reports here as your
+        Your Insight Point of Contact will share contracts, permits, and reports here as your
         projects progress.
       </p>
     </div>

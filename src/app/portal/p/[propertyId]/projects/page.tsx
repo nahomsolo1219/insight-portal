@@ -127,7 +127,7 @@ function EmptyState() {
       </div>
       <h3 className="text-base font-semibold text-gray-900">No projects yet</h3>
       <p className="mx-auto mt-2 max-w-sm text-sm text-gray-500">
-        No active projects right now. Your project manager will set things up here when
+        No active projects right now. Your Insight Point of Contact will set things up here when
         work begins.
       </p>
     </div>

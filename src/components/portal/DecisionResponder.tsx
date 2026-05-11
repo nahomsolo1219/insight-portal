@@ -121,7 +121,7 @@ export function DecisionResponder({
               isEditorial ? 'text-ink-500' : 'text-emerald-700/80',
             )}
           >
-            Thanks — your project manager has been notified.
+            Thanks — your Insight Point of Contact has been notified.
           </p>
         </div>
       </div>
@@ -231,7 +231,7 @@ export function DecisionResponder({
           className,
         )}
       >
-        Your project manager hasn&apos;t finalised the options yet — check back soon.
+        Your Insight Point of Contact hasn&apos;t finalised the options yet — check back soon.
       </p>
     );
   }

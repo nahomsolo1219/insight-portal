@@ -116,7 +116,7 @@ function EmptyState() {
       </div>
       <h2 className="text-ink-900 mt-4 text-xl font-light tracking-tight">No homes on file yet</h2>
       <p className="text-ink-500 mx-auto mt-2 max-w-md text-sm">
-        Your project manager will add your home shortly. Once it’s on file, this is where
+        Your Insight Point of Contact will add your home shortly. Once it’s on file, this is where
         your visits, photos, and invoices will live.
       </p>
     </div>

@@ -654,7 +654,7 @@ function RailProjectManagerCard({ profile }: { profile: ClientProfile }) {
 
   return (
     <section className="shadow-soft-md rounded-2xl bg-paper p-5">
-      <RailEyebrow>Your project manager</RailEyebrow>
+      <RailEyebrow>Your Insight Point of Contact</RailEyebrow>
       <div className="flex items-center gap-3">
         <span
           className="text-paper flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"

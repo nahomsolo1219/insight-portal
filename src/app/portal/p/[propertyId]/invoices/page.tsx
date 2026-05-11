@@ -27,7 +27,7 @@ export default async function PortalInvoicesPage() {
           Invoices
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Statements and payment status. Your project manager handles all billing — no
+          Statements and payment status. Your Insight Point of Contact handles all billing — no
           action needed from you.
         </p>
       </header>
@@ -199,7 +199,7 @@ function EmptyState() {
       </div>
       <h3 className="text-base font-semibold text-gray-900">No invoices yet</h3>
       <p className="mx-auto mt-2 max-w-sm text-sm text-gray-500">
-        Invoices will appear here as your projects progress. Your project manager
+        Invoices will appear here as your projects progress. Your Insight Point of Contact
         handles all billing — no action needed from you.
       </p>
     </div>

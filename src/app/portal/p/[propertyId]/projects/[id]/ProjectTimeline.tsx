@@ -532,7 +532,7 @@ function Timeline({
   if (milestones.length === 0) {
     return (
       <div className="shadow-card rounded-2xl bg-white p-8 text-center text-sm text-gray-500">
-        No milestones have been added yet. Your project manager will lay out the plan
+        No milestones have been added yet. Your Insight Point of Contact will lay out the plan
         soon.
       </div>
     );
@@ -1060,7 +1060,7 @@ function PMCard({
   if (!name) return null;
   return (
     <section>
-      <SectionLabel muted>Your project manager</SectionLabel>
+      <SectionLabel muted>Your Insight Point of Contact</SectionLabel>
       <div className="shadow-card flex items-center gap-3 rounded-2xl bg-white p-5">
         <span className="bg-brand-teal-500 inline-flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white">
           {initialsFrom(name) || 'PM'}

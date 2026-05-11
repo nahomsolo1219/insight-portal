@@ -224,7 +224,7 @@ function EmptyState() {
       </span>
       <h3 className="text-base font-semibold text-gray-900">No appointments yet</h3>
       <p className="mx-auto mt-2 max-w-sm text-sm text-gray-500">
-        Your project manager will add visits here as they&apos;re scheduled.
+        Your Insight Point of Contact will add visits here as they&apos;re scheduled.
       </p>
     </div>
   );
