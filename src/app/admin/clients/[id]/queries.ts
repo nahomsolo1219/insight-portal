@@ -16,7 +16,6 @@ import {
   projectTemplates,
   projects,
   properties,
-  reports,
   staff,
   templatePhases,
   vendors,
@@ -324,55 +323,6 @@ export async function getProjectsForPropertySelect(propertyId: string): Promise<
     .from(projects)
     .where(eq(projects.propertyId, propertyId))
     .orderBy(desc(projects.startDate));
-}
-
-// ---------------------------------------------------------------------------
-// Reports tab
-// ---------------------------------------------------------------------------
-
-export interface ReportRow {
-  id: string;
-  name: string;
-  /** YYYY-MM-DD string from the DB. */
-  date: string;
-  /** 'inspection' | 'assessment' | 'update' | 'year_end' */
-  type: string;
-  storagePath: string;
-  isNew: boolean;
-  propertyId: string;
-  /** Reports can optionally be linked to a specific project. */
-  projectId: string | null;
-  projectName: string | null;
-  /** Reports can optionally be authored by a vendor. */
-  vendorName: string | null;
-  createdAt: Date;
-}
-
-/**
- * Every report attached to this property. Date descending, createdAt as
- * tiebreaker. Vendor + project joins are LEFT JOINs — both fields are
- * optional on the report.
- */
-export async function getReportsForProperty(propertyId: string): Promise<ReportRow[]> {
-  return db
-    .select({
-      id: reports.id,
-      name: reports.name,
-      date: reports.date,
-      type: reports.type,
-      storagePath: reports.storagePath,
-      isNew: reports.isNew,
-      propertyId: reports.propertyId,
-      projectId: reports.projectId,
-      projectName: projects.name,
-      vendorName: vendors.name,
-      createdAt: reports.createdAt,
-    })
-    .from(reports)
-    .leftJoin(projects, eq(projects.id, reports.projectId))
-    .leftJoin(vendors, eq(vendors.id, reports.vendorId))
-    .where(eq(reports.propertyId, propertyId))
-    .orderBy(desc(reports.date), desc(reports.createdAt));
 }
 
 export interface VendorOption {
