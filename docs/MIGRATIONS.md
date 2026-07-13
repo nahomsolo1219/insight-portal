@@ -164,6 +164,34 @@ npx tsx scripts/apply-manual-sql.ts manual_profile_trigger.sql
 These don't go in the drizzle journal. The verifier ignores them.
 See `src/db/migrations/README.md` for the current list.
 
+### Profile-trigger role default
+
+`manual_profile_trigger.sql` installs `public.handle_new_user()`, which
+creates a `public.profiles` row for every new `auth.users` row. Its
+`role` fallback (used only when the auth user has no `role` in its
+metadata) was originally `'admin'` so the very first bootstrap account
+could reach the dashboard.
+
+`manual_profile_trigger_default_client.sql` supersedes that: it
+`CREATE OR REPLACE`s the same function with the fallback changed to
+`'client'` (with a NULL `client_id` → harmless empty-state portal), so
+a user arriving without role metadata can never silently become an
+admin. Invite flows are unaffected — `inviteUser()` always passes an
+explicit `role`, so this default only governs metadata-less rows.
+
+Apply it the same way as any manual file — it does not edit the
+original in place, it redefines the function:
+
+```bash
+npx tsx scripts/apply-manual-sql.ts manual_profile_trigger_default_client.sql
+```
+
+Because both files define the same function via `CREATE OR REPLACE`,
+whichever runs last wins. On a fresh environment apply
+`manual_profile_trigger_default_client.sql` (it is the current
+definition); the older `manual_profile_trigger.sql` is retained only
+for history. Re-running is idempotent.
+
 ---
 
 ## Storage bucket setup
