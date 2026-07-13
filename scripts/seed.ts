@@ -11,6 +11,7 @@
 
 import './_env'; // MUST be first — see scripts/_env.ts
 
+import { createInterface } from 'node:readline';
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../src/db';
 import {
@@ -41,29 +42,183 @@ function localDateString(d: Date = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
-async function clearSeededTables() {
-  await db.execute(sql`DELETE FROM maintenance_visit_scope_items`);
-  await db.execute(sql`DELETE FROM maintenance_visits`);
-  await db.execute(sql`DELETE FROM maintenance_plans`);
-  await db.execute(sql`DELETE FROM weekly_updates`);
-  await db.execute(sql`DELETE FROM documents`);
-  await db.execute(sql`DELETE FROM reports`);
-  await db.execute(sql`DELETE FROM invoices`);
-  await db.execute(sql`DELETE FROM photos`);
-  await db.execute(sql`DELETE FROM appointments`);
-  await db.execute(sql`DELETE FROM milestones`);
-  await db.execute(sql`DELETE FROM projects`);
-  await db.execute(sql`DELETE FROM properties`);
-  await db.execute(sql`DELETE FROM clients`);
-  await db.execute(sql`DELETE FROM audit_log`);
-  await db.execute(sql`DELETE FROM vendors`);
-  await db.execute(sql`DELETE FROM staff`);
-  await db.execute(sql`DELETE FROM membership_tiers`);
+// Every table the seed wipes, in FK-safe delete order. This is also the set
+// the guard counts + reports before deleting, so the "rows to be deleted"
+// preview can never drift from what actually gets cleared. These are
+// hardcoded identifiers (never user input), so `sql.raw` is safe here.
+const SEEDED_TABLES = [
+  'maintenance_visit_scope_items',
+  'maintenance_visits',
+  'maintenance_plans',
+  'weekly_updates',
+  'documents',
+  'reports',
+  'invoices',
+  'photos',
+  'appointments',
+  'milestones',
+  'projects',
+  'properties',
+  'clients',
+  'audit_log',
+  'vendors',
+  'staff',
+  'membership_tiers',
   // Templates — cascade handles template_milestones + template_phases
-  await db.execute(sql`DELETE FROM template_milestones`);
-  await db.execute(sql`DELETE FROM template_phase_dependencies`);
-  await db.execute(sql`DELETE FROM template_phases`);
-  await db.execute(sql`DELETE FROM project_templates`);
+  'template_milestones',
+  'template_phase_dependencies',
+  'template_phases',
+  'project_templates',
+] as const;
+
+async function clearSeededTables() {
+  for (const table of SEEDED_TABLES) {
+    await db.execute(sql.raw(`DELETE FROM ${table}`));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Destructive-seed guard
+//
+// This script runs unconditional DELETE FROM on every table above. The same
+// `.env.local` is reused for everything, so `DATABASE_URL` can point at
+// production — running the seed there would irreversibly wipe every real
+// client's data. The guard makes the failure mode "refused and told me why",
+// never "silently wiped prod". Two layers:
+//
+//   1. Host allow-list — anything that isn't obviously a local dev database
+//      hard-aborts unless SEED_ALLOW_DESTRUCTIVE=true is explicitly set.
+//   2. Typed-host confirmation — the operator must retype the target host at
+//      an interactive prompt (or set SEED_CONFIRM_HOST for non-TTY runs).
+//
+// We prefer a typed confirmation over an env flag *alone* precisely because
+// `.env.local` is long-lived and shared: a once-set flag stays "armed" and
+// would silently permit a wipe the day that file is repointed at prod. A
+// typed confirmation can't be left armed — it forces a human to read and
+// reproduce the host every single run, which is the moment a mistake is
+// caught.
+// ---------------------------------------------------------------------------
+
+const DEV_HOST_PATTERNS: readonly RegExp[] = [
+  /^localhost$/i,
+  /^127\.0\.0\.1$/,
+  /^0\.0\.0\.0$/,
+  /^::1$/,
+  /^host\.docker\.internal$/i,
+  /\.local$/i,
+  /\.localhost$/i,
+];
+
+function parseDbTarget(url: string): { host: string; database: string } | null {
+  try {
+    const u = new URL(url);
+    if (!u.hostname) return null;
+    return { host: u.hostname, database: u.pathname.replace(/^\//, '') || '(default)' };
+  } catch {
+    return null;
+  }
+}
+
+function isDevHost(host: string): boolean {
+  return DEV_HOST_PATTERNS.some((re) => re.test(host));
+}
+
+async function tableRowCounts(): Promise<{ table: string; count: number }[]> {
+  const out: { table: string; count: number }[] = [];
+  for (const table of SEEDED_TABLES) {
+    try {
+      const rows = (await db.execute(
+        sql.raw(`SELECT count(*)::int AS c FROM ${table}`),
+      )) as unknown as Array<{ c: number | string }>;
+      out.push({ table, count: Number(rows[0]?.c ?? 0) });
+    } catch {
+      // Missing table (partial schema) — report 0 rather than crashing the guard.
+      out.push({ table, count: 0 });
+    }
+  }
+  return out;
+}
+
+async function promptLine(question: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return await new Promise<string>((resolve) => rl.question(question, resolve));
+  } finally {
+    rl.close();
+  }
+}
+
+function abort(message: string): never {
+  console.error(`\n✖ ${message}\n`);
+  process.exit(1);
+}
+
+async function guardDestructiveSeed(): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) abort('DATABASE_URL is not set. Refusing to seed.');
+
+  const target = parseDbTarget(url);
+  if (!target) abort('Could not parse a host out of DATABASE_URL. Refusing to seed.');
+
+  const { host, database } = target;
+  const dev = isDevHost(host);
+  const allowDestructive = process.env.SEED_ALLOW_DESTRUCTIVE === 'true';
+
+  console.log('\n' + '─'.repeat(68));
+  console.log('  DESTRUCTIVE SEED — deletes ALL rows in every table, then inserts demo data');
+  console.log('─'.repeat(68));
+  console.log(`  Target host : ${host}`);
+  console.log(`  Database    : ${database}`);
+  console.log(`  Assessment  : ${dev ? 'looks like a local dev database' : 'does NOT look like a local dev database'}`);
+
+  // Layer 1 — refuse non-dev hosts unless explicitly opted in. We don't even
+  // touch the database in this branch.
+  if (!dev && !allowDestructive) {
+    abort(
+      `Refusing to seed: "${host}" does not look like a local dev database.\n\n` +
+        `  npm run db:seed runs unconditional DELETE FROM on every table. If this is a\n` +
+        `  production or shared database, it will irreversibly destroy real client data.\n\n` +
+        `  If — and only if — this is a throwaway dev/staging database you intend to wipe,\n` +
+        `  re-run with the explicit opt-in:\n\n` +
+        `      SEED_ALLOW_DESTRUCTIVE=true npm run db:seed`,
+    );
+  }
+
+  // Show the blast radius so a human can catch a mistake before confirming.
+  const counts = await tableRowCounts();
+  const total = counts.reduce((n, c) => n + c.count, 0);
+  console.log(`\n  Rows that will be DELETED (${total} total):`);
+  const nonEmpty = counts.filter((c) => c.count > 0);
+  if (nonEmpty.length === 0) {
+    console.log('    (all seeded tables are already empty)');
+  } else {
+    for (const c of nonEmpty) {
+      console.log(`    ${String(c.count).padStart(7)}  ${c.table}`);
+    }
+  }
+  if (!dev) {
+    console.log('\n  ⚠  SEED_ALLOW_DESTRUCTIVE is set for a NON-dev host. Be certain.');
+  }
+
+  // Layer 2 — typed-host confirmation.
+  let confirmation: string;
+  if (process.stdin.isTTY) {
+    confirmation = (await promptLine(`\n  Type the target host to confirm deletion (${host}): `)).trim();
+  } else if (process.env.SEED_CONFIRM_HOST != null) {
+    confirmation = process.env.SEED_CONFIRM_HOST.trim();
+    console.log('\n  Non-interactive run — confirming via SEED_CONFIRM_HOST.');
+  } else {
+    abort(
+      `No interactive terminal to confirm, and SEED_CONFIRM_HOST is not set.\n` +
+        `  Re-run in a real terminal, or set SEED_CONFIRM_HOST=${host} to confirm non-interactively.`,
+    );
+  }
+
+  if (confirmation !== host) {
+    abort(`Confirmation "${confirmation}" does not match "${host}". Aborting — nothing was deleted.`);
+  }
+
+  console.log('\n  Confirmed. Proceeding.\n');
 }
 
 /** Look up a milestone by title on a project. Throws if not found. */
@@ -91,6 +246,10 @@ async function patchMs(
 // ==========================================================================
 
 async function seed() {
+  // Gate the destructive DELETEs behind host + confirmation checks before we
+  // touch anything. Aborts the process with a clear message if unsafe.
+  await guardDestructiveSeed();
+
   console.log('Clearing existing seed data...');
   await clearSeededTables();
 
