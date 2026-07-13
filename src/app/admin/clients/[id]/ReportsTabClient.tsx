@@ -22,7 +22,7 @@ import { LoadingDots } from '@/components/admin/LoadingDots';
 import { Modal } from '@/components/admin/Modal';
 import { useToast } from '@/components/admin/ToastProvider';
 import { PdfViewer } from '@/components/portal/PdfViewer';
-import { cn, formatDate } from '@/lib/utils';
+import { cn, formatDate, formatReportTitle } from '@/lib/utils';
 import {
   deleteReport,
   updateReport,
@@ -156,22 +156,24 @@ function ReportRowItem({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  // Vendor leads the title (per the firm owner's ask); it's dropped from the
+  // meta line below so it isn't repeated.
+  const title = formatReportTitle(report.vendorName, report.name);
   return (
     <div className="hover:bg-brand-warm-50 flex items-center gap-4 border-t border-gray-50 px-5 py-4 transition-colors first:border-t-0">
       <div className="bg-cream flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-gray-500">
         <ReportTypeIcon type={report.type} />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-gray-900">{report.name}</div>
+        <div className="truncate text-sm font-medium text-gray-900">{title}</div>
         <div className="mt-0.5 text-xs text-gray-500">
           {labelForType(report.type)} · {formatDate(report.date)}
-          {report.vendorName && ` · ${report.vendorName}`}
         </div>
       </div>
       <div className="flex flex-shrink-0 items-center gap-1">
         {report.signedUrl ? (
           <>
-            <PdfViewer url={report.signedUrl} name={`${report.name}.pdf`} />
+            <PdfViewer url={report.signedUrl} name={`${title}.pdf`} />
             <a
               href={report.signedUrl}
               target="_blank"
@@ -188,7 +190,7 @@ function ReportRowItem({
         <button
           type="button"
           onClick={onEdit}
-          aria-label={`Edit ${report.name}`}
+          aria-label={`Edit ${title}`}
           className="hover:text-brand-teal-500 rounded-lg p-1.5 text-gray-400 transition-all hover:bg-brand-warm-50"
         >
           <Pencil size={16} strokeWidth={1.5} />
@@ -196,7 +198,7 @@ function ReportRowItem({
         <button
           type="button"
           onClick={onDelete}
-          aria-label={`Delete ${report.name}`}
+          aria-label={`Delete ${title}`}
           className="rounded-lg p-1.5 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500"
         >
           <Trash2 size={16} strokeWidth={1.5} />
@@ -653,7 +655,11 @@ function DeleteConfirmModal({
       }
     >
       <p className="mb-3 text-sm text-gray-700">
-        You&apos;re about to delete <strong className="font-semibold">{report.name}</strong>.
+        You&apos;re about to delete{' '}
+        <strong className="font-semibold">
+          {formatReportTitle(report.vendorName, report.name)}
+        </strong>
+        .
       </p>
       <p className="text-sm text-gray-500">
         This removes the file from storage and the database. This cannot be undone.

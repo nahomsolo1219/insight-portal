@@ -12,7 +12,7 @@ import { redirect } from 'next/navigation';
 import { createElement, type ComponentType } from 'react';
 import { PdfViewer } from '@/components/portal/PdfViewer';
 import { getCurrentUser } from '@/lib/auth/current-user';
-import { cn, formatDate } from '@/lib/utils';
+import { cn, formatDate, formatReportTitle } from '@/lib/utils';
 import {
   getClientDocuments,
   type PortalDocumentRow,
@@ -149,14 +149,15 @@ function DocumentCard({ doc }: { doc: PortalDocumentRow }) {
 function ReportCard({ report }: { report: PortalReportRow }) {
   const iconCmp = iconForReportType(report.type);
   const tone = toneForReportType(report.type);
+  // Vendor leads the title (formatReportTitle), so it's dropped from the meta
+  // line to avoid repeating it.
   const metaParts = [prettyType(report.type), formatDate(report.date)];
-  if (report.vendorName) metaParts.push(report.vendorName);
 
   return (
     <FileCard
       icon={createElement(iconCmp, { size: 18, strokeWidth: 1.5 })}
       iconTone={tone}
-      title={report.name}
+      title={formatReportTitle(report.vendorName, report.name)}
       meta={metaParts.join(' · ')}
       signedUrl={report.signedUrl}
       storagePath={report.storagePath}

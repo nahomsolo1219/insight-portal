@@ -16,8 +16,10 @@ import {
   properties,
   reports,
   staff,
+  vendors,
 } from '@/db/schema';
 import { getSignedUrls } from '@/lib/storage/upload';
+import { formatReportTitle } from '@/lib/utils';
 
 export interface ClientProfile {
   id: string;
@@ -234,11 +236,13 @@ export async function getPropertyRecentActivity(
       db
         .select({
           name: reports.name,
+          vendorName: vendors.name,
           createdAt: reports.createdAt,
           propertyName: properties.name,
         })
         .from(reports)
         .innerJoin(properties, eq(properties.id, reports.propertyId))
+        .leftJoin(vendors, eq(vendors.id, reports.vendorId))
         .where(inArray(reports.propertyId, propertyIds))
         .orderBy(desc(reports.createdAt))
         .limit(limit),
@@ -295,7 +299,7 @@ export async function getPropertyRecentActivity(
     for (const r of reportRows) {
       items.push({
         type: 'report',
-        title: `${r.name} added`,
+        title: `${formatReportTitle(r.vendorName, r.name)} added`,
         subtitle: r.propertyName,
         date: r.createdAt.toISOString(),
         projectId: null,

@@ -28,6 +28,21 @@ export function formatDate(iso: string): string {
   });
 }
 
+/**
+ * Report titles lead with the subcontractor's name so they're scannable at a
+ * glance — "Bay Electric — Annual inspection" rather than "Annual inspection"
+ * with the vendor buried in small text beneath (per the firm owner's ask).
+ * Falls back to the title alone when a report has no vendor. Used everywhere
+ * a report renders: admin Reports tab, portal Documents list, activity feed.
+ */
+export function formatReportTitle(
+  vendorName: string | null | undefined,
+  name: string,
+): string {
+  const vendor = vendorName?.trim();
+  return vendor ? `${vendor} — ${name}` : name;
+}
+
 export function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
     month: 'short',
