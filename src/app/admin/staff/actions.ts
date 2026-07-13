@@ -6,6 +6,7 @@ import { db } from '@/db';
 import { profiles, staff } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { buildAuthConfirmUrl } from '@/lib/auth/email-links';
 import { sendEmail } from '@/lib/email/send';
 import type { SendEmailResult } from '@/lib/email/types';
 import { getWelcomeEmailVars } from '@/lib/email/variables';
@@ -78,14 +79,16 @@ function isAlreadyRegistered(error: unknown): boolean {
  * Flow:
  *  1. `generateLink({ type: 'invite', data: { role, full_name } })` — creates
  *     the auth.users row with role/full_name in user_metadata (the profile
- *     trigger reads role, so an invited client lands role='client'), and
- *     returns `properties.action_link`.
+ *     trigger reads role, so an invited client lands role='client').
  *  2. On a resend (user already exists → invite errors), fall back to a
  *     `recovery` link, which also lands on the password-set page.
  *  3. Link the profile to the client/staff row (trigger doesn't know the FKs).
- *  4. Send the branded email carrying `action_link` as the CTA. Every role
- *     gets one — clients get `welcome_client`, everyone else `staff_invite` —
- *     so disabling Supabase's emails never leaves a role with no way to onboard.
+ *  4. Send the branded email whose CTA points at our own /auth/callback with
+ *     the link's `token_hash` + `type` (NOT `action_link` — see
+ *     buildAuthConfirmUrl for why the hosted verify link can't work with a
+ *     server callback). Every role gets an email — clients get `welcome_client`,
+ *     everyone else `staff_invite` — so disabling Supabase's emails never
+ *     leaves a role with no way to onboard.
  */
 export async function inviteUser(params: InviteUserParams): Promise<InviteUserResult> {
   await requireAdmin();
@@ -122,14 +125,22 @@ export async function inviteUser(params: InviteUserParams): Promise<InviteUserRe
     });
   }
 
-  if (gen.error || !gen.data?.properties?.action_link) {
+  if (gen.error || !gen.data?.properties?.hashed_token) {
     return {
       success: false,
       error: gen.error?.message ?? 'Failed to generate the invite link.',
     };
   }
 
-  const actionLink = gen.data.properties.action_link;
+  // Point the CTA at our own callback with token_hash + type (the hosted
+  // action_link completes in the implicit flow and can't be read server-side).
+  const props = gen.data.properties;
+  const actionLink = buildAuthConfirmUrl({
+    siteUrl,
+    tokenHash: props.hashed_token,
+    type: props.verification_type,
+    next: '/auth/reset-password',
+  });
   const user = gen.data.user;
 
   if (user && (params.clientId || params.staffId)) {

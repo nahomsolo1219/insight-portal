@@ -56,22 +56,23 @@ Ship the branded-email code (this change set). From this point the app
 generates links and sends via Resend; it no longer triggers Supabase's own
 invite/recovery/magic sends.
 
-### 2. Auth → URL Configuration (REQUIRED — links are inert without this)
+### 2. Auth → URL Configuration (REQUIRED)
 
-The link inside each email redirects through Supabase's `/verify` endpoint to
-our callback. Supabase only honors a `redirect_to` that is in the allow-list;
-otherwise it falls back to the Site URL and the user never reaches the
-password-set screen.
+The email CTA points directly at our own `/auth/callback?token_hash=…&type=…&next=…`,
+and the callback verifies with `verifyOtp` (it does NOT use Supabase's hosted
+`/verify` link — that completes in the implicit flow and returns the session in
+the URL fragment, which a server route can't read; that mismatch is what made
+every link fail before). We still pass a `redirectTo` to `generateLink`, so the
+allow-list must still be set or `generateLink` can reject the request.
 
 1. **Site URL** → set to `NEXT_PUBLIC_SITE_URL` (e.g. `https://portal.insighthm.com`).
 2. **Redirect URLs** → add (exact origin must match the deployed host):
-   - `https://portal.insighthm.com/auth/callback`
-   - `https://portal.insighthm.com/auth/callback?next=/auth/reset-password`
    - `https://portal.insighthm.com/**` (wildcard is the simplest safe option)
    - For local testing also add `http://localhost:3000/**`.
 
-Until the callback URL is allow-listed, generated links will not route to the
-app — this is the "code is inert until the dashboard is configured" part.
+`NEXT_PUBLIC_SITE_URL` must be set in the deployed env (it builds the callback
+URL in the email); if it's absent the link points at `http://localhost:3000`
+and onboarding breaks.
 
 ### 3. Auth → Sign-Ups / Providers → turn OFF public sign-ups
 

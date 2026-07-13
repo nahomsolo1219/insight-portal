@@ -2,6 +2,7 @@
 
 import { db } from '@/db';
 import { emailLog } from '@/db/schema';
+import { buildAuthConfirmUrl } from '@/lib/auth/email-links';
 import { sendEmail } from '@/lib/email/send';
 import type { EmailTemplateKey } from '@/lib/email/types';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -70,7 +71,7 @@ export async function requestPasswordReset(email: string): Promise<{ ok: boolean
       options: { redirectTo },
     });
 
-    if (error || !data?.properties?.action_link) {
+    if (error || !data?.properties?.hashed_token) {
       // Observable failure: full error + a failed email_log row. Stay generic
       // in the RESPONSE (return ok below) so we don't leak account existence.
       console.error('[requestPasswordReset] generateLink failed', {
@@ -83,16 +84,26 @@ export async function requestPasswordReset(email: string): Promise<{ ok: boolean
       await logFailedAttempt(
         'password_reset',
         to,
-        error ? describeError(error) : 'generateLink returned no action_link and no error',
+        error ? describeError(error) : 'generateLink returned no token_hash and no error',
       );
       return { ok: true };
     }
+
+    // Point the email at our own callback with token_hash + type (not the
+    // hosted action_link — it can't be verified server-side).
+    const props = data.properties;
+    const ctaUrl = buildAuthConfirmUrl({
+      siteUrl: siteUrl(),
+      tokenHash: props.hashed_token,
+      type: props.verification_type,
+      next: '/auth/reset-password',
+    });
 
     await sendEmail({
       key: 'password_reset',
       to,
       recipientUserId: data.user?.id ?? null,
-      variables: { cta_url: data.properties.action_link },
+      variables: { cta_url: ctaUrl },
     });
   } catch (err) {
     console.error('[requestPasswordReset] unexpected error:', err);
@@ -120,7 +131,7 @@ export async function requestMagicLink(
       options: { redirectTo },
     });
 
-    if (error || !data?.properties?.action_link) {
+    if (error || !data?.properties?.hashed_token) {
       console.error('[requestMagicLink] generateLink failed', {
         email: to,
         redirectTo,
@@ -131,16 +142,24 @@ export async function requestMagicLink(
       await logFailedAttempt(
         'magic_link',
         to,
-        error ? describeError(error) : 'generateLink returned no action_link and no error',
+        error ? describeError(error) : 'generateLink returned no token_hash and no error',
       );
       return { ok: true };
     }
+
+    const props = data.properties;
+    const ctaUrl = buildAuthConfirmUrl({
+      siteUrl: siteUrl(),
+      tokenHash: props.hashed_token,
+      type: props.verification_type,
+      next: safeNext,
+    });
 
     await sendEmail({
       key: 'magic_link',
       to,
       recipientUserId: data.user?.id ?? null,
-      variables: { cta_url: data.properties.action_link },
+      variables: { cta_url: ctaUrl },
     });
   } catch (err) {
     console.error('[requestMagicLink] unexpected error:', err);
