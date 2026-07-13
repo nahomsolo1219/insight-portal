@@ -187,17 +187,6 @@ export function ClientDetailTabs({
       {/* Invoices are client-scoped — they render even when no property is selected. */}
       {activeTab === 'invoices' && invoicesSlot}
       {activeTab === 'profile' && profileSlot}
-      {activeTab !== 'projects' &&
-        activeTab !== 'properties' &&
-        activeTab !== 'maintenance' &&
-        activeTab !== 'documents' &&
-        activeTab !== 'reports' &&
-        activeTab !== 'appointments' &&
-        activeTab !== 'photos' &&
-        activeTab !== 'invoices' &&
-        activeTab !== 'profile' && (
-          <ComingSoon tabLabel={TABS.find((t) => t.id === activeTab)!.label} />
-        )}
     </div>
   );
 }
@@ -206,15 +195,6 @@ function EmptyTab({ message }: { message: string }) {
   return (
     <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center text-sm text-gray-400">
       {message}
-    </div>
-  );
-}
-
-function ComingSoon({ tabLabel }: { tabLabel: string }) {
-  return (
-    <div className="shadow-soft-md rounded-2xl bg-paper p-12 text-center">
-      <h3 className="text-base font-semibold text-gray-900">{tabLabel} tab</h3>
-      <p className="mt-2 text-sm text-gray-500">Being built in a follow-up session.</p>
     </div>
   );
 }

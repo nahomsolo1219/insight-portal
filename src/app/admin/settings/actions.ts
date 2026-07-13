@@ -417,35 +417,3 @@ export async function removeFirmLogo(kind: 'light' | 'dark'): Promise<ActionResu
     return { success: false, error: 'Failed to remove logo.' };
   }
 }
-
-export async function resetBrandColors(): Promise<ActionResult> {
-  const user = await requireAdmin();
-
-  try {
-    const [existing] = await db
-      .select({ id: companySettings.id })
-      .from(companySettings)
-      .limit(1);
-    if (!existing) return { success: false, error: 'Settings row not found.' };
-
-    await db
-      .update(companySettings)
-      .set({ brandPrimaryColor: null, brandAccentColor: null, updatedAt: new Date() })
-      .where(eq(companySettings.id, existing.id));
-
-    await logAudit({
-      actor: user,
-      action: 'updated settings',
-      targetType: 'settings',
-      targetLabel: 'Reset brand colors to defaults',
-    });
-
-    revalidatePath('/admin/settings');
-    revalidatePath('/admin');
-    revalidatePath('/portal');
-    return { success: true };
-  } catch (error) {
-    console.error('[resetBrandColors]', error);
-    return { success: false, error: 'Failed to reset brand colors.' };
-  }
-}
