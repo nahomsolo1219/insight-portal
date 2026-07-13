@@ -11,13 +11,18 @@ import {
   type PortalInvoiceSummary,
 } from './queries';
 
-export default async function PortalInvoicesPage() {
+export default async function PortalInvoicesPage({
+  params,
+}: {
+  params: Promise<{ propertyId: string }>;
+}) {
+  const { propertyId } = await params;
   const user = await getCurrentUser();
   if (!user || user.role !== 'client' || !user.clientId) redirect('/');
 
   const [invoices, summary] = await Promise.all([
-    getClientInvoices(user.clientId),
-    getClientInvoiceSummary(user.clientId),
+    getClientInvoices(user.clientId, propertyId),
+    getClientInvoiceSummary(user.clientId, propertyId),
   ]);
 
   return (

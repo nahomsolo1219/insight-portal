@@ -14,7 +14,7 @@ export default async function PortalProjectsPage({
   const user = await getCurrentUser();
   if (!user || user.role !== 'client' || !user.clientId) redirect('/');
 
-  const projects = await getClientProjects(user.clientId);
+  const projects = await getClientProjects(user.clientId, propertyId);
 
   return (
     <div className="space-y-6">

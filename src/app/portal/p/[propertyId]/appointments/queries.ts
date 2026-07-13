@@ -39,14 +39,15 @@ export interface ClientAppointmentLists {
  */
 export async function getClientAppointments(
   clientId: string,
+  propertyId: string,
 ): Promise<ClientAppointmentLists> {
-  const clientProperties = await db
+  // Ownership check: property exists AND belongs to this client.
+  const [property] = await db
     .select({ id: properties.id })
     .from(properties)
-    .where(eq(properties.clientId, clientId));
-
-  const propertyIds = clientProperties.map((p) => p.id);
-  if (propertyIds.length === 0) return { upcoming: [], past: [] };
+    .where(and(eq(properties.id, propertyId), eq(properties.clientId, clientId)))
+    .limit(1);
+  if (!property) return { upcoming: [], past: [] };
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -71,7 +72,7 @@ export async function getClientAppointments(
     .innerJoin(properties, eq(properties.id, appointments.propertyId))
     .leftJoin(projects, eq(projects.id, appointments.projectId))
     .leftJoin(vendors, eq(vendors.id, appointments.vendorId))
-    .where(inArray(appointments.propertyId, propertyIds))
+    .where(eq(appointments.propertyId, propertyId))
     .orderBy(asc(appointments.date), asc(appointments.startTime));
 
   const upcoming: ClientAppointmentRow[] = [];
@@ -99,21 +100,24 @@ export async function getClientAppointments(
  * cancelled appointments since the client can't see them anywhere else
  * either.
  */
-export async function getAppointmentDates(clientId: string): Promise<string[]> {
-  const clientProperties = await db
+export async function getAppointmentDates(
+  clientId: string,
+  propertyId: string,
+): Promise<string[]> {
+  // Ownership check: property exists AND belongs to this client.
+  const [property] = await db
     .select({ id: properties.id })
     .from(properties)
-    .where(eq(properties.clientId, clientId));
-
-  const propertyIds = clientProperties.map((p) => p.id);
-  if (propertyIds.length === 0) return [];
+    .where(and(eq(properties.id, propertyId), eq(properties.clientId, clientId)))
+    .limit(1);
+  if (!property) return [];
 
   const rows = await db
     .select({ date: appointments.date })
     .from(appointments)
     .where(
       and(
-        inArray(appointments.propertyId, propertyIds),
+        eq(appointments.propertyId, propertyId),
         inArray(appointments.status, ['scheduled', 'confirmed', 'completed']),
       ),
     );

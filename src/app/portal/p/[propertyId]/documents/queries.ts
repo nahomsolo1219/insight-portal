@@ -2,7 +2,7 @@
 // (project-scoped) and every report (property-scoped) belonging to a
 // client, then signs all storage URLs in one batch.
 
-import { asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/db';
 import { documents, projects, properties, reports, vendors } from '@/db/schema';
 import { getSignedUrls } from '@/lib/storage/upload';
@@ -45,30 +45,39 @@ export interface DocumentsPayload {
 }
 
 /**
- * Pull every doc + report visible to this client. Same scope-by-clientId
- * defense-in-depth pattern used elsewhere in the portal — RLS would block
- * cross-client reads anyway, but the explicit filter is clear in code
- * review.
+ * Pull every doc + report for a SINGLE property. The portal is
+ * property-scoped, so we filter to the selected `propertyId` rather than
+ * rolling up the whole client. Documents are project-scoped (no direct
+ * property/client column), so we reach them via the property's projects;
+ * reports are property-scoped and filter directly.
+ *
+ * `clientId` is still required for the ownership check — the property must
+ * belong to the signed-in client (defence in depth on top of RLS).
  */
-export async function getClientDocuments(clientId: string): Promise<DocumentsPayload> {
-  const clientProperties = await db
+export async function getClientDocuments(
+  clientId: string,
+  propertyId: string,
+): Promise<DocumentsPayload> {
+  // Ownership check: property exists AND belongs to this client.
+  const [property] = await db
     .select({
       id: properties.id,
       name: properties.name,
       address: properties.address,
     })
     .from(properties)
-    .where(eq(properties.clientId, clientId))
-    .orderBy(asc(properties.name));
+    .where(and(eq(properties.id, propertyId), eq(properties.clientId, clientId)))
+    .limit(1);
 
-  const propertyIds = clientProperties.map((p) => p.id);
-  if (propertyIds.length === 0) {
+  if (!property) {
     return { properties: [], documents: [], reports: [] };
   }
 
-  // Documents live one level down from properties (under projects), so we
-  // need the project list to (a) scope the documents query and (b) attach
-  // project + property names to each row without an N+1.
+  const clientProperties = [property];
+
+  // Documents live one level down from the property (under projects), so we
+  // need this property's project list to (a) scope the documents query and
+  // (b) attach project + property names to each row without an N+1.
   const projectRows = await db
     .select({
       id: projects.id,
@@ -76,7 +85,7 @@ export async function getClientDocuments(clientId: string): Promise<DocumentsPay
       propertyId: projects.propertyId,
     })
     .from(projects)
-    .where(inArray(projects.propertyId, propertyIds));
+    .where(eq(projects.propertyId, propertyId));
 
   const projectIds = projectRows.map((p) => p.id);
   const projectById = new Map(projectRows.map((p) => [p.id, p]));
@@ -111,7 +120,7 @@ export async function getClientDocuments(clientId: string): Promise<DocumentsPay
       })
       .from(reports)
       .leftJoin(vendors, eq(vendors.id, reports.vendorId))
-      .where(inArray(reports.propertyId, propertyIds))
+      .where(eq(reports.propertyId, propertyId))
       .orderBy(desc(reports.date)),
   ]);
 

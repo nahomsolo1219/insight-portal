@@ -10,14 +10,19 @@ import {
   type ClientAppointmentRow,
 } from './queries';
 
-export default async function PortalAppointmentsPage() {
+export default async function PortalAppointmentsPage({
+  params,
+}: {
+  params: Promise<{ propertyId: string }>;
+}) {
+  const { propertyId } = await params;
   const user = await getCurrentUser();
   if (!user || user.role !== 'client' || !user.clientId) redirect('/');
 
   const clientId = user.clientId;
   const [{ upcoming, past }, dates] = await Promise.all([
-    getClientAppointments(clientId),
-    getAppointmentDates(clientId),
+    getClientAppointments(clientId, propertyId),
+    getAppointmentDates(clientId, propertyId),
   ]);
 
   // Open the calendar on the next visit's month so dots are immediately

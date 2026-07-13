@@ -1,12 +1,42 @@
 // Read queries for the portal Invoices page. Pure read-only — clients
 // can view and download but never change payment status (admin-only).
 
-import { count, desc, eq, sum } from 'drizzle-orm';
+import { and, count, desc, eq, isNull, or, type SQL, sum } from 'drizzle-orm';
 import { db } from '@/db';
 import { invoices, projects, properties } from '@/db/schema';
 import { getSignedUrls } from '@/lib/storage/upload';
 
 export type InvoiceStatus = 'paid' | 'unpaid' | 'partial';
+
+/**
+ * Scope predicate for an invoice belonging to a given property. Invoices
+ * carry an OPTIONAL `propertyId` — an invoice with no property assigned is
+ * a client-level bill (e.g. a membership charge) that isn't tied to any one
+ * home. We deliberately surface those on EVERY property's page (propertyId
+ * matches OR propertyId IS NULL): hiding a bill entirely is worse than
+ * showing it on each property, and the card renders no property label for
+ * the unassigned ones so they don't misattribute. See the invoices page
+ * for the UI treatment.
+ *
+ * Combined with the `clientId` equality the callers already apply, this is
+ * "this client's invoices for this property, plus this client's
+ * unassigned invoices".
+ */
+function invoicePropertyScope(propertyId: string): SQL | undefined {
+  return or(eq(invoices.propertyId, propertyId), isNull(invoices.propertyId));
+}
+
+/** Ownership check shared by the invoice reads: the property must exist and
+ *  belong to the signed-in client. Returns false when it doesn't, so the
+ *  caller can short-circuit to an empty result. */
+async function propertyBelongsToClient(clientId: string, propertyId: string): Promise<boolean> {
+  const [property] = await db
+    .select({ id: properties.id })
+    .from(properties)
+    .where(and(eq(properties.id, propertyId), eq(properties.clientId, clientId)))
+    .limit(1);
+  return Boolean(property);
+}
 
 export interface PortalInvoiceRow {
   id: string;
@@ -29,7 +59,12 @@ export interface PortalInvoiceSummary {
   invoiceCount: number;
 }
 
-export async function getClientInvoices(clientId: string): Promise<PortalInvoiceRow[]> {
+export async function getClientInvoices(
+  clientId: string,
+  propertyId: string,
+): Promise<PortalInvoiceRow[]> {
+  if (!(await propertyBelongsToClient(clientId, propertyId))) return [];
+
   const rows = await db
     .select({
       id: invoices.id,
@@ -46,7 +81,7 @@ export async function getClientInvoices(clientId: string): Promise<PortalInvoice
     .from(invoices)
     .leftJoin(projects, eq(projects.id, invoices.projectId))
     .leftJoin(properties, eq(properties.id, invoices.propertyId))
-    .where(eq(invoices.clientId, clientId))
+    .where(and(eq(invoices.clientId, clientId), invoicePropertyScope(propertyId)))
     .orderBy(desc(invoices.invoiceDate));
 
   if (rows.length === 0) return [];
@@ -79,7 +114,12 @@ export async function getClientInvoices(clientId: string): Promise<PortalInvoice
  */
 export async function getClientInvoiceSummary(
   clientId: string,
+  propertyId: string,
 ): Promise<PortalInvoiceSummary> {
+  if (!(await propertyBelongsToClient(clientId, propertyId))) {
+    return { totalInvoiced: 0, totalPaid: 0, totalOutstanding: 0, invoiceCount: 0 };
+  }
+
   const rows = await db
     .select({
       status: invoices.status,
@@ -87,7 +127,7 @@ export async function getClientInvoiceSummary(
       count: count(),
     })
     .from(invoices)
-    .where(eq(invoices.clientId, clientId))
+    .where(and(eq(invoices.clientId, clientId), invoicePropertyScope(propertyId)))
     .groupBy(invoices.status);
 
   let totalInvoiced = 0;

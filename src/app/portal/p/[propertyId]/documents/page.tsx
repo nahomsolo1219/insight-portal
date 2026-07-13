@@ -19,11 +19,16 @@ import {
   type PortalReportRow,
 } from './queries';
 
-export default async function PortalDocumentsPage() {
+export default async function PortalDocumentsPage({
+  params,
+}: {
+  params: Promise<{ propertyId: string }>;
+}) {
+  const { propertyId } = await params;
   const user = await getCurrentUser();
   if (!user || user.role !== 'client' || !user.clientId) redirect('/');
 
-  const { properties, documents, reports } = await getClientDocuments(user.clientId);
+  const { properties, documents, reports } = await getClientDocuments(user.clientId, propertyId);
 
   // Bucket by property — both documents and reports share a property card so
   // the client can scan their whole house in one place.

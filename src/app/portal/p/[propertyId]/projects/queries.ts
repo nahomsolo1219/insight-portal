@@ -21,23 +21,29 @@ export interface ClientProjectListRow {
 }
 
 /**
- * Every project (active, completed, on-hold) across all of this client's
- * properties. Active projects sort first; within each status, newest start
+ * Every project (active, completed, on-hold) on a SINGLE property. The
+ * portal is property-scoped (the sidebar switcher picks one home at a
+ * time), so we filter to `propertyId` rather than rolling up the whole
+ * client. Active projects sort first; within each status, newest start
  * date wins. Pending-decision counts come back in the same payload so the
  * card can flag projects the client needs to act on.
+ *
+ * `clientId` is still required for the ownership check — the property must
+ * belong to the signed-in client (defence in depth on top of RLS + the
+ * layout's own check).
  */
 export async function getClientProjects(
   clientId: string,
+  propertyId: string,
 ): Promise<ClientProjectListRow[]> {
-  // 1. Walk the property → project tree once, keeping property names on hand
-  //    so we don't N+1 a lookup per card.
-  const clientProperties = await db
+  // Ownership check: the property exists AND belongs to this client. A
+  // miss returns empty rather than leaking another property's projects.
+  const [property] = await db
     .select({ id: properties.id, name: properties.name })
     .from(properties)
-    .where(eq(properties.clientId, clientId));
-
-  const propertyIds = clientProperties.map((p) => p.id);
-  if (propertyIds.length === 0) return [];
+    .where(and(eq(properties.id, propertyId), eq(properties.clientId, clientId)))
+    .limit(1);
+  if (!property) return [];
 
   const projectRows = await db
     .select({
@@ -52,15 +58,15 @@ export async function getClientProjects(
       propertyId: projects.propertyId,
     })
     .from(projects)
-    .where(inArray(projects.propertyId, propertyIds))
+    .where(eq(projects.propertyId, propertyId))
     // Active first; within each status, newest start date wins.
     .orderBy(asc(projects.status), desc(projects.startDate));
 
   if (projectRows.length === 0) return [];
 
-  // 2. Pull pending-decision counts in one grouped roundtrip rather than a
-  //    count-per-project query. Awaiting-client milestones are how the
-  //    portal surfaces "you have something to do".
+  // Pull pending-decision counts in one grouped roundtrip rather than a
+  // count-per-project query. Awaiting-client milestones are how the
+  // portal surfaces "you have something to do".
   const projectIds = projectRows.map((p) => p.id);
   const decisionRows = await db
     .select({
@@ -79,11 +85,10 @@ export async function getClientProjects(
   const decisionsByProject = new Map(
     decisionRows.map((r) => [r.projectId, Number(r.count)]),
   );
-  const propertyById = new Map(clientProperties.map((p) => [p.id, p.name]));
 
   return projectRows.map((p) => ({
     ...p,
-    propertyName: propertyById.get(p.propertyId) ?? '',
+    propertyName: property.name,
     pendingDecisions: decisionsByProject.get(p.id) ?? 0,
   }));
 }
