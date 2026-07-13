@@ -49,9 +49,23 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     const replyTo = company.emailReplyTo || undefined;
 
     // Inject firm-level variables.
+    //
+    // The email logo must be an ABSOLUTE, publicly-fetchable, RASTER URL:
+    // an inbox renders with no session, and Gmail/Outlook don't display
+    // SVG. `company.logoLightUrl` is a private-bucket STORAGE PATH (e.g.
+    // "company/logo-light.png") — dropping it into <img src> yields a
+    // broken relative link behind auth, which is the "broken logo in Gmail"
+    // bug. So we ignore it unless it's already an absolute http(s) URL, and
+    // otherwise use the bundled PNG served publicly by Next from /public.
+    // (The old fallback pointed at /logo-dark.svg — absolute but SVG, so
+    // still broken in Gmail.)
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const logoUrl = isAbsoluteUrl(company.logoLightUrl)
+      ? company.logoLightUrl
+      : `${siteUrl}/logo-email.png`;
     const vars: Record<string, string> = {
       firm_name: company.firmName,
-      logo_url: company.logoLightUrl || `${process.env.NEXT_PUBLIC_SITE_URL || ''}/logo-dark.svg`,
+      logo_url: logoUrl,
       ...input.variables,
     };
 
@@ -88,6 +102,13 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     await logEmail(input, '', 'failed', message).catch(() => {});
     return { success: false, error: message };
   }
+}
+
+/** True when the stored value is already an absolute http(s) URL an inbox
+ *  can fetch. Firm logos are normally private-bucket storage paths, which
+ *  fail in email — those fall through to the bundled public asset. */
+function isAbsoluteUrl(value: string | null | undefined): value is string {
+  return typeof value === 'string' && /^https?:\/\//i.test(value);
 }
 
 async function logEmail(

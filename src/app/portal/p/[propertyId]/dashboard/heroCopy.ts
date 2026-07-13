@@ -74,7 +74,7 @@ export function selectDashboardHeroCopy(input: DashboardHeroInput): DashboardHer
   if (input.statusTone === 'rose') {
     return {
       tone: 'urgent',
-      text: "Wanted to flag something here — let's talk when you have a moment.",
+      text: 'This home is flagged for attention. Your Insight contact will follow up.',
     };
   }
 
@@ -85,14 +85,14 @@ export function selectDashboardHeroCopy(input: DashboardHeroInput): DashboardHer
       if (projectName) {
         return {
           tone: 'urgent',
-          text: `One thing needs you on the ${projectName} — pick when you have a minute.`,
+          text: `1 decision needs your input on ${projectName}.`,
         };
       }
-      return { tone: 'urgent', text: "1 decision waiting — it's below." };
+      return { tone: 'urgent', text: '1 decision needs your input.' };
     }
     return {
       tone: 'urgent',
-      text: `${input.pendingDecisionCount} decisions waiting — they're below.`,
+      text: `${input.pendingDecisionCount} decisions need your input.`,
     };
   }
 
@@ -107,12 +107,12 @@ export function selectDashboardHeroCopy(input: DashboardHeroInput): DashboardHer
     if (first) {
       return {
         tone: 'caretaking',
-        text: `${first} was by ${dayWord} — full report below.`,
+        text: `${first} was on site ${dayWord}.`,
       };
     }
     return {
       tone: 'caretaking',
-      text: `We were by ${dayWord} — full report below.`,
+      text: `Your last visit was ${dayWord}.`,
     };
   }
 
@@ -124,12 +124,12 @@ export function selectDashboardHeroCopy(input: DashboardHeroInput): DashboardHer
       if (first) {
         return {
           tone: 'steady',
-          text: `${first} is heading over today. Everything else is on track.`,
+          text: `${first} is visiting today.`,
         };
       }
       return {
         tone: 'steady',
-        text: 'Visit scheduled for today. Everything else is on track.',
+        text: 'A visit is scheduled for today.',
       };
     }
 
@@ -141,14 +141,14 @@ export function selectDashboardHeroCopy(input: DashboardHeroInput): DashboardHer
       if (weekday) {
         return {
           tone: 'steady',
-          text: `Next visit is ${weekday} — ${month} ${day}. Everything's on track until then.`,
+          text: `Next visit: ${weekday}, ${month} ${day}.`,
         };
       }
     }
     if (month && day != null) {
       return {
         tone: 'steady',
-        text: `Next visit is ${month} ${day}. Everything's on track until then.`,
+        text: `Next visit: ${month} ${day}.`,
       };
     }
     // Date parse failed somewhere — treat it as if there were no visit.
@@ -156,16 +156,17 @@ export function selectDashboardHeroCopy(input: DashboardHeroInput): DashboardHer
 
   // Priority 5 — active work.
   if (input.activeProjectCount > 0) {
+    const n = input.activeProjectCount;
     return {
       tone: 'steady',
-      text: "Work is in motion. We'll surface anything that needs you.",
+      text: `${n} active project${n === 1 ? '' : 's'}. Nothing needs your input right now.`,
     };
   }
 
   // Priority 6 — idle / calm fallback.
   return {
     tone: 'calm',
-    text: 'Things are quiet here — your home is looking after itself.',
+    text: 'Nothing needs your attention right now.',
   };
 }
 

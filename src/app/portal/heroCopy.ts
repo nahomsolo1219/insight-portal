@@ -52,7 +52,7 @@ export function selectHeroCopy(cards: PropertyLandingCard[]): HeroCopyResult {
   if (flagged) {
     return {
       tone: 'urgent',
-      text: `Wanted to flag something on the ${propertyName(flagged)} property.`,
+      text: `${propertyName(flagged)} is flagged for attention.`,
     };
   }
 
@@ -71,12 +71,12 @@ export function selectHeroCopy(cards: PropertyLandingCard[]): HeroCopyResult {
       const ownerName = owner ? propertyName(owner) : FALLBACK_NAME;
       return {
         tone: 'urgent',
-        text: `One thing needs you on the ${ownerName} property.`,
+        text: `1 decision needs your input on ${ownerName}.`,
       };
     }
     return {
       tone: 'urgent',
-      text: `${totalDecisions} decisions are waiting across your homes.`,
+      text: `${totalDecisions} decisions need your input across your homes.`,
     };
   }
 
@@ -90,16 +90,16 @@ export function selectHeroCopy(cards: PropertyLandingCard[]): HeroCopyResult {
   if (dormant && active && dormant.id !== active.id) {
     return {
       tone: 'mixed',
-      text: `${propertyName(active)} is in motion; ${propertyName(dormant)} is resting for the season.`,
+      text: `${propertyName(active)} has active work; ${propertyName(dormant)} has none right now.`,
     };
   }
 
   // Priority 4 — steady cadence. Active project somewhere, nothing
-  // urgent. The "nothing needs you today" half is the reassurance.
+  // urgent. The second sentence states the actual status.
   if (active) {
     return {
       tone: 'steady',
-      text: 'Work in motion across your homes — nothing needs you today.',
+      text: 'Active work across your homes. Nothing needs your input right now.',
     };
   }
 
@@ -109,7 +109,7 @@ export function selectHeroCopy(cards: PropertyLandingCard[]): HeroCopyResult {
   // is acceptable.
   return {
     tone: 'calm',
-    text: 'Everything is calm. Pick a home to look in on.',
+    text: 'Nothing needs your attention right now.',
   };
 }
 
