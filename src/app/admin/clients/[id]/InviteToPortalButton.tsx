@@ -139,6 +139,18 @@ function InviteModal({
         showToast(msg, 'error');
         return;
       }
+      // The account exists (created or already there) but the branded email
+      // didn't go out — tell the admin plainly and keep the modal open so they
+      // can try again. Not a rollback: the user is real, just un-notified.
+      if (result.emailSent === false) {
+        const msg = `The portal account is set, but the email failed to send${
+          result.emailError ? ` (${result.emailError})` : ''
+        }. Try again to resend.`;
+        setError(msg);
+        showToast(msg, 'error');
+        router.refresh();
+        return;
+      }
       showToast(
         mode === 'resend'
           ? `Invite re-sent to ${email.trim()}`

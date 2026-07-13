@@ -4,6 +4,7 @@ import { CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { requestMagicLink, requestPasswordReset } from './actions';
 
 type Mode =
   | { kind: 'form' }
@@ -62,20 +63,13 @@ export function LoginForm() {
     setError(null);
     setLoading('magic');
 
-    const supabase = createClient();
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
-    });
+    // Routed through our server action → generateLink + Resend (branded email
+    // from our domain) instead of Supabase's unbranded magic-link email.
+    // Always resolves generically (anti-enumeration); we show the same
+    // confirmation screen regardless.
+    await requestMagicLink(email, next);
 
     setLoading(null);
-
-    if (otpError) {
-      setError(otpError.message);
-      return;
-    }
     setMode({ kind: 'magic-link-sent', email });
   }
 
@@ -87,20 +81,14 @@ export function LoginForm() {
     setError(null);
     setLoading('reset');
 
-    const supabase = createClient();
-    // Supabase sends a recovery email whose link lands on /auth/callback
-    // with a code; we pipe `next` through to /auth/reset-password so the
-    // user can set a new password with an authed session.
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
-    });
+    // Routed through our server action → generateLink({ type: 'recovery' }) +
+    // Resend (branded email from our domain) instead of Supabase's unbranded
+    // recovery email. The link lands on /auth/callback → /auth/reset-password
+    // so the user sets a new password with an authed session. Always resolves
+    // generically (anti-enumeration).
+    await requestPasswordReset(email);
 
     setLoading(null);
-
-    if (resetError) {
-      setError(resetError.message);
-      return;
-    }
     setMode({ kind: 'reset-sent', email });
   }
 

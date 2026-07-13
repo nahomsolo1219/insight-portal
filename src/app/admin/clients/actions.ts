@@ -86,8 +86,15 @@ export async function createClient(
         role: 'client',
         clientId: newClient.id,
       });
-      inviteSent = invite.success;
-      if (!invite.success) inviteError = invite.error;
+      // "Sent" requires the branded email to actually go out. generateLink may
+      // create the user while the Resend send fails — treat that as not-sent so
+      // the admin is prompted to resend (the user exists, so it's not a rollback).
+      inviteSent = invite.success && invite.emailSent === true;
+      if (!invite.success) {
+        inviteError = invite.error;
+      } else if (!invite.emailSent) {
+        inviteError = invite.emailError ?? 'The invite email failed to send.';
+      }
     }
 
     // Dashboard "Recent Activity" + sidebar badges read this surface.

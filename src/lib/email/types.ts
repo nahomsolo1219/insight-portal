@@ -7,7 +7,12 @@ export type EmailTemplateKey =
   | 'invoice_issued'
   | 'appointment_scheduled'
   | 'appointment_reminder'
-  | 'welcome_client';
+  | 'welcome_client'
+  // Auth emails — we generate the Supabase link ourselves (generateLink) and
+  // send it via Resend instead of Supabase's unbranded defaults.
+  | 'staff_invite'
+  | 'password_reset'
+  | 'magic_link';
 
 export interface SendEmailInput {
   key: EmailTemplateKey;

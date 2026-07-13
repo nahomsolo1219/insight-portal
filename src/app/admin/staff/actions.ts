@@ -7,6 +7,7 @@ import { profiles, staff } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { sendEmail } from '@/lib/email/send';
+import type { SendEmailResult } from '@/lib/email/types';
 import { getWelcomeEmailVars } from '@/lib/email/variables';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -36,20 +37,55 @@ export interface InviteUserParams {
 }
 
 export interface InviteUserResult {
+  /** True when the auth user exists (freshly created, or already existed on a
+   *  resend) AND we generated a link for them. */
   success: boolean;
+  /** Set only when success=false (we could not create the user / generate a link). */
   error?: string;
   userId?: string;
+  /** Whether the branded invite email actually went out via Resend. When this
+   *  is false the user EXISTS but nobody was notified — the caller must surface
+   *  a "resend" path. */
+  emailSent?: boolean;
+  emailError?: string;
+}
+
+/** Supabase returns this (varying by version) when generateLink type:'invite'
+ *  hits an email that's already registered — the signal to fall back to a
+ *  recovery link for the resend/re-invite path. */
+function isAlreadyRegistered(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const code = (error as { code?: string }).code ?? '';
+  const message = ((error as { message?: string }).message ?? '').toLowerCase();
+  return (
+    code === 'email_exists' ||
+    code === 'user_already_exists' ||
+    message.includes('already been registered') ||
+    message.includes('already registered') ||
+    message.includes('already exists')
+  );
 }
 
 /**
- * Invite a new user to the portal. Only callable by admins.
+ * Invite a user to the portal (or resend an invite). Only callable by admins.
+ *
+ * We take over the auth email from Supabase: `generateLink` CREATES the user
+ * and RETURNS the link WITHOUT sending anything, then we send our own branded
+ * email (via Resend) carrying that real link. This replaces the old
+ * `inviteUserByEmail`, which sent Supabase's unbranded email AND created the
+ * user — you can't suppress its email.
  *
  * Flow:
- *  1. Supabase Auth sends the invite email and creates the auth.users row.
- *  2. Our on_auth_user_created trigger creates the matching public.profiles row
- *     using the full_name + role we pass in user_metadata.
- *  3. We follow up with an UPDATE to link the profile to a client or staff row
- *     when applicable (the trigger doesn't know about those FKs).
+ *  1. `generateLink({ type: 'invite', data: { role, full_name } })` — creates
+ *     the auth.users row with role/full_name in user_metadata (the profile
+ *     trigger reads role, so an invited client lands role='client'), and
+ *     returns `properties.action_link`.
+ *  2. On a resend (user already exists → invite errors), fall back to a
+ *     `recovery` link, which also lands on the password-set page.
+ *  3. Link the profile to the client/staff row (trigger doesn't know the FKs).
+ *  4. Send the branded email carrying `action_link` as the CTA. Every role
+ *     gets one — clients get `welcome_client`, everyone else `staff_invite` —
+ *     so disabling Supabase's emails never leaves a role with no way to onboard.
  */
 export async function inviteUser(params: InviteUserParams): Promise<InviteUserResult> {
   await requireAdmin();
@@ -59,25 +95,44 @@ export async function inviteUser(params: InviteUserParams): Promise<InviteUserRe
   }
 
   const admin = createAdminClient();
-  // Invitees land on the password-setup page so their first action is
-  // choosing a credential — after which they can use email+password
-  // for subsequent sign-ins without always going through magic links.
+  // Invitees land on the password-setup page so their first action is choosing
+  // a credential; after that they can use email+password. The reset-password
+  // page routes them by role once the password is set (don't regress that).
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
   const redirectTo = `${siteUrl}/auth/callback?next=/auth/reset-password`;
 
-  const { data, error } = await admin.auth.admin.inviteUserByEmail(params.email, {
-    data: {
-      full_name: params.fullName,
-      role: params.role,
+  // Create the user + get the link WITHOUT sending Supabase's own email.
+  let gen = await admin.auth.admin.generateLink({
+    type: 'invite',
+    email: params.email,
+    options: {
+      data: { full_name: params.fullName, role: params.role },
+      redirectTo,
     },
-    redirectTo,
   });
 
-  if (error) {
-    return { success: false, error: error.message };
+  // Resend / re-invite: type:'invite' errors when the email already exists. A
+  // recovery link also lands on the password-set page, so it works as a fresh
+  // "set your password" link for a user who hasn't onboarded yet.
+  if (gen.error && isAlreadyRegistered(gen.error)) {
+    gen = await admin.auth.admin.generateLink({
+      type: 'recovery',
+      email: params.email,
+      options: { redirectTo },
+    });
   }
 
-  if (data.user && (params.clientId || params.staffId)) {
+  if (gen.error || !gen.data?.properties?.action_link) {
+    return {
+      success: false,
+      error: gen.error?.message ?? 'Failed to generate the invite link.',
+    };
+  }
+
+  const actionLink = gen.data.properties.action_link;
+  const user = gen.data.user;
+
+  if (user && (params.clientId || params.staffId)) {
     await db
       .update(profiles)
       .set({
@@ -85,28 +140,40 @@ export async function inviteUser(params: InviteUserParams): Promise<InviteUserRe
         staffId: params.staffId ?? null,
         updatedAt: new Date(),
       })
-      .where(eq(profiles.id, data.user.id));
+      .where(eq(profiles.id, user.id));
   }
 
-  // Email: send welcome email for client invites.
+  // Send the branded email carrying the REAL link. The user already exists at
+  // this point, so a failed send is NOT a rollback — it's surfaced to the
+  // admin (emailSent=false) so they can resend.
+  let emailResult: SendEmailResult;
   if (params.role === 'client' && params.clientId) {
-    try {
-      const vars = await getWelcomeEmailVars(params.clientId);
-      await sendEmail({
-        key: 'welcome_client',
-        to: params.email,
-        recipientUserId: data.user?.id,
-        variables: vars,
-      });
-    } catch (error) {
-      console.error('[inviteUser] welcome email failed', error);
-    }
+    const vars = await getWelcomeEmailVars(params.clientId);
+    emailResult = await sendEmail({
+      key: 'welcome_client',
+      to: params.email,
+      recipientUserId: user?.id ?? null,
+      // Override the /portal cta_url with the real password-set link.
+      variables: { ...vars, cta_url: actionLink },
+    });
+  } else {
+    emailResult = await sendEmail({
+      key: 'staff_invite',
+      to: params.email,
+      recipientUserId: user?.id ?? null,
+      variables: { user_name: params.fullName, cta_url: actionLink },
+    });
   }
 
   revalidatePath('/admin/staff');
   revalidatePath('/admin/clients');
 
-  return { success: true, userId: data.user?.id };
+  return {
+    success: true,
+    userId: user?.id,
+    emailSent: emailResult.success,
+    emailError: emailResult.success ? undefined : emailResult.error,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -175,8 +242,14 @@ export async function createStaffMember(
         role: inviteRole,
         staffId: member.id,
       });
-      inviteSent = result.success;
-      if (!result.success) inviteError = result.error;
+      // "Sent" means the branded email actually went out. The user may have
+      // been created while the email failed — surface that so the admin resends.
+      inviteSent = result.success && result.emailSent === true;
+      if (!result.success) {
+        inviteError = result.error;
+      } else if (!result.emailSent) {
+        inviteError = result.emailError ?? 'The invite email failed to send.';
+      }
     }
 
     revalidatePath('/admin/staff');
