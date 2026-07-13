@@ -14,6 +14,7 @@ import { PhotosTab } from './PhotosTab';
 import { ProfileTab } from './ProfileTab';
 import { ProjectsTab } from './ProjectsTab';
 import { PropertiesTab } from './PropertiesTab';
+import { ReportsTab } from './ReportsTab';
 import { getClientDetail, getClientPortalStatus } from './queries';
 
 interface PageProps {
@@ -54,6 +55,17 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
   ) : null;
   const documentsSlot = activePropertyId ? (
     <DocumentsTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
+  ) : null;
+  const activeProperty = activePropertyId
+    ? (properties.find((p) => p.id === activePropertyId) ?? null)
+    : null;
+  const reportsSlot = activePropertyId ? (
+    <ReportsTab
+      key={activePropertyId}
+      clientId={id}
+      propertyId={activePropertyId}
+      propertyName={activeProperty?.name ?? 'This property'}
+    />
   ) : null;
   const appointmentsSlot = activePropertyId ? (
     <AppointmentsTab key={activePropertyId} clientId={id} propertyId={activePropertyId} />
@@ -148,6 +160,7 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
         propertiesSlot={propertiesSlot}
         maintenanceSlot={maintenanceSlot}
         documentsSlot={documentsSlot}
+        reportsSlot={reportsSlot}
         appointmentsSlot={appointmentsSlot}
         photosSlot={photosSlot}
         invoicesSlot={invoicesSlot}

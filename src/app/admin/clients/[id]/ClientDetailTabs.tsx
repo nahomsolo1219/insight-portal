@@ -6,6 +6,7 @@ import {
   Camera,
   DollarSign,
   FileBox,
+  FileText,
   Home,
   MapPin,
   User,
@@ -31,6 +32,9 @@ const TABS = [
   { id: 'appointments', label: 'Appointments', icon: Calendar },
   { id: 'photos', label: 'Photos', icon: Camera },
   { id: 'documents', label: 'Documents', icon: FileBox },
+  // Reports are vendor-produced inspection/service PDFs — property-scoped,
+  // distinct from project Documents. Sits next to Documents in the IA.
+  { id: 'reports', label: 'Reports', icon: FileText },
   { id: 'invoices', label: 'Invoices', icon: DollarSign },
   { id: 'profile', label: 'Profile', icon: User },
 ] as const;
@@ -50,6 +54,7 @@ interface ClientDetailTabsProps {
   propertiesSlot: React.ReactNode;
   maintenanceSlot: React.ReactNode;
   documentsSlot: React.ReactNode;
+  reportsSlot: React.ReactNode;
   appointmentsSlot: React.ReactNode;
   photosSlot: React.ReactNode;
   invoicesSlot: React.ReactNode;
@@ -64,6 +69,7 @@ export function ClientDetailTabs({
   propertiesSlot,
   maintenanceSlot,
   documentsSlot,
+  reportsSlot,
   appointmentsSlot,
   photosSlot,
   invoicesSlot,
@@ -163,6 +169,11 @@ export function ClientDetailTabs({
           ? documentsSlot
           : <EmptyTab message="No properties yet. Add a property first." />
       )}
+      {activeTab === 'reports' && (
+        activeProperty
+          ? reportsSlot
+          : <EmptyTab message="No properties yet. Add a property first." />
+      )}
       {activeTab === 'appointments' && (
         activeProperty
           ? appointmentsSlot
@@ -180,6 +191,7 @@ export function ClientDetailTabs({
         activeTab !== 'properties' &&
         activeTab !== 'maintenance' &&
         activeTab !== 'documents' &&
+        activeTab !== 'reports' &&
         activeTab !== 'appointments' &&
         activeTab !== 'photos' &&
         activeTab !== 'invoices' &&

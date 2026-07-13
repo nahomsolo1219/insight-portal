@@ -16,6 +16,7 @@ import {
   projectTemplates,
   projects,
   properties,
+  reports,
   staff,
   templatePhases,
   vendors,
@@ -341,6 +342,69 @@ export async function getVendorsForSelect(): Promise<VendorOption[]> {
     .from(vendors)
     .where(eq(vendors.active, true))
     .orderBy(asc(vendors.name));
+}
+
+// ---------------------------------------------------------------------------
+// Reports tab — subcontractor inspection/service PDFs, property-scoped.
+// Distinct from Documents (project paperwork): a report is produced by a
+// vendor (Bay Electric's annual inspection, Bay Air's HVAC service) and the
+// homeowner reads it in the portal.
+// ---------------------------------------------------------------------------
+
+export interface AdminReportRow {
+  id: string;
+  name: string;
+  /** YYYY-MM-DD string from the DB. */
+  date: string;
+  type: string;
+  storagePath: string;
+  vendorId: string | null;
+  vendorName: string | null;
+  appointmentId: string | null;
+  createdAt: Date;
+}
+
+/**
+ * Every report attached to this property, vendor name joined in for the
+ * vendor-led title. Sorted by report date desc (createdAt as tiebreaker).
+ */
+export async function getReportsForProperty(propertyId: string): Promise<AdminReportRow[]> {
+  return db
+    .select({
+      id: reports.id,
+      name: reports.name,
+      date: reports.date,
+      type: reports.type,
+      storagePath: reports.storagePath,
+      vendorId: reports.vendorId,
+      vendorName: vendors.name,
+      appointmentId: reports.appointmentId,
+      createdAt: reports.createdAt,
+    })
+    .from(reports)
+    .leftJoin(vendors, eq(vendors.id, reports.vendorId))
+    .where(eq(reports.propertyId, propertyId))
+    .orderBy(desc(reports.date), desc(reports.createdAt));
+}
+
+export interface AppointmentOption {
+  id: string;
+  title: string;
+  date: string;
+}
+
+/**
+ * Light appointment list for the optional "link to an appointment" picker in
+ * the report upload modal. Newest first.
+ */
+export async function getAppointmentsForPropertySelect(
+  propertyId: string,
+): Promise<AppointmentOption[]> {
+  return db
+    .select({ id: appointments.id, title: appointments.title, date: appointments.date })
+    .from(appointments)
+    .where(eq(appointments.propertyId, propertyId))
+    .orderBy(desc(appointments.date));
 }
 
 // ---------------------------------------------------------------------------

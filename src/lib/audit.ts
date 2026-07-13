@@ -43,6 +43,7 @@ export type AuditAction =
   | 'rejected photo'
   | 'deleted photo'
   | 'uploaded report'
+  | 'updated report'
   | 'deleted report'
   | 'uploaded invoice'
   | 'updated invoice status'
