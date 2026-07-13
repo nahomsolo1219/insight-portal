@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ChevronRight, Users } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronRight, MailWarning, Users } from 'lucide-react';
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth/current-user';
 import { cn, formatCurrency, initialsFrom } from '@/lib/utils';
@@ -186,7 +186,7 @@ function ClientTable({
           need a parallel render path; the scrolling table keeps the same
           information dense and shareable URL. */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[820px]">
+        <table className="w-full min-w-[940px]">
           <thead>
             <tr className="bg-cream border-line border-b">
               <SortableTh
@@ -207,6 +207,7 @@ function ClientTable({
                 align="right"
               />
               <Th>Assigned PM</Th>
+              <Th>Portal</Th>
               <Th>
                 <span className="sr-only">Open</span>
               </Th>
@@ -296,6 +297,19 @@ function ClientRow({ client, isLast }: { client: ClientRow; isLast: boolean }) {
         <span className="text-ink-700 text-sm">
           {client.assignedPmName ?? <span className="text-ink-400">Unassigned</span>}
         </span>
+      </Td>
+      <Td>
+        {client.invited ? (
+          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+            <Check size={12} strokeWidth={2} />
+            Invited
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+            <MailWarning size={12} strokeWidth={2} />
+            Not invited
+          </span>
+        )}
       </Td>
       <Td align="right">
         <Link

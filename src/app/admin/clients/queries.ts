@@ -5,7 +5,7 @@
 
 import { and, count, eq, inArray, sql, sum } from 'drizzle-orm';
 import { db } from '@/db';
-import { clients, invoices, membershipTiers, projects, properties, staff } from '@/db/schema';
+import { clients, invoices, membershipTiers, profiles, projects, properties, staff } from '@/db/schema';
 import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 
 export interface ClientRow {
@@ -24,6 +24,13 @@ export interface ClientRow {
   primaryAddress: string | null;
   /** Signed URL for the client's avatar, or null when no avatar uploaded. */
   avatarUrl: string | null;
+  /**
+   * Whether this client has been invited to the portal yet — true once a
+   * `profiles` row with role=client is linked to them. Mirrors the
+   * invited/not_invited chip logic in the client detail page
+   * (`getClientPortalStatus`), batched across the whole list here.
+   */
+  invited: boolean;
 }
 
 export async function listClients(): Promise<ClientRow[]> {
@@ -94,6 +101,18 @@ export async function listClients(): Promise<ClientRow[]> {
 
   const balanceMap = new Map(balanceAggregates.map((b) => [b.clientId, b.balanceCents ?? 0]));
 
+  // Portal-invite status: a client is "invited" once a role=client profile
+  // is linked to it. Same detection as `getClientPortalStatus` on the detail
+  // page, but batched across the whole list in one round-trip.
+  const invitedRows = await db
+    .select({ clientId: profiles.clientId })
+    .from(profiles)
+    .where(and(eq(profiles.role, 'client'), inArray(profiles.clientId, clientIds)));
+
+  const invitedSet = new Set(
+    invitedRows.map((r) => r.clientId).filter((id): id is string => Boolean(id)),
+  );
+
   // Sign every avatar in one batch — saves a round-trip per row.
   const avatarPaths = rows
     .map((r) => r.avatarStoragePath)
@@ -115,6 +134,7 @@ export async function listClients(): Promise<ClientRow[]> {
     activeProjectCount: projectMap.get(r.id) ?? 0,
     balanceCents: balanceMap.get(r.id) ?? 0,
     avatarUrl: r.avatarStoragePath ? avatarUrls.get(r.avatarStoragePath) ?? null : null,
+    invited: invitedSet.has(r.id),
   }));
 }
 

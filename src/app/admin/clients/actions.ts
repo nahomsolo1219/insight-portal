@@ -6,6 +6,7 @@ import { db } from '@/db';
 import { clients } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { inviteUser } from '../staff/actions';
 
 export interface CreateClientInput {
   name: string;
@@ -15,6 +16,13 @@ export interface CreateClientInput {
   membershipTierId?: string;
   assignedPmId?: string;
   memberSince?: string; // YYYY-MM-DD
+  /**
+   * When true, immediately send the portal invite after creating the client
+   * (via the same `inviteUser` path the detail-page "Invite to portal" button
+   * uses). A failed invite does NOT roll back the client — the caller is told
+   * so it can prompt a retry.
+   */
+  sendInvite?: boolean;
 }
 
 export type ActionResult<T = undefined> =
@@ -35,7 +43,7 @@ function validateClient(input: CreateClientInput): string | null {
 
 export async function createClient(
   input: CreateClientInput,
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<{ id: string; inviteSent: boolean; inviteError?: string }>> {
   const user = await requireAdmin();
 
   const validationError = validateClient(input);
@@ -66,10 +74,26 @@ export async function createClient(
       clientId: newClient.id,
     });
 
+    // Optionally fire the portal invite. The client already exists at this
+    // point, so a failed invite must NOT roll it back — we surface the error
+    // and let the admin retry via the detail-page "Invite to portal" button.
+    let inviteSent = false;
+    let inviteError: string | undefined;
+    if (input.sendInvite) {
+      const invite = await inviteUser({
+        email: input.email.trim(),
+        fullName: newClient.name,
+        role: 'client',
+        clientId: newClient.id,
+      });
+      inviteSent = invite.success;
+      if (!invite.success) inviteError = invite.error;
+    }
+
     // Dashboard "Recent Activity" + sidebar badges read this surface.
     revalidatePath('/admin/clients');
     revalidatePath('/admin');
-    return { success: true, data: { id: newClient.id } };
+    return { success: true, data: { id: newClient.id, inviteSent, inviteError } };
   } catch (error) {
     console.error('[createClient]', error);
     return { success: false, error: 'Failed to create client. Please try again.' };

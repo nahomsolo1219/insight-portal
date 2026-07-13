@@ -27,6 +27,8 @@ interface FormState {
   phone: string;
   membershipTierId: string;
   assignedPmId: string;
+  /** Send the portal invite as part of creating the client. Defaults ON. */
+  sendInvite: boolean;
 }
 
 const emptyForm: FormState = {
@@ -35,6 +37,7 @@ const emptyForm: FormState = {
   phone: '',
   membershipTierId: '',
   assignedPmId: '',
+  sendInvite: true,
 };
 
 export function NewClientButton({ tiers, pms, variant = 'standalone' }: NewClientButtonProps) {
@@ -113,13 +116,26 @@ export function NewClientButton({ tiers, pms, variant = 'standalone' }: NewClien
         phone: form.phone || undefined,
         membershipTierId: form.membershipTierId || undefined,
         assignedPmId: form.assignedPmId || undefined,
+        sendInvite: form.sendInvite,
       });
       if (!result.success) {
         setError(result.error);
         showToast(result.error, 'error');
         return;
       }
-      showToast('Client created');
+      // The client was created regardless of invite outcome. If the invite
+      // was requested but failed, tell the admin clearly — the detail page
+      // we're about to land on shows "Invite to portal" for the retry.
+      if (form.sendInvite && result.data && !result.data.inviteSent) {
+        showToast(
+          'Client created, but the invite email failed to send — use Invite to portal to retry',
+          'error',
+        );
+      } else if (form.sendInvite) {
+        showToast('Client created and portal invite sent');
+      } else {
+        showToast('Client created');
+      }
       setOpen(false);
       setForm(emptyForm);
       if (result.data?.id) {
@@ -242,6 +258,21 @@ export function NewClientButton({ tiers, pms, variant = 'standalone' }: NewClien
               ))}
             </select>
           </Field>
+          <label className="border-line hover:bg-brand-warm-50 flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition-colors">
+            <input
+              type="checkbox"
+              checked={form.sendInvite}
+              onChange={(e) => setForm({ ...form, sendInvite: e.target.checked })}
+              className="text-brand-teal-500 focus:ring-brand-teal-200 mt-0.5 h-4 w-4 rounded border-gray-300"
+            />
+            <div>
+              <div className="text-sm font-medium text-gray-900">Send portal invite now</div>
+              <p className="mt-0.5 text-xs text-gray-500">
+                Emails a password-setup link so the client can sign in. Leave off to invite later
+                from the client&apos;s page.
+              </p>
+            </div>
+          </label>
           {error && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
               {error}
