@@ -59,6 +59,11 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     // otherwise use the bundled PNG served publicly by Next from /public.
     // (The old fallback pointed at /logo-dark.svg — absolute but SVG, so
     // still broken in Gmail.)
+    //
+    // /logo-email.png is the WHITE wordmark variant, rasterized from the
+    // brand's light logo. This matters: the email header is teal (#1B4F5A),
+    // and the "Logo-Dark" artwork is near-black (#062626) — it would be
+    // invisible on the header. Do NOT swap in the dark logo here.
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
     const logoUrl = isAbsoluteUrl(company.logoLightUrl)
       ? company.logoLightUrl
