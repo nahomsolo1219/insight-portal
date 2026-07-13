@@ -1,6 +1,9 @@
 'use server';
 
+import { db } from '@/db';
+import { emailLog } from '@/db/schema';
 import { sendEmail } from '@/lib/email/send';
+import type { EmailTemplateKey } from '@/lib/email/types';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 // Public login-page auth-email actions. These take over the recovery and
@@ -10,14 +13,48 @@ import { createAdminClient } from '@/lib/supabase/admin';
 // These are UNAUTHENTICATED (the login page is public), and they use the
 // service-role client only to generate a link and email it to the address
 // itself — nothing sensitive is returned to the caller, so this is not an
-// enumeration or exfiltration vector. We deliberately always resolve to a
-// generic `{ ok: true }` (even when the email isn't a real user, which makes
-// generateLink error) so a caller can't probe which addresses have accounts.
-// Every attempt — success or failure — is recorded in email_log by sendEmail,
-// so a genuinely failed send is still discoverable by an admin.
+// enumeration or exfiltration vector.
+//
+// ANTI-ENUMERATION lives in the RESPONSE ONLY: we always resolve to a generic
+// `{ ok: true }` so a caller can't tell whether an account exists. But every
+// failure MUST be observable server-side — otherwise a broken reset (e.g.
+// generateLink rejecting the redirect, a missing service-role key, or a
+// non-existent user) fails silently with nothing to debug. So every failure
+// path here: (a) console.error's the full error, and (b) writes a
+// status='failed' row to email_log, even when we bail BEFORE calling
+// sendEmail. Never `return { ok: true }` on a failure without logging first.
 
 function siteUrl(): string {
   return process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+}
+
+/** Human-readable one-liner from a Supabase AuthError (or anything). Captures
+ *  the code + status the dashboard/logs need, not just the message. */
+function describeError(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const e = error as { name?: string; code?: string; status?: number; message?: string };
+    return `${e.name ?? 'Error'} code=${e.code ?? 'n/a'} status=${e.status ?? 'n/a'}: ${
+      e.message ?? JSON.stringify(error)
+    }`;
+  }
+  return String(error);
+}
+
+/** Record a failed auth-email attempt in email_log so it's discoverable even
+ *  when we never reached sendEmail(). Never throws. */
+async function logFailedAttempt(key: EmailTemplateKey, to: string, detail: string): Promise<void> {
+  try {
+    await db.insert(emailLog).values({
+      templateKey: key,
+      recipientEmail: to,
+      recipientUserId: null, // no user id available on a generateLink failure
+      subject: '(auth link generation failed — no email sent)',
+      status: 'failed',
+      error: detail,
+    });
+  } catch (logErr) {
+    console.error('[login.actions] failed to write email_log row:', logErr);
+  }
 }
 
 export async function requestPasswordReset(email: string): Promise<{ ok: boolean }> {
@@ -34,8 +71,20 @@ export async function requestPasswordReset(email: string): Promise<{ ok: boolean
     });
 
     if (error || !data?.properties?.action_link) {
-      // Expected when the email isn't a registered user — don't reveal that.
-      console.warn('[requestPasswordReset] no link generated:', error?.message);
+      // Observable failure: full error + a failed email_log row. Stay generic
+      // in the RESPONSE (return ok below) so we don't leak account existence.
+      console.error('[requestPasswordReset] generateLink failed', {
+        email: to,
+        redirectTo,
+        siteUrlEnvSet: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
+        serviceRoleKeySet: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+        error,
+      });
+      await logFailedAttempt(
+        'password_reset',
+        to,
+        error ? describeError(error) : 'generateLink returned no action_link and no error',
+      );
       return { ok: true };
     }
 
@@ -47,6 +96,7 @@ export async function requestPasswordReset(email: string): Promise<{ ok: boolean
     });
   } catch (err) {
     console.error('[requestPasswordReset] unexpected error:', err);
+    await logFailedAttempt('password_reset', to, `unexpected: ${describeError(err)}`);
   }
 
   return { ok: true };
@@ -71,9 +121,18 @@ export async function requestMagicLink(
     });
 
     if (error || !data?.properties?.action_link) {
-      // Users are invite-only, so a magic-link request for a non-user errors
-      // here. Stay generic to avoid leaking which addresses have accounts.
-      console.warn('[requestMagicLink] no link generated:', error?.message);
+      console.error('[requestMagicLink] generateLink failed', {
+        email: to,
+        redirectTo,
+        siteUrlEnvSet: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
+        serviceRoleKeySet: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+        error,
+      });
+      await logFailedAttempt(
+        'magic_link',
+        to,
+        error ? describeError(error) : 'generateLink returned no action_link and no error',
+      );
       return { ok: true };
     }
 
@@ -85,6 +144,7 @@ export async function requestMagicLink(
     });
   } catch (err) {
     console.error('[requestMagicLink] unexpected error:', err);
+    await logFailedAttempt('magic_link', to, `unexpected: ${describeError(err)}`);
   }
 
   return { ok: true };
