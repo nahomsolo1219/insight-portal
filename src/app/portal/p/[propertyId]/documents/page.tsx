@@ -30,8 +30,9 @@ export default async function PortalDocumentsPage({
 
   const { properties, documents, reports } = await getClientDocuments(user.clientId, propertyId);
 
-  // Bucket by property — both documents and reports share a property card so
-  // the client can scan their whole house in one place.
+  // Bucket by property — the portal is property-scoped so this is a single
+  // section now, but keeping the grouping preserves the property header +
+  // address and lets documents and reports share one property card.
   const docsByProperty = new Map<string, PortalDocumentRow[]>();
   for (const d of documents) {
     const list = docsByProperty.get(d.propertyId);

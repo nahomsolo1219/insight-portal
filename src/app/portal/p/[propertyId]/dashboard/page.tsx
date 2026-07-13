@@ -20,10 +20,9 @@ import { FeaturedDecisionCard } from '@/components/portal/FeaturedDecisionCard';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { cn, formatDate, formatTime, initialsFrom } from '@/lib/utils';
 import {
-  getClientActiveProjects,
-  getClientDashboardStats,
-  getClientRecentActivity,
   getMyClientProfile,
+  getPropertyActiveProjects,
+  getPropertyRecentActivity,
   type ActivityItem,
   type ClientProfile,
   type ClientProjectRow,
@@ -51,16 +50,15 @@ export default async function PortalDashboardPage({
   if (!user || user.role !== 'client' || !user.clientId) redirect('/');
 
   const clientId = user.clientId;
-  // Five parallel reads. The property-scoped one (`propertyData`) returns
-  // hero data + featured decision + visit details + recent photos in a
-  // single round-trip — fewer network hops than fanning out the photo +
-  // visit reads separately. The client-wide rollups still come from the
-  // legacy /portal queries module.
-  const [profile, stats, activeProjects, activity, propertyData, maintenanceSummary] = await Promise.all([
+  // Five parallel reads, ALL property-scoped now (except the PM contact
+  // card, which is client-level by nature). `propertyData` returns hero +
+  // featured decision + visit details + recent photos + the active-project
+  // and pending-decision COUNTS for this property; the active-project list
+  // and the activity feed are their own property-scoped reads.
+  const [profile, activeProjects, activity, propertyData, maintenanceSummary] = await Promise.all([
     getMyClientProfile(clientId),
-    getClientDashboardStats(clientId),
-    getClientActiveProjects(clientId),
-    getClientRecentActivity(clientId, 8),
+    getPropertyActiveProjects(clientId, propertyId),
+    getPropertyRecentActivity(clientId, propertyId, 8),
     getPropertyDashboardData(clientId, propertyId),
     getMaintenancePlanSummary(propertyId),
   ]);
@@ -121,8 +119,8 @@ export default async function PortalDashboardPage({
 
       <StatCards
         propertyId={propertyId}
-        activeProjects={stats.activeProjects}
-        pendingDecisions={stats.pendingDecisions}
+        activeProjects={propertyData.activeProjectCount}
+        pendingDecisions={propertyData.pendingDecisionCount}
         nextScheduledVisit={propertyData.nextScheduledVisit}
       />
 

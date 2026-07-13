@@ -3,7 +3,7 @@
 // intent is obvious in code review and a misconfigured RLS policy can't
 // leak someone else's data.
 
-import { and, asc, count, desc, eq, gte, inArray, isNull, sum } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, isNull, or } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   appointments,
@@ -52,113 +52,6 @@ export async function getMyClientProfile(clientId: string): Promise<ClientProfil
     .limit(1);
 
   return client ?? null;
-}
-
-export interface ClientDashboardStats {
-  activeProjects: number;
-  pendingDecisions: number;
-  upcomingAppointments: number;
-  outstandingCents: number;
-  propertyCount: number;
-}
-
-/**
- * Headline counts for the portal dashboard cards. We do property/project
- * lookups first (so we can scope by ID lists) and run the dependent counts
- * in parallel after each step. Outstanding-balance can run in parallel
- * with the property fetch — it only needs `clientId`.
- */
-export async function getClientDashboardStats(
-  clientId: string,
-): Promise<ClientDashboardStats> {
-  const [propertyRows, balanceRow] = await Promise.all([
-    db
-      .select({ id: properties.id })
-      .from(properties)
-      .where(eq(properties.clientId, clientId)),
-    db
-      .select({ total: sum(invoices.amountCents).mapWith(Number) })
-      .from(invoices)
-      .where(
-        and(
-          eq(invoices.clientId, clientId),
-          inArray(invoices.status, ['unpaid', 'partial']),
-        ),
-      )
-      .then((rows) => rows[0]),
-  ]);
-
-  const propertyIds = propertyRows.map((p) => p.id);
-  const outstandingCents = balanceRow?.total ?? 0;
-
-  if (propertyIds.length === 0) {
-    return {
-      activeProjects: 0,
-      pendingDecisions: 0,
-      upcomingAppointments: 0,
-      outstandingCents,
-      propertyCount: 0,
-    };
-  }
-
-  const today = new Date().toISOString().slice(0, 10);
-
-  // Three parallel reads keyed off the property-id list.
-  const [activeProjectRow, projectIdRows, upcomingRow] = await Promise.all([
-    db
-      .select({ count: count() })
-      .from(projects)
-      .where(
-        and(eq(projects.status, 'active'), inArray(projects.propertyId, propertyIds)),
-      )
-      .then((rows) => rows[0]),
-    db
-      .select({ id: projects.id })
-      .from(projects)
-      .where(inArray(projects.propertyId, propertyIds)),
-    db
-      .select({ count: count() })
-      .from(appointments)
-      .where(
-        and(
-          inArray(appointments.propertyId, propertyIds),
-          gte(appointments.date, today),
-          inArray(appointments.status, ['scheduled', 'confirmed']),
-        ),
-      )
-      .then((rows) => rows[0]),
-  ]);
-
-  const activeProjects = Number(activeProjectRow?.count ?? 0);
-  const upcomingAppointments = Number(upcomingRow?.count ?? 0);
-  const projectIds = projectIdRows.map((p) => p.id);
-
-  let pendingDecisions = 0;
-  if (projectIds.length > 0) {
-    const [decisionRow] = await db
-      .select({ count: count() })
-      .from(milestones)
-      .where(
-        and(
-          eq(milestones.status, 'awaiting_client'),
-          inArray(milestones.projectId, projectIds),
-          // Already-responded decisions stay `awaiting_client` until
-          // admin signs off (per respondToDecision's design); excluding
-          // them here keeps the dashboard stat + portal badge honest
-          // about what *the client* still needs to do.
-          isNull(milestones.clientResponse),
-        ),
-      );
-    pendingDecisions = Number(decisionRow?.count ?? 0);
-  }
-
-  return {
-    activeProjects,
-    pendingDecisions,
-    upcomingAppointments,
-    outstandingCents,
-    propertyCount: propertyIds.length,
-  };
 }
 
 export interface UpcomingAppointmentRow {
@@ -215,9 +108,16 @@ export interface ClientProjectRow {
   propertyName: string;
 }
 
-/** All currently-active projects across all the client's properties. */
-export async function getClientActiveProjects(
+/**
+ * Currently-active projects on a SINGLE property. The dashboard is
+ * property-scoped (sidebar switcher), so this must not roll up the whole
+ * client — otherwise the Tahoe Cabin dashboard lists the other house's
+ * projects. `clientId` stays in the filter as an ownership guard on top of
+ * the propertyId equality.
+ */
+export async function getPropertyActiveProjects(
   clientId: string,
+  propertyId: string,
 ): Promise<ClientProjectRow[]> {
   return db
     .select({
@@ -232,7 +132,13 @@ export async function getClientActiveProjects(
     })
     .from(projects)
     .innerJoin(properties, eq(properties.id, projects.propertyId))
-    .where(and(eq(properties.clientId, clientId), eq(projects.status, 'active')))
+    .where(
+      and(
+        eq(properties.clientId, clientId),
+        eq(projects.propertyId, propertyId),
+        eq(projects.status, 'active'),
+      ),
+    )
     .orderBy(desc(projects.startDate));
 }
 
@@ -266,20 +172,23 @@ export interface ActivityItem {
  * thing that changes a complete milestone's row is, in practice, the
  * status flip itself.
  */
-export async function getClientRecentActivity(
+export async function getPropertyRecentActivity(
   clientId: string,
+  propertyId: string,
   limit = 8,
 ): Promise<ActivityItem[]> {
-  const clientProperties = await db
+  // Ownership check: the property must belong to this client. A miss returns
+  // an empty feed rather than another property's activity.
+  const [property] = await db
     .select({ id: properties.id })
     .from(properties)
-    .where(eq(properties.clientId, clientId));
-
-  const propertyIds = clientProperties.map((p) => p.id);
+    .where(and(eq(properties.id, propertyId), eq(properties.clientId, clientId)))
+    .limit(1);
 
   const items: ActivityItem[] = [];
 
-  if (propertyIds.length > 0) {
+  if (property) {
+    const propertyIds = [propertyId];
     const projectRows = await db
       .select({ id: projects.id, name: projects.name })
       .from(projects)
@@ -392,30 +301,38 @@ export async function getClientRecentActivity(
         projectId: null,
       });
     }
-  }
 
-  const recentInvoices = await db
-    .select({
-      number: invoices.invoiceNumber,
-      description: invoices.description,
-      invoiceDate: invoices.invoiceDate,
-      createdAt: invoices.createdAt,
-      amountCents: invoices.amountCents,
-    })
-    .from(invoices)
-    .where(eq(invoices.clientId, clientId))
-    .orderBy(desc(invoices.createdAt))
-    .limit(limit);
+    // Invoices scoped to this property OR unassigned (client-level bills) —
+    // same rule the invoices page uses. Only reached once the property's
+    // ownership is confirmed.
+    const recentInvoices = await db
+      .select({
+        number: invoices.invoiceNumber,
+        description: invoices.description,
+        invoiceDate: invoices.invoiceDate,
+        createdAt: invoices.createdAt,
+        amountCents: invoices.amountCents,
+      })
+      .from(invoices)
+      .where(
+        and(
+          eq(invoices.clientId, clientId),
+          or(eq(invoices.propertyId, propertyId), isNull(invoices.propertyId)),
+        ),
+      )
+      .orderBy(desc(invoices.createdAt))
+      .limit(limit);
 
-  for (const inv of recentInvoices) {
-    const dollars = (inv.amountCents ?? 0) / 100;
-    items.push({
-      type: 'invoice',
-      title: `Invoice #${inv.number} issued`,
-      subtitle: `$${dollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${inv.description ? ` · ${inv.description}` : ''}`,
-      date: inv.createdAt.toISOString(),
-      projectId: null,
-    });
+    for (const inv of recentInvoices) {
+      const dollars = (inv.amountCents ?? 0) / 100;
+      items.push({
+        type: 'invoice',
+        title: `Invoice #${inv.number} issued`,
+        subtitle: `$${dollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${inv.description ? ` · ${inv.description}` : ''}`,
+        date: inv.createdAt.toISOString(),
+        projectId: null,
+      });
+    }
   }
 
   items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

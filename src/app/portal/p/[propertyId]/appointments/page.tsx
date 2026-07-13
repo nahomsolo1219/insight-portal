@@ -36,7 +36,7 @@ export default async function PortalAppointmentsPage({
           Appointments
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Visits scheduled across your properties.
+          Visits scheduled at this property.
         </p>
       </header>
 
