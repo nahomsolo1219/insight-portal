@@ -1,4 +1,5 @@
 import { Download, FileText, MapPin } from 'lucide-react';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { PdfViewer } from '@/components/portal/PdfViewer';
 import { getCurrentUser } from '@/lib/auth/current-user';
@@ -11,19 +12,50 @@ import {
   type PortalInvoiceSummary,
 } from './queries';
 
+// Open vs paid split — David asked for "a folder for past 'paid' invoices
+// as well as the new or open ones." Open = anything still owed
+// (unpaid/partial); Paid = settled; All = both. URL-stateful (?status=)
+// so a tab is linkable and survives refresh.
+type StatusFilter = 'open' | 'paid' | 'all';
+
+const OPEN_STATUSES: ReadonlySet<InvoiceStatus> = new Set(['unpaid', 'partial']);
+
+function parseStatusFilter(raw: string | undefined): StatusFilter {
+  return raw === 'paid' ? 'paid' : raw === 'all' ? 'all' : 'open';
+}
+
+function matchesFilter(status: InvoiceStatus, filter: StatusFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'paid') return status === 'paid';
+  return OPEN_STATUSES.has(status);
+}
+
 export default async function PortalInvoicesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ propertyId: string }>;
+  searchParams: Promise<{ status?: string }>;
 }) {
-  const { propertyId } = await params;
+  const [{ propertyId }, { status: statusParam }] = await Promise.all([params, searchParams]);
   const user = await getCurrentUser();
   if (!user || user.role !== 'client' || !user.clientId) redirect('/');
+
+  const filter = parseStatusFilter(statusParam);
 
   const [invoices, summary] = await Promise.all([
     getClientInvoices(user.clientId, propertyId),
     getClientInvoiceSummary(user.clientId, propertyId),
   ]);
+
+  // Counts drive the tab labels; derived from the full property-scoped set
+  // so the numbers don't move as the client switches tabs.
+  const counts = {
+    all: invoices.length,
+    open: invoices.filter((i) => OPEN_STATUSES.has(i.status)).length,
+    paid: invoices.filter((i) => i.status === 'paid').length,
+  };
+  const visible = invoices.filter((i) => matchesFilter(i.status, filter));
 
   return (
     <div className="space-y-6">
@@ -37,17 +69,101 @@ export default async function PortalInvoicesPage({
         </p>
       </header>
 
+      {/* Summary stays GLOBAL (all statuses for this property): the Paid vs
+          Outstanding breakdown is only meaningful when both are shown — a
+          per-tab summary would zero out one column. The tabs filter the
+          list below, not the overview. */}
       <SummaryBar summary={summary} />
 
       {invoices.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="space-y-3">
-          {invoices.map((inv) => (
-            <InvoiceCard key={inv.id} invoice={inv} />
-          ))}
-        </div>
+        <>
+          <StatusTabs propertyId={propertyId} current={filter} counts={counts} />
+          {visible.length === 0 ? (
+            <FilteredEmpty propertyId={propertyId} filter={filter} />
+          ) : (
+            <div className="space-y-3">
+              {visible.map((inv) => (
+                <InvoiceCard key={inv.id} invoice={inv} />
+              ))}
+            </div>
+          )}
+        </>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Status tabs — Open / Paid / All. Link-based so the URL is the source of
+// truth (matches the admin clients list's URL-driven filter tabs), styled
+// for the portal's cream/ink/teal surface.
+// ---------------------------------------------------------------------------
+
+function invoicesHref(propertyId: string, filter: StatusFilter): string {
+  const base = `/portal/p/${propertyId}/invoices`;
+  // Omit the param for the default tab so the canonical URL stays clean.
+  return filter === 'open' ? base : `${base}?status=${filter}`;
+}
+
+function StatusTabs({
+  propertyId,
+  current,
+  counts,
+}: {
+  propertyId: string;
+  current: StatusFilter;
+  counts: { all: number; open: number; paid: number };
+}) {
+  const tabs: ReadonlyArray<{ id: StatusFilter; label: string; count: number }> = [
+    { id: 'open', label: 'Open', count: counts.open },
+    { id: 'paid', label: 'Paid', count: counts.paid },
+    { id: 'all', label: 'All', count: counts.all },
+  ];
+
+  return (
+    <nav aria-label="Filter invoices" className="flex flex-wrap gap-2">
+      {tabs.map((t) => {
+        const active = t.id === current;
+        return (
+          <Link
+            key={t.id}
+            href={invoicesHref(propertyId, t.id)}
+            aria-current={active ? 'page' : undefined}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
+              active
+                ? 'bg-brand-teal-500 text-white'
+                : 'bg-white text-gray-600 shadow-card hover:text-brand-teal-500',
+            )}
+          >
+            {t.label}
+            <span
+              className={cn(
+                'rounded-full px-1.5 text-xs font-semibold tabular-nums',
+                active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500',
+              )}
+            >
+              {t.count}
+            </span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function FilteredEmpty({ propertyId, filter }: { propertyId: string; filter: StatusFilter }) {
+  const label = filter === 'paid' ? 'paid' : 'open';
+  return (
+    <div className="shadow-card rounded-2xl bg-white p-8 text-center">
+      <p className="text-sm text-gray-500">
+        No {label} invoices.{' '}
+        <Link href={invoicesHref(propertyId, 'all')} className="text-brand-teal-500 hover:underline">
+          Show all
+        </Link>
+      </p>
     </div>
   );
 }
