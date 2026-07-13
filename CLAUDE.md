@@ -2,6 +2,33 @@
 
 Admin portal for Insight Home Maintenance, a luxury home maintenance and remodel firm serving HNW homeowners in SF Bay Area.
 
+## ⚠️ CRITICAL — There is NO RLS backstop. Every client query MUST filter by clientId.
+
+The app's Drizzle client (`src/db/index.ts`) connects to Supabase through the
+pooler as the `postgres` role, which has **BYPASSRLS**. So every page query and
+every server action runs with row-level security effectively **OFF**. The RLS
+policies defined on the tables are *not enforced for application traffic* —
+treat them as documentation of intent, not as an enforced control.
+
+The app is safe today **only** because every client-facing query explicitly
+filters on `clientId` (and, in the property-scoped portal, `propertyId`). There
+is **no database-level safety net**. A single forgotten `WHERE client_id = …`
+is an instant cross-tenant data leak — one client seeing another's projects,
+invoices, photos, or documents.
+
+**The invariant — non-negotiable for every contributor:**
+
+- Every query that reads client-owned data MUST filter by the caller's
+  `clientId` explicitly, in the query itself. Never rely on RLS to catch a
+  missing filter — it will not.
+- For data that hangs off a property (projects, appointments, documents,
+  reports, photos), derive the id list from an ownership-checked parent
+  (`properties WHERE client_id = :clientId`, or a `propertyId` verified to
+  belong to the client) and constrain every child read to those ids. Follow
+  the existing patterns in `src/app/portal/**/queries.ts`.
+- If you are ever unsure whether a query is scoped, assume it is **not** and
+  add the filter. An extra `WHERE` costs nothing; a leak costs the business.
+
 ## Stack
 
 - Next.js 16+ (App Router), TypeScript strict
@@ -75,7 +102,7 @@ See `src/lib/types.ts` for complete interfaces.
 - Route group: `src/app/field/` — mobile-first, full-bleed, no sidebar, no bottom tabs.
 - Layout: teal header band with logo + sign-out, content area scrolls. iOS safe-area insets via `.safe-area-top` / `.safe-area-bottom` utilities (added to globals.css).
 - Auth: requires `role = 'field_staff'`. Admins are explicitly allowed for testing. Clients get bounced to `/portal`.
-- **Scoping (post-0007):** field staff see only properties / projects / appointments tied to a `project_assignments` row matching their `auth.uid()`. A user with zero assignments lands on a "No projects assigned yet — contact your admin" empty state on `/field/upload`. Admins bypass the scope (testing). Admins manage assignments via the admin project surface (Part 2 of this work — not yet built).
+- **Scoping (post-0007):** field staff see only properties / projects / appointments tied to a `project_assignments` row matching their `auth.uid()`. A user with zero assignments lands on a "No projects assigned yet — contact your admin" empty state on `/field/upload`. Admins bypass the scope (testing). Admins manage assignments via the **Team tab on the admin project detail page** (`src/app/admin/projects/[id]/TeamTabClient.tsx`) — `assignStaffToProject` / `unassignStaffFromProject` in that route's `actions.ts`. (This is built and live; earlier notes calling it "Part 2, not yet built" are stale.)
 - Pages:
   - `/field` — today's schedule, scoped to assignments; big "Upload to any property" CTA; recent uploads strip with status dots (pending = amber, categorized = emerald, rejected = red).
   - `/field/upload` — property + project pickers (assignment-scoped), optional caption, camera/file input with `capture="environment"` (rear camera default on mobile), thumbnail strip, gold upload CTA, GPS prefetch + status row, success card.
@@ -93,10 +120,10 @@ See `src/lib/types.ts` for complete interfaces.
 ## Client portal
 
 - Route group: `src/app/portal/` — separate from admin.
-- Layout: horizontal top nav (`src/components/portal/PortalNav.tsx`), narrower 900px content column. Designed to read like a concierge experience, not a software dashboard.
-- Auth: same Supabase Auth. **No role cookie.** Each layout calls `getCurrentUser()` and redirects on role mismatch — admin layout sends non-admins to `/`, portal layout sends non-clients to `/`. The root `/` page dispatches per role (admin → /admin, client → /portal, field_staff → /login for now).
+- **Property-scoped.** `/portal` is a landing that lists the client's properties; the real surfaces live under `/portal/p/[propertyId]/…` (`dashboard`, `projects`, `projects/[id]`, `appointments`, `documents`, `invoices`, `maintenance`). The per-property layout (`src/app/portal/p/[propertyId]/layout.tsx`) validates the URL's `propertyId` belongs to the signed-in client and renders `PortalSidebar` (`src/components/portal/PortalSidebar.tsx`) — a dark teal column with a **property switcher** (dropdown when the client owns ≥ 2 properties), nav, notifications, and profile menu.
+- Auth: same Supabase Auth. **No role cookie.** Each layout calls `getCurrentUser()` and redirects on role mismatch — admin layout sends non-admins to `/`, portal layout sends non-clients to `/`. The root `/` page dispatches per role (admin → /admin, client → /portal, field_staff → /field).
 - Middleware (`src/lib/supabase/middleware.ts`) only handles auth gating: unauthenticated requests to `/admin/*` or `/portal/*` get redirected to `/login?next=…`. Role-based routing happens in the layouts to avoid an extra DB roundtrip on every request.
-- Queries in `src/app/portal/queries.ts` — every query takes `clientId` and filters explicitly even though RLS already enforces it.
+- Queries in `src/app/portal/**/queries.ts` — every query takes `clientId` (property-scoped pages also take `propertyId`) and filters explicitly. This explicit filter is the ONLY enforcement — RLS is bypassed for app traffic (see the CRITICAL note at the top).
 - Auth callback (`src/app/auth/callback/route.ts`) defaults `next=/`; the root page picks the right per-role destination.
 - Clients see: dashboard, projects (timeline), documents, invoices.
 - Clients do NOT see: admin pages, pending photos, internal milestones, staff/vendor/template/settings.

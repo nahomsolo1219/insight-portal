@@ -6,10 +6,16 @@ import { getCurrentUser } from '@/lib/auth/current-user';
  * Field staff layout. Mobile-first, full-bleed — no sidebar, no bottom
  * tabs, no chrome competing with the photo workflow.
  *
- * Auth: middleware already gates unauthenticated traffic. Here we widen
- * to admins (for testing) and strictly forbid clients — the field
- * surface intentionally exposes other clients' properties as part of the
- * "any field tech can be dispatched anywhere" workflow.
+ * Auth: middleware already gates unauthenticated traffic. Here we only do
+ * role gating — widen to admins (for testing) and strictly forbid clients.
+ *
+ * IMPORTANT: this is role gating ONLY, not data scoping. Field staff do NOT
+ * see every client's properties — every field query is assignment-scoped via
+ * `project_assignments` (matching auth.uid()), so a tech sees only the
+ * properties/projects/appointments they're assigned to (admins bypass the
+ * scope for testing). Do not "simplify" the field queries to drop that
+ * filter — it is the only thing preventing a cross-client data leak on this
+ * surface.
  */
 export default async function FieldLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
