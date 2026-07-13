@@ -66,8 +66,13 @@ export default function ResetPasswordPage() {
     }
     setDone(true);
     // Small delay so the user sees the success state before we redirect.
+    // Route through the root dispatcher (`/`) rather than hardcoding /admin:
+    // the session cookie is already set (invite or recovery both land here
+    // authed), so `/` reads the profile role and sends admins → /admin,
+    // clients → /portal, field_staff → /field. Hardcoding /admin bounced
+    // invited clients straight back out via the admin guard.
     setTimeout(() => {
-      router.replace('/admin');
+      router.replace('/');
       router.refresh();
     }, 1200);
   }
@@ -81,7 +86,7 @@ export default function ResetPasswordPage() {
           </h1>
           <p className="text-sm text-gray-500">
             {done
-              ? 'Redirecting you to the dashboard…'
+              ? 'Signing you in…'
               : 'Choose a password you can remember. This becomes your sign-in credential.'}
           </p>
         </div>
