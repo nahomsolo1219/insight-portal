@@ -6,6 +6,7 @@ import { db } from '@/db';
 import { companySettings, emailTemplates, membershipTiers } from '@/db/schema';
 import { logAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/auth/current-user';
+import { getSiteUrl } from '@/lib/site-url';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { BUCKET_NAME } from '@/lib/storage/paths';
 
@@ -229,7 +230,7 @@ export async function sendTestEmail(templateId: string): Promise<ActionResult> {
     // Override a few for readability.
     vars.client_name = 'Test Client';
     vars.firm_name = 'Insight Home Maintenance';
-    vars.cta_url = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    vars.cta_url = getSiteUrl();
 
     const { sendEmail } = await import('@/lib/email/send');
     const result = await sendEmail({

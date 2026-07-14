@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { emailLog, emailTemplates } from '@/db/schema';
 import { getCompanySettings } from '@/lib/company/queries';
+import { getSiteUrl } from '@/lib/site-url';
 import { renderTemplate } from './render';
 import { sendViaResend } from './resend';
 import type { SendEmailInput, SendEmailResult } from './types';
@@ -64,7 +65,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     // brand's light logo. This matters: the email header is teal (#1B4F5A),
     // and the "Logo-Dark" artwork is near-black (#062626) — it would be
     // invisible on the header. Do NOT swap in the dark logo here.
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const siteUrl = getSiteUrl();
     const logoUrl = isAbsoluteUrl(company.logoLightUrl)
       ? company.logoLightUrl
       : `${siteUrl}/logo-email.png`;

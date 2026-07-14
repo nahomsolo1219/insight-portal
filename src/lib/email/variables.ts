@@ -16,9 +16,10 @@ import {
   properties,
   staff,
 } from '@/db/schema';
+import { getSiteUrl } from '@/lib/site-url';
 import { formatCurrency } from '@/lib/utils';
 
-const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+const siteUrl = getSiteUrl;
 
 async function getClientName(clientId: string): Promise<string> {
   const [row] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, clientId)).limit(1);

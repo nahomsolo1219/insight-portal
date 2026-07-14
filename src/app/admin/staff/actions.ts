@@ -10,6 +10,7 @@ import { buildAuthConfirmUrl } from '@/lib/auth/email-links';
 import { sendEmail } from '@/lib/email/send';
 import type { SendEmailResult } from '@/lib/email/types';
 import { getWelcomeEmailVars } from '@/lib/email/variables';
+import { getSiteUrl } from '@/lib/site-url';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 type ActionResult<T = undefined> =
@@ -101,7 +102,7 @@ export async function inviteUser(params: InviteUserParams): Promise<InviteUserRe
   // Invitees land on the password-setup page so their first action is choosing
   // a credential; after that they can use email+password. The reset-password
   // page routes them by role once the password is set (don't regress that).
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+  const siteUrl = getSiteUrl();
   const redirectTo = `${siteUrl}/auth/callback?next=/auth/reset-password`;
 
   // Create the user + get the link WITHOUT sending Supabase's own email.

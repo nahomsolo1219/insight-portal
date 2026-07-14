@@ -5,6 +5,7 @@ import { emailLog } from '@/db/schema';
 import { buildAuthConfirmUrl } from '@/lib/auth/email-links';
 import { sendEmail } from '@/lib/email/send';
 import type { EmailTemplateKey } from '@/lib/email/types';
+import { getSiteUrl } from '@/lib/site-url';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 // Public login-page auth-email actions. These take over the recovery and
@@ -26,7 +27,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 // sendEmail. Never `return { ok: true }` on a failure without logging first.
 
 function siteUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+  return getSiteUrl();
 }
 
 /** Human-readable one-liner from a Supabase AuthError (or anything). Captures
