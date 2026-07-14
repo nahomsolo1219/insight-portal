@@ -24,10 +24,14 @@ const dmSerif = DM_Serif_Display({
   display: 'swap',
 });
 
+// Neutral default title — this covers the public / auth surfaces (login,
+// password-set, the `/` role dispatcher). Each route group overrides it with
+// its own audience-appropriate title via `metadata` in its layout, so a
+// logged-in client no longer sees "Admin Portal" in their tab.
 export const metadata: Metadata = {
-  title: 'Insight HM — Admin Portal',
+  title: 'Insight HM',
   description:
-    'Internal operations hub for Insight Home Maintenance — luxury home maintenance and remodel.',
+    'Insight Home Maintenance — luxury home maintenance and remodel for SF Bay Area homeowners.',
 };
 
 export default function RootLayout({

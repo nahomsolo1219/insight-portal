@@ -1,6 +1,11 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { ToastProvider } from '@/components/admin/ToastProvider';
 import { getCurrentUser } from '@/lib/auth/current-user';
+
+export const metadata: Metadata = {
+  title: 'Insight HM — Client Portal',
+};
 
 /**
  * Outer portal layout. Two responsibilities and nothing else:

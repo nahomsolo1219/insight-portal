@@ -1,6 +1,11 @@
 import { LogOut } from 'lucide-react';
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth/current-user';
+
+export const metadata: Metadata = {
+  title: 'Insight HM — Field',
+};
 
 /**
  * Field staff layout. Mobile-first, full-bleed — no sidebar, no bottom

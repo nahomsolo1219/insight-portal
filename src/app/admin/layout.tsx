@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { AdminHeader } from '@/components/admin/AdminHeader';
@@ -13,6 +14,10 @@ import { getCompanySettings } from '@/lib/company/queries';
 import { getAvatarPublicUrl } from '@/lib/storage/upload';
 import { getActiveClientsForProjectPicker } from './queries';
 import { getClientFormOptions } from './clients/queries';
+
+export const metadata: Metadata = {
+  title: 'Insight HM — Admin Portal',
+};
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   // Belt-and-suspenders: middleware already redirects unauthenticated users,

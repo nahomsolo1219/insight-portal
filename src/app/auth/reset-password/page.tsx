@@ -3,6 +3,7 @@
 import { CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { BrandLockup } from '@/components/BrandLockup';
 import { createClient } from '@/lib/supabase/client';
 
 // Landing page for:
@@ -81,6 +82,7 @@ export default function ResetPasswordPage() {
     <div className="bg-brand-warm-100 flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
+          <BrandLockup />
           <h1 className="font-display text-brand-teal-500 mb-2 text-3xl">
             {done ? 'Password updated' : 'Set a new password'}
           </h1>
