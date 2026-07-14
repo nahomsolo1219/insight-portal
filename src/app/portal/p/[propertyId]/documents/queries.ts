@@ -5,7 +5,7 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/db';
 import { documents, projects, properties, reports, vendors } from '@/db/schema';
-import { getSignedUrls } from '@/lib/storage/upload';
+import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 
 export interface PortalPropertyRow {
   id: string;
@@ -125,13 +125,21 @@ export async function getClientDocuments(
   ]);
 
   // One batched signed-URL call across docs + reports — saves a round-trip
-  // per file. getSignedUrls dedupes nothing, but the path lists don't
-  // overlap (different bucket prefixes), so a flat concat is fine.
+  // per file. Signed with the SERVICE-ROLE signer, not the cookie-bound one:
+  // the cookie-bound @supabase/ssr storage client does not reliably carry the
+  // client's JWT to the storage REST request, so the "Clients read own files"
+  // RLS policy denies the sign and every file renders "Unavailable" even
+  // though the policy WOULD allow it (admin forked onto service-role for the
+  // same reason). Safe here because ownership is already enforced in SQL: the
+  // property is confirmed to belong to `clientId` above, documents are scoped
+  // to that property's projects, and reports to that property — so every path
+  // handed to the signer is provably this client's own file.
   const allPaths = [
     ...docRows.map((d) => d.storagePath),
     ...reportRows.map((r) => r.storagePath),
   ];
-  const urlByPath = allPaths.length > 0 ? await getSignedUrls(allPaths) : new Map<string, string>();
+  const urlByPath =
+    allPaths.length > 0 ? await getSignedUrlsAdmin(allPaths) : new Map<string, string>();
 
   const docs: PortalDocumentRow[] = docRows.map((d) => {
     const project = projectById.get(d.projectId);

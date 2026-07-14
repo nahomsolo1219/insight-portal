@@ -4,7 +4,7 @@
 import { and, count, desc, eq, isNull, or, type SQL, sum } from 'drizzle-orm';
 import { db } from '@/db';
 import { invoices, projects, properties } from '@/db/schema';
-import { getSignedUrls } from '@/lib/storage/upload';
+import { getSignedUrlsAdmin } from '@/lib/storage/upload';
 
 export type InvoiceStatus = 'paid' | 'unpaid' | 'partial';
 
@@ -86,10 +86,18 @@ export async function getClientInvoices(
 
   if (rows.length === 0) return [];
 
-  // One batched signed-URL call rather than N round-trips. Empty paths
-  // (shouldn't happen in practice, but defensive) are filtered out.
+  // Sign with the SERVICE-ROLE signer, not the cookie-bound one. The
+  // cookie-bound @supabase/ssr storage client does not reliably carry the
+  // client's JWT to the storage REST request, so `current_user_role()` reads
+  // as null and the "Clients read own files" RLS policy denies the sign — the
+  // file comes back "Unavailable" even though the policy WOULD allow it. Admin
+  // surfaces already forked onto the service-role signer for this exact reason
+  // (see getSignedUrlsAdmin in @/lib/storage/upload). This is safe here because
+  // ownership is already enforced in SQL above: `propertyBelongsToClient` gates
+  // the read and every row is filtered by `invoices.clientId = clientId`, so
+  // every path handed to the signer is provably this client's own file.
   const paths = rows.map((r) => r.storagePath).filter(Boolean);
-  const urlByPath = paths.length > 0 ? await getSignedUrls(paths) : new Map<string, string>();
+  const urlByPath = paths.length > 0 ? await getSignedUrlsAdmin(paths) : new Map<string, string>();
 
   return rows.map((r) => ({
     id: r.id,
