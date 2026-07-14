@@ -6,6 +6,7 @@
 
 import 'server-only';
 
+import { cache } from 'react';
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { profiles } from '@/db/schema';
@@ -35,8 +36,14 @@ export interface CurrentUser {
  * Returns the currently-authenticated user's profile, or null if nobody is
  * signed in. Throws if the auth session exists but the profile row is missing
  * (which would indicate the signup trigger failed).
+ *
+ * Wrapped in React `cache()` so it runs at most once per server request even
+ * though both the layout and the page (via `requireAdmin`/`requireUser`) call
+ * it — the memo dedupes the `auth.getUser()` round-trip and the profiles read
+ * within a single render pass. Server Actions are a separate request, so they
+ * still get a fresh lookup.
  */
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -63,7 +70,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     phone: profile.phone,
     updatedAt: profile.updatedAt,
   };
-}
+});
 
 /**
  * Like getCurrentUser but throws if nobody is signed in. Use at the top of
