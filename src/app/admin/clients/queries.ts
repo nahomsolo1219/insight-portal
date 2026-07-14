@@ -34,7 +34,11 @@ export interface ClientRow {
 }
 
 export async function listClients(): Promise<ClientRow[]> {
-  // Base rows, joined with tier + PM
+  // Base rows, joined with tier + PM. This query must run first because it
+  // produces the clientId list every aggregate below is scoped to. The
+  // LIMIT is a safety bound, not a feature: this is a luxury book of ~50
+  // clients, so 500 is ~10x headroom and never trims real data — it just
+  // stops a runaway table read from ever fanning the whole page out.
   const rows = await db
     .select({
       id: clients.id,
@@ -50,22 +54,67 @@ export async function listClients(): Promise<ClientRow[]> {
     .from(clients)
     .leftJoin(membershipTiers, eq(membershipTiers.id, clients.membershipTierId))
     .leftJoin(staff, eq(staff.id, clients.assignedPmId))
-    .orderBy(clients.name);
+    .orderBy(clients.name)
+    .limit(500);
 
   if (rows.length === 0) return [];
 
   const clientIds = rows.map((r) => r.id);
+  const avatarPaths = rows
+    .map((r) => r.avatarStoragePath)
+    .filter((p): p is string => Boolean(p));
 
-  // Property count + an arbitrary-but-stable "first" address per client.
-  const propertyAggregates = await db
-    .select({
-      clientId: properties.clientId,
-      count: count(),
-      firstAddress: sql<string>`min(${properties.address})`,
-    })
-    .from(properties)
-    .where(inArray(properties.clientId, clientIds))
-    .groupBy(properties.clientId);
+  // The four aggregates and the avatar-signing call are independent once we
+  // hold `clientIds` / `avatarPaths`, so fan them out in one wave instead of
+  // five serial round-trips (this used to await each in sequence).
+  const [propertyAggregates, projectAggregates, balanceAggregates, invitedRows, avatarUrls] =
+    await Promise.all([
+      // Property count + an arbitrary-but-stable "first" address per client.
+      db
+        .select({
+          clientId: properties.clientId,
+          count: count(),
+          firstAddress: sql<string>`min(${properties.address})`,
+        })
+        .from(properties)
+        .where(inArray(properties.clientId, clientIds))
+        .groupBy(properties.clientId),
+      // Active project counts. Projects live on properties, so we join through.
+      db
+        .select({
+          clientId: properties.clientId,
+          activeCount: count(),
+        })
+        .from(projects)
+        .innerJoin(properties, eq(properties.id, projects.propertyId))
+        .where(and(eq(projects.status, 'active'), inArray(properties.clientId, clientIds)))
+        .groupBy(properties.clientId),
+      // Outstanding balance: unpaid + partial invoice totals per client.
+      db
+        .select({
+          clientId: invoices.clientId,
+          balanceCents: sum(invoices.amountCents).mapWith(Number),
+        })
+        .from(invoices)
+        .where(
+          and(
+            inArray(invoices.clientId, clientIds),
+            inArray(invoices.status, ['unpaid', 'partial']),
+          ),
+        )
+        .groupBy(invoices.clientId),
+      // Portal-invite status: a client is "invited" once a role=client
+      // profile is linked to it. Same detection as `getClientPortalStatus`
+      // on the detail page, batched across the whole list.
+      db
+        .select({ clientId: profiles.clientId })
+        .from(profiles)
+        .where(and(eq(profiles.role, 'client'), inArray(profiles.clientId, clientIds))),
+      // Sign every avatar in one batch — saves a round-trip per row.
+      avatarPaths.length > 0
+        ? getSignedUrlsAdmin(avatarPaths)
+        : Promise.resolve(new Map<string, string>()),
+    ]);
 
   const propertyMap = new Map(
     propertyAggregates.map((p) => [
@@ -74,51 +123,13 @@ export async function listClients(): Promise<ClientRow[]> {
     ]),
   );
 
-  // Active project counts. Projects live on properties, so we join through.
-  const projectAggregates = await db
-    .select({
-      clientId: properties.clientId,
-      activeCount: count(),
-    })
-    .from(projects)
-    .innerJoin(properties, eq(properties.id, projects.propertyId))
-    .where(and(eq(projects.status, 'active'), inArray(properties.clientId, clientIds)))
-    .groupBy(properties.clientId);
-
   const projectMap = new Map(projectAggregates.map((p) => [p.clientId, Number(p.activeCount)]));
 
-  // Outstanding balance: unpaid + partial invoice totals per client.
-  const balanceAggregates = await db
-    .select({
-      clientId: invoices.clientId,
-      balanceCents: sum(invoices.amountCents).mapWith(Number),
-    })
-    .from(invoices)
-    .where(
-      and(inArray(invoices.clientId, clientIds), inArray(invoices.status, ['unpaid', 'partial'])),
-    )
-    .groupBy(invoices.clientId);
-
   const balanceMap = new Map(balanceAggregates.map((b) => [b.clientId, b.balanceCents ?? 0]));
-
-  // Portal-invite status: a client is "invited" once a role=client profile
-  // is linked to it. Same detection as `getClientPortalStatus` on the detail
-  // page, but batched across the whole list in one round-trip.
-  const invitedRows = await db
-    .select({ clientId: profiles.clientId })
-    .from(profiles)
-    .where(and(eq(profiles.role, 'client'), inArray(profiles.clientId, clientIds)));
 
   const invitedSet = new Set(
     invitedRows.map((r) => r.clientId).filter((id): id is string => Boolean(id)),
   );
-
-  // Sign every avatar in one batch — saves a round-trip per row.
-  const avatarPaths = rows
-    .map((r) => r.avatarStoragePath)
-    .filter((p): p is string => Boolean(p));
-  const avatarUrls =
-    avatarPaths.length > 0 ? await getSignedUrlsAdmin(avatarPaths) : new Map<string, string>();
 
   return rows.map((r) => ({
     id: r.id,

@@ -27,10 +27,11 @@ export default async function ClientsPage({ searchParams }: PageProps) {
 
   const allClients = await listClients();
 
-  // Filter + sort happen in-memory because listClients already returns the
-  // full denormalised set in one round-trip; ~50 rows max per the query
-  // module's note. Server-side filter/sort keeps the server-component
-  // reload model honest and means the URL is the single source of truth.
+  // Filter + sort happen in-memory because listClients returns the full
+  // denormalised set (a base query plus one parallel wave of aggregates);
+  // ~50 rows max per the query module's note. Server-side filter/sort keeps
+  // the server-component reload model honest and means the URL is the single
+  // source of truth.
   const filtered =
     filter === 'all'
       ? allClients
