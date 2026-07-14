@@ -129,6 +129,8 @@ export async function archiveClient(clientId: string): Promise<ActionResult> {
     });
 
     revalidatePath('/admin/clients');
+    revalidatePath(`/admin/clients/${clientId}`); // detail shows the status badge
+    revalidatePath('/admin'); // dashboard active-client count
     return { success: true };
   } catch (error) {
     console.error('[archiveClient]', error);

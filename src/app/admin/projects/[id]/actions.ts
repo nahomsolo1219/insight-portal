@@ -146,6 +146,8 @@ export async function updateProject(
 
     revalidatePath(`/admin/projects/${projectId}`);
     revalidatePath(`/admin/clients/${owner.clientId}`);
+    revalidatePath('/admin/clients'); // list activeProjectCount moves on status change
+    revalidatePath('/admin'); // dashboard active-project count
     return { success: true };
   } catch (error) {
     console.error('[updateProject]', error);
@@ -179,6 +181,8 @@ export async function deleteProject(
     });
 
     revalidatePath(`/admin/clients/${owner.clientId}`);
+    revalidatePath('/admin/clients'); // list shows per-client activeProjectCount
+    revalidatePath('/admin'); // dashboard active-project count
     return { success: true };
   } catch (error) {
     console.error('[deleteProject]', error);

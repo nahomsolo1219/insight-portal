@@ -249,6 +249,7 @@ export async function updateProperty(
     });
 
     revalidatePath(`/admin/clients/${clientId}`);
+    revalidatePath('/admin/clients'); // list subtitle shows the first address
     revalidatePath('/admin');
     return { success: true };
   } catch (error) {
@@ -333,6 +334,7 @@ export async function createProperty(
     });
 
     revalidatePath(`/admin/clients/${clientId}`);
+    revalidatePath('/admin/clients'); // list shows per-client propertyCount
     revalidatePath('/admin');
     return { success: true, data: { id: property.id } };
   } catch (error) {
@@ -409,6 +411,7 @@ export async function deleteProperty(
     });
 
     revalidatePath(`/admin/clients/${clientId}`);
+    revalidatePath('/admin/clients'); // list shows per-client propertyCount
     revalidatePath('/admin');
     return { success: true };
   } catch (error) {
@@ -514,6 +517,7 @@ export async function createProject(
     });
 
     revalidatePath(`/admin/clients/${clientId}`);
+    revalidatePath('/admin/clients'); // list shows per-client activeProjectCount
     revalidatePath('/admin');
     return { success: true, data: { id: project.id } };
   } catch (error) {

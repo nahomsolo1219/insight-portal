@@ -105,12 +105,13 @@ export function AddPropertyButton({ clientId, variant = 'inline' }: Props) {
       showToast('Property added');
       close();
       // Navigate to the new property so subsequent tabs (Projects,
-      // Documents, etc.) immediately scope to it.
+      // Documents, etc.) immediately scope to it, then refresh: pushing to the
+      // same route otherwise serves the cached RSC and the new property
+      // wouldn't appear until a manual reload. Matches NewProjectButton.
       if (result.data?.id) {
         router.push(`/admin/clients/${clientId}?property=${result.data.id}`);
-      } else {
-        router.refresh();
       }
+      router.refresh();
     });
   }
 
