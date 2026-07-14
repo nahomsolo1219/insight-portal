@@ -58,56 +58,5 @@ attachDatabasePool(pool);
 
 export const db = drizzle(pool, { schema });
 
-/** Thrown by `withDbTimeout` when a DB operation blows its wall-clock budget —
- *  in practice, a stale pooled socket left dead by a Fluid freeze. */
-export class DbTimeoutError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'DbTimeoutError';
-  }
-}
-
-/**
- * Race a DB operation against a wall-clock timeout so a stale pooled socket
- * fails in seconds instead of hanging to Vercel's 300s limit (→ 504). postgres.js
- * has no per-query timeout, and a half-open TCP socket gives no error, so this
- * client-side timer is the only thing that can turn the hang into a failure.
- *
- * `run` is a THUNK, not a promise, so each retry issues a genuinely new query.
- * A timed-out attempt leaves its connection marked busy inside postgres.js (the
- * abandoned query never settled), so the pool will NOT hand that same socket to
- * the retry — with pool headroom (max > 1) the retry lands on a different idle
- * connection or a fresh TCP one. `retries: 2` means up to three attempts, so
- * even if a first retry hits a second stale-idle socket (a busy instance that
- * froze with several open connections), the next attempt converges onto a fresh
- * connection. Abandoned dead sockets are reclaimed by postgres.js once TCP
- * keepalive / connect_timeout marks them dead (~a minute), which the max:5
- * headroom absorbs in the meantime.
- */
-export async function withDbTimeout<T>(
-  run: () => Promise<T>,
-  { ms = 5000, retries = 2, label = 'query' }: { ms?: number; retries?: number; label?: string } = {},
-): Promise<T> {
-  for (let attempt = 0; ; attempt++) {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      return await Promise.race([
-        run(),
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(
-            () => reject(new DbTimeoutError(`DB "${label}" exceeded ${ms}ms (attempt ${attempt + 1})`)),
-            ms,
-          );
-        }),
-      ]);
-    } catch (err) {
-      if (err instanceof DbTimeoutError && attempt < retries) continue;
-      throw err;
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
-  }
-}
-
 // Re-export schema so call sites can do `import { db, profiles } from '@/db'`.
 export * from './schema';

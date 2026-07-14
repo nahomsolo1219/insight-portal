@@ -8,7 +8,6 @@ import {
   getUnreadNotificationCount,
   listMyNotifications,
 } from '@/app/notifications/queries';
-import { withDbTimeout } from '@/db';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { getCompanySettings } from '@/lib/company/queries';
 import { getAvatarPublicUrl } from '@/lib/storage/upload';
@@ -33,27 +32,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // out in the Session 7 follow-up (the dashboard's "Needs attention"
   // surface is the source of truth for "what needs your action
   // today" — the sidebar is purely navigational now).
-  // Guarded with withDbTimeout: this fan-out runs on every admin page load and
-  // includes the `staff` read (getClientFormOptions) that keeps showing up
-  // stranded in ClientRead after a Fluid freeze. A dead pooled socket here
-  // fails fast + retries onto a fresh connection instead of 504ing at 300s.
   const [
     formOptions,
     projectPickerClients,
     notifications,
     unreadNotificationCount,
     companySettings,
-  ] = await withDbTimeout(
-    () =>
-      Promise.all([
-        getClientFormOptions(),
-        getActiveClientsForProjectPicker(),
-        listMyNotifications(user.id),
-        getUnreadNotificationCount(user.id),
-        getCompanySettings(),
-      ]),
-    { label: 'admin-chrome' },
-  );
+  ] = await Promise.all([
+    getClientFormOptions(),
+    getActiveClientsForProjectPicker(),
+    listMyNotifications(user.id),
+    getUnreadNotificationCount(user.id),
+    getCompanySettings(),
+  ]);
 
   // The avatarUrl on `user` is a storage *path*, not a public URL —
   // compose the URL once here so the header + sidebar can render the
