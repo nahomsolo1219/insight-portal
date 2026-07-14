@@ -8,7 +8,7 @@ import 'server-only';
 
 import { cache } from 'react';
 import { eq } from 'drizzle-orm';
-import { db } from '@/db';
+import { db, withDbTimeout } from '@/db';
 import { profiles } from '@/db/schema';
 import { createClient } from '@/lib/supabase/server';
 
@@ -44,32 +44,42 @@ export interface CurrentUser {
  * still get a fresh lookup.
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // This is the first (and often only) pooled query on essentially every
+  // route — the admin/portal layouts and requireAdmin/requireUser all funnel
+  // through it — so it is where a stale-after-freeze socket bites first.
+  // Guard it with a wall-clock timeout so a dead connection fails fast and
+  // the retry lands on a fresh one instead of hanging to Vercel's 300s limit.
+  return withDbTimeout(
+    async () => {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-  if (!user) return null;
+      if (!user) return null;
 
-  const [profile] = await db.select().from(profiles).where(eq(profiles.id, user.id)).limit(1);
+      const [profile] = await db.select().from(profiles).where(eq(profiles.id, user.id)).limit(1);
 
-  if (!profile) {
-    throw new Error(
-      `No profile row for authenticated user ${user.id}. The signup trigger may have failed.`,
-    );
-  }
+      if (!profile) {
+        throw new Error(
+          `No profile row for authenticated user ${user.id}. The signup trigger may have failed.`,
+        );
+      }
 
-  return {
-    id: profile.id,
-    email: profile.email,
-    fullName: profile.fullName,
-    role: profile.role,
-    clientId: profile.clientId,
-    staffId: profile.staffId,
-    avatarUrl: profile.avatarUrl,
-    phone: profile.phone,
-    updatedAt: profile.updatedAt,
-  };
+      return {
+        id: profile.id,
+        email: profile.email,
+        fullName: profile.fullName,
+        role: profile.role,
+        clientId: profile.clientId,
+        staffId: profile.staffId,
+        avatarUrl: profile.avatarUrl,
+        phone: profile.phone,
+        updatedAt: profile.updatedAt,
+      };
+    },
+    { label: 'getCurrentUser' },
+  );
 });
 
 /**

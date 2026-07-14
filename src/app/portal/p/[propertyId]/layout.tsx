@@ -5,7 +5,7 @@ import {
   listMyNotifications,
 } from '@/app/notifications/queries';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
-import { db } from '@/db';
+import { db, withDbTimeout } from '@/db';
 import { clients, properties } from '@/db/schema';
 import { requireUser } from '@/lib/auth/current-user';
 import { getCompanySettings } from '@/lib/company/queries';
@@ -48,37 +48,44 @@ export default async function PortalPropertyLayout({ children, params }: Props) 
   // pair drives the bell badge + dropdown panel (real data as of
   // Session 7 — replaces the prior pending-decision proxy); the
   // client row hydrates the sidebar profile chip.
+  // Guarded with withDbTimeout for the same reason as the admin chrome: this
+  // per-request fan-out is where a stale-after-freeze pooled socket would
+  // otherwise hang the whole portal page to Vercel's 300s limit.
   const [clientRow, propertyRows, notifications, unreadNotificationCount, companySettings] =
-    await Promise.all([
-      db
-        .select({
-          id: clients.id,
-          name: clients.name,
-          email: clients.email,
-          phone: clients.phone,
-          avatarStoragePath: clients.avatarStoragePath,
-        })
-        .from(clients)
-        .where(eq(clients.id, user.clientId))
-        .limit(1)
-        .then((rows) => rows[0] ?? null),
-      db
-        .select({
-          id: properties.id,
-          name: properties.name,
-          region: properties.region,
-          city: properties.city,
-          state: properties.state,
-          coverPhotoUrl: properties.coverPhotoUrl,
-          coverPhotoUploadedAt: properties.coverPhotoUploadedAt,
-        })
-        .from(properties)
-        .where(eq(properties.clientId, user.clientId))
-        .orderBy(asc(properties.name)),
-      listMyNotifications(user.id),
-      getUnreadNotificationCount(user.id),
-      getCompanySettings(),
-    ]);
+    await withDbTimeout(
+      () =>
+        Promise.all([
+          db
+            .select({
+              id: clients.id,
+              name: clients.name,
+              email: clients.email,
+              phone: clients.phone,
+              avatarStoragePath: clients.avatarStoragePath,
+            })
+            .from(clients)
+            .where(eq(clients.id, user.clientId!))
+            .limit(1)
+            .then((rows) => rows[0] ?? null),
+          db
+            .select({
+              id: properties.id,
+              name: properties.name,
+              region: properties.region,
+              city: properties.city,
+              state: properties.state,
+              coverPhotoUrl: properties.coverPhotoUrl,
+              coverPhotoUploadedAt: properties.coverPhotoUploadedAt,
+            })
+            .from(properties)
+            .where(eq(properties.clientId, user.clientId!))
+            .orderBy(asc(properties.name)),
+          listMyNotifications(user.id),
+          getUnreadNotificationCount(user.id),
+          getCompanySettings(),
+        ]),
+      { label: 'portal-chrome' },
+    );
 
   const avatarUrl = clientRow?.avatarStoragePath
     ? await getSignedUrl(clientRow.avatarStoragePath)
