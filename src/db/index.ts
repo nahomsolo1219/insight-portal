@@ -17,15 +17,29 @@ const connectionString = process.env.DATABASE_URL!;
 // Vercel's 300s function limit → 504. This is what `wait_event = ClientRead`
 // for minutes actually is: an idle connection stranded by a suspended client.
 //
-//   max: 3            — a SMALL pool, but > 1 on purpose. The bug got worse
-//                       under max:1 because a single stale socket blocked
-//                       every request on the instance; with a spare, a dead
-//                       connection has a live bystander to route around.
-//   idle_timeout: 20  — harmless, and reaps connections when the instance is
-//                       actually running; it CANNOT fire mid-freeze, so it is
-//                       not what protects us here.
-//   max_lifetime: 600 — recycle connections every ~10 min for hygiene (same
-//                       timer caveat — not the load-bearing guard).
+//   max: 5            — headroom is the point. `withDbTimeout`'s retry can only
+//                       escape a poisoned socket if the pool can hand it a
+//                       DIFFERENT connection: when an attempt times out,
+//                       postgres.js still holds that connection busy (the
+//                       abandoned query never settled), so with max > 1 the
+//                       retry checks out another idle connection or opens a
+//                       fresh TCP one. Under max:1 there is no spare — the
+//                       retry queues on the same busy-dead socket and also
+//                       times out (the 10.9s = 5s + 5s + throw signature). 5
+//                       covers Fluid's per-instance request concurrency plus
+//                       that retry headroom. It does NOT reintroduce hoarding:
+//                       Supavisor multiplexes centrally, so 5 sockets/instance
+//                       is trivial for the pooler (the DB is healthy at ~450
+//                       req/hr) — the original "exhaustion" read was itself a
+//                       misdiagnosis of these stale ClientRead connections.
+//   idle_timeout: 20  — reaps connections when the instance is actually
+//                       running; CANNOT fire mid-freeze, so it is not what
+//                       protects us here.
+//   max_lifetime: 300 — recycle every 5 min so a connection can't persist
+//                       indefinitely and accumulate freeze exposure. Bounds
+//                       staleness *between* freezes (the timer can't fire
+//                       *during* one); short enough to refresh sockets often,
+//                       long enough to avoid churn at this traffic level.
 //   connect_timeout: 10 — fail fast if the pooler can't hand out a socket.
 //
 // The load-bearing guard is `withDbTimeout` below (an app-side timeout +
@@ -34,9 +48,9 @@ const connectionString = process.env.DATABASE_URL!;
 // statement_timeout can help.
 const client = postgres(connectionString, {
   prepare: false,
-  max: 3,
+  max: 5,
   idle_timeout: 20,
-  max_lifetime: 60 * 10,
+  max_lifetime: 60 * 5,
   connect_timeout: 10,
 });
 
@@ -57,15 +71,20 @@ export class DbTimeoutError extends Error {
  * has no per-query timeout, and a half-open TCP socket gives no error, so this
  * client-side timer is the only thing that can turn the hang into a failure.
  *
- * `run` is a THUNK, not a promise, so the retry issues a genuinely new query:
- * with `max > 1` that retry checks out a *different* pooled connection, so a
- * single dead socket self-heals within one request. The abandoned first
- * attempt is left for postgres.js to reap once connect_timeout/keepalive marks
- * its socket dead.
+ * `run` is a THUNK, not a promise, so each retry issues a genuinely new query.
+ * A timed-out attempt leaves its connection marked busy inside postgres.js (the
+ * abandoned query never settled), so the pool will NOT hand that same socket to
+ * the retry — with pool headroom (max > 1) the retry lands on a different idle
+ * connection or a fresh TCP one. `retries: 2` means up to three attempts, so
+ * even if a first retry hits a second stale-idle socket (a busy instance that
+ * froze with several open connections), the next attempt converges onto a fresh
+ * connection. Abandoned dead sockets are reclaimed by postgres.js once TCP
+ * keepalive / connect_timeout marks them dead (~a minute), which the max:5
+ * headroom absorbs in the meantime.
  */
 export async function withDbTimeout<T>(
   run: () => Promise<T>,
-  { ms = 5000, retries = 1, label = 'query' }: { ms?: number; retries?: number; label?: string } = {},
+  { ms = 5000, retries = 2, label = 'query' }: { ms?: number; retries?: number; label?: string } = {},
 ): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     let timer: ReturnType<typeof setTimeout> | undefined;
