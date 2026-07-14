@@ -160,7 +160,12 @@ export const clients = pgTable('clients', {
    *  live on `profiles.avatarUrl` (legacy column name; also a path). */
   avatarStoragePath: text('avatar_storage_path'),
   ...timestamps,
-});
+}, (table) => ({
+  // The clients-list page filters on status and joins tier + PM per row.
+  statusIdx: index('clients_status_idx').on(table.status),
+  assignedPmIdx: index('clients_assigned_pm_id_idx').on(table.assignedPmId),
+  membershipTierIdx: index('clients_membership_tier_id_idx').on(table.membershipTierId),
+}));
 
 // profiles — links a Supabase auth.users row to its role and (for clients/staff)
 // to the corresponding domain row.
@@ -176,7 +181,12 @@ export const profiles = pgTable('profiles', {
   clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
   staffId: uuid('staff_id').references(() => staff.id, { onDelete: 'set null' }),
   ...timestamps,
-});
+}, (table) => ({
+  // The clients-list "invited" column filters profiles by role + client_id;
+  // both were unindexed, forcing a full-table scan per list render.
+  clientIdIdx: index('profiles_client_id_idx').on(table.clientId),
+  roleIdx: index('profiles_role_idx').on(table.role),
+}));
 
 // properties
 export const properties = pgTable('properties', {
@@ -219,7 +229,10 @@ export const properties = pgTable('properties', {
     onDelete: 'set null',
   }),
   ...timestamps,
-});
+}, (table) => ({
+  // Every client-scoped read derives its property/project id list from here.
+  clientIdIdx: index('properties_client_id_idx').on(table.clientId),
+}));
 
 // vendors
 export const vendors = pgTable('vendors', {
@@ -355,7 +368,12 @@ export const projects = pgTable('projects', {
   changesCents: integer('changes_cents').notNull().default(0),
   paidCents: integer('paid_cents').notNull().default(0),
   ...timestamps,
-});
+}, (table) => ({
+  // Projects are joined through property_id and filtered by status
+  // (active) on the dashboard and clients list.
+  propertyIdIdx: index('projects_property_id_idx').on(table.propertyId),
+  statusIdx: index('projects_status_idx').on(table.status),
+}));
 
 // project_assignments — many-to-many between projects and field-staff
 // users (profiles.id == auth.users.id). Drives what each technician can
@@ -427,7 +445,12 @@ export const appointments = pgTable('appointments', {
   scopeOfWork: text('scope_of_work'),
   assignedPmId: uuid('assigned_pm_id').references(() => staff.id, { onDelete: 'set null' }),
   ...timestamps,
-});
+}, (table) => ({
+  // Property-scoped visit windows filter by property_id + date + status.
+  propertyIdIdx: index('appointments_property_id_idx').on(table.propertyId),
+  dateIdx: index('appointments_date_idx').on(table.date),
+  statusIdx: index('appointments_status_idx').on(table.status),
+}));
 
 // ---------- Maintenance plans (new in 0012) ----------
 //
@@ -643,7 +666,11 @@ export const invoices = pgTable('invoices', {
   status: invoiceStatusEnum('status').notNull().default('unpaid'),
   storagePath: text('storage_path').notNull(),
   ...timestamps,
-});
+}, (table) => ({
+  // Outstanding-balance and revenue rollups filter by client_id + status.
+  clientIdIdx: index('invoices_client_id_idx').on(table.clientId),
+  statusIdx: index('invoices_status_idx').on(table.status),
+}));
 
 // weekly_updates
 export const weeklyUpdates = pgTable('weekly_updates', {
