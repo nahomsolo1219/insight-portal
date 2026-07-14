@@ -1,60 +1,62 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+import { attachDatabasePool } from '@vercel/functions';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import * as schema from './schema';
 
 const connectionString = process.env.DATABASE_URL!;
 
-// Supabase connection pooling (PgBouncer/Supavisor in transaction mode) does
-// not support prepared statements, so prepare:false is required.
+// node-postgres (pg) pool against the Supabase TRANSACTION pooler (port 6543).
 //
-// Pool sizing for a *freezing* serverless runtime (Vercel Fluid). The failure
-// mode this config defends against is NOT connection-count exhaustion — it's
-// stale sockets. When Fluid suspends a warm instance, the JS event loop stops,
-// so idle_timeout / max_lifetime timers never fire and the pooled TCP socket
-// is left open. Supavisor or the network NAT then closes its side during the
-// freeze; on thaw, postgres.js reuses a socket that is dead but looks alive
-// and the query hangs (there is no per-query timeout in postgres.js) until
-// Vercel's 300s function limit → 504. This is what `wait_event = ClientRead`
-// for minutes actually is: an idle connection stranded by a suspended client.
+// Why pg and not postgres.js: this app runs on Vercel Fluid, which SUSPENDS
+// warm instances between requests. A long-lived TCP socket dies silently
+// during a suspend — Postgres parks on `wait_event = ClientRead`, waiting for
+// a client that is frozen — and on thaw the next request reuses the corpse and
+// hangs to Vercel's 300s function limit → 504 (first-request-after-idle 504,
+// immediate reload succeeds: the dead socket being evicted). Timer-based
+// mitigations (idle_timeout, max_lifetime) can't help: a frozen event loop
+// fires no timers. `attachDatabasePool` below is Vercel's supported hook — it
+// runs in the suspend lifecycle, the one moment code still executes before the
+// freeze, and closes idle pool clients so no socket survives to go stale. It
+// requires the `pg` pool interface, which is why we migrated off postgres.js.
 //
-//   max: 5            — headroom is the point. `withDbTimeout`'s retry can only
-//                       escape a poisoned socket if the pool can hand it a
-//                       DIFFERENT connection: when an attempt times out,
-//                       postgres.js still holds that connection busy (the
-//                       abandoned query never settled), so with max > 1 the
-//                       retry checks out another idle connection or opens a
-//                       fresh TCP one. Under max:1 there is no spare — the
-//                       retry queues on the same busy-dead socket and also
-//                       times out (the 10.9s = 5s + 5s + throw signature). 5
-//                       covers Fluid's per-instance request concurrency plus
-//                       that retry headroom. It does NOT reintroduce hoarding:
-//                       Supavisor multiplexes centrally, so 5 sockets/instance
-//                       is trivial for the pooler (the DB is healthy at ~450
-//                       req/hr) — the original "exhaustion" read was itself a
-//                       misdiagnosis of these stale ClientRead connections.
-//   idle_timeout: 20  — reaps connections when the instance is actually
-//                       running; CANNOT fire mid-freeze, so it is not what
-//                       protects us here.
-//   max_lifetime: 300 — recycle every 5 min so a connection can't persist
-//                       indefinitely and accumulate freeze exposure. Bounds
-//                       staleness *between* freezes (the timer can't fire
-//                       *during* one); short enough to refresh sockets often,
-//                       long enough to avoid churn at this traffic level.
-//   connect_timeout: 10 — fail fast if the pooler can't hand out a socket.
-//
-// The load-bearing guard is `withDbTimeout` below (an app-side timeout +
-// retry), because only a client-side wall-clock timer can catch a hung write
-// to a dead socket — the server never sees that query, so no server-side
-// statement_timeout can help.
-const client = postgres(connectionString, {
-  prepare: false,
+// node-postgres uses UNNAMED prepared statements, which the transaction pooler
+// accepts, so it needs no `prepare:false` equivalent.
+const pool = new Pool({
+  connectionString,
+  // A small pool WITH headroom. Not 1 — max:1 was proven harmful: it leaves no
+  // spare, so evicting a bad socket and opening a fresh one has nowhere to go
+  // and requests queue on the corpse. 5 covers Fluid's per-instance request
+  // concurrency plus that headroom; trivial for Supavisor, which multiplexes
+  // centrally (the DB is healthy at ~450 req/hr — "exhaustion" was a misread of
+  // these idle ClientRead sockets, not a real connection-count problem).
   max: 5,
-  idle_timeout: 20,
-  max_lifetime: 60 * 5,
-  connect_timeout: 10,
+  // Reap idle clients after 10s when the instance is actually running. Hygiene
+  // only — it cannot fire during a freeze; attachDatabasePool covers that.
+  idleTimeoutMillis: 10_000,
+  // Cap how long acquiring/establishing a connection may take; pg destroys the
+  // socket when this trips, so a stalled connect fails fast instead of hanging.
+  connectionTimeoutMillis: 10_000,
+  // Server-side statement timeout: Postgres itself ABORTS a slow-but-alive
+  // query after 8s (error 57014) and frees the connection cleanly. A true
+  // cancel, not an abandon.
+  statement_timeout: 8_000,
+  // Client-side read timeout for an UNRESPONSIVE socket (the dead-after-freeze
+  // case the server never sees). When it fires, pg rejects the query and
+  // pg-pool calls release(err), which REMOVES and destroys the client — the
+  // corpse is evicted, not returned to the pool, so the next request gets a
+  // fresh connection. Set above statement_timeout so a slow-but-alive query is
+  // cancelled server-side first; this only trips when the server never answers.
+  query_timeout: 10_000,
+  // OS-level TCP keepalive so a dead peer surfaces rather than black-holing.
+  keepAlive: true,
 });
 
-export const db = drizzle(client, { schema });
+// Vercel Fluid suspend hook — closes idle pool clients before the instance
+// freezes, so no socket survives to be stale on thaw. This is the actual
+// root-cause fix. No-op off Vercel (local dev, scripts, build).
+attachDatabasePool(pool);
+
+export const db = drizzle(pool, { schema });
 
 /** Thrown by `withDbTimeout` when a DB operation blows its wall-clock budget —
  *  in practice, a stale pooled socket left dead by a Fluid freeze. */
