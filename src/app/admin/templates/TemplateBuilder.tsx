@@ -16,7 +16,7 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Plus } from 'lucide-react';
+import { LayoutTemplate, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState, useTransition } from 'react';
 import { useToast } from '@/components/admin/ToastProvider';
@@ -303,7 +303,33 @@ export function TemplateBuilder({ template }: Props) {
 
   return (
     <BuilderProvider value={ctx}>
-      <div className="fixed inset-0 top-0 left-0 h-screen w-screen bg-[#F9F9F7]">
+      {/* Desktop-only: the @xyflow node canvas depends on hover, fine-grained
+          drag-to-connect handles, pan/zoom, and simultaneous corner overlays
+          (MiniMap + Controls + two Panels) that do not degrade to a phone.
+          Below md we show a "use a larger screen" interstitial instead of a
+          broken, unusable canvas. */}
+      <div className="fixed inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-[#F9F9F7] px-8 text-center md:hidden">
+        <div className="bg-brand-teal-50 text-brand-teal-500 flex h-14 w-14 items-center justify-center rounded-2xl">
+          <LayoutTemplate size={26} strokeWidth={1.5} />
+        </div>
+        <div>
+          <h1 className="text-ink-900 text-lg font-medium">Best viewed on a larger screen</h1>
+          <p className="text-ink-500 mx-auto mt-2 max-w-xs text-sm">
+            The template builder is a drag-to-connect canvas that needs a
+            tablet or desktop. Open this page on a wider screen to edit phases
+            and milestones.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="text-brand-teal-500 hover:bg-brand-teal-50 mt-1 inline-flex h-11 items-center rounded-xl px-4 text-sm font-medium transition-colors"
+        >
+          Back to templates
+        </button>
+      </div>
+
+      <div className="fixed inset-0 top-0 left-0 hidden h-screen w-screen bg-[#F9F9F7] md:block">
         <ReactFlow
           nodes={nodes}
           edges={edges}

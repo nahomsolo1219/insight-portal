@@ -426,9 +426,9 @@ export function NewPlanModal({ properties, vendors, fieldStaff, onClose }: NewPl
 
 function Stepper({ step }: { step: StepIndex }) {
   return (
-    <ol className="mb-6 flex items-center gap-2 text-xs font-medium text-ink-500">
+    <ol className="mb-6 -mx-1 flex items-center gap-2 overflow-x-auto px-1 text-xs font-medium text-ink-500 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {STEPS.map((label, i) => (
-        <li key={label} className="flex items-center gap-2">
+        <li key={label} className="flex flex-shrink-0 items-center gap-2 whitespace-nowrap">
           <span
             className={cn(
               'inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-semibold tabular-nums',

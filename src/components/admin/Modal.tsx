@@ -75,7 +75,7 @@ export function Modal({
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-line flex items-start justify-between gap-4 border-b px-8 py-6">
+        <div className="border-line flex items-start justify-between gap-4 border-b px-5 py-5 sm:px-8 sm:py-6">
           <div>
             <h2 className="text-ink-900 text-xl font-medium tracking-tight">{title}</h2>
             {description && <p className="text-ink-500 mt-1 text-sm">{description}</p>}
@@ -90,9 +90,9 @@ export function Modal({
             <X size={18} strokeWidth={1.5} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-8 py-6">{children}</div>
+        <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6">{children}</div>
         {footer && (
-          <div className="bg-cream border-line flex items-center justify-end gap-3 border-t px-8 py-5">
+          <div className="bg-cream border-line flex items-center justify-end gap-3 border-t px-5 py-4 sm:px-8 sm:py-5">
             {footer}
           </div>
         )}
