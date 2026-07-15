@@ -160,7 +160,10 @@ function FilterRow({
 
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-      <nav aria-label="Filter plans" className="border-line flex gap-1 border-b">
+      <nav
+        aria-label="Filter plans"
+        className="border-line -mx-1 flex max-w-full gap-1 overflow-x-auto border-b px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {tabs.map((t) => {
           const active = t.id === current;
           const href = buildHref({ filter: t.id, sort, dir, year, q });
@@ -170,7 +173,7 @@ function FilterRow({
               href={href}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'relative px-4 py-2.5 text-sm font-medium transition-colors',
+                'relative flex-shrink-0 whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors',
                 active ? 'text-ink-900' : 'text-ink-500 hover:text-ink-700',
               )}
             >
@@ -268,9 +271,19 @@ function PlanTable({
   }
 
   return (
-    <div className="shadow-soft-md overflow-hidden rounded-2xl bg-paper">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[920px]">
+    <>
+      {/* Mobile: card-per-row (the table's min-w-[920px] would force the phone
+          viewport ~905px wide otherwise). */}
+      <div className="space-y-3 md:hidden">
+        {rows.map((p) => (
+          <PlanCard key={p.id} plan={p} />
+        ))}
+      </div>
+
+      {/* Desktop: dense sortable table, unchanged. */}
+      <div className="shadow-soft-md hidden overflow-hidden rounded-2xl bg-paper md:block">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[920px]">
           <thead>
             <tr className="bg-cream border-line border-b">
               <Th>Plan</Th>
@@ -307,9 +320,50 @@ function PlanTable({
               <PlanRow key={p.id} plan={p} isLast={i === rows.length - 1} />
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
-    </div>
+    </>
+  );
+}
+
+// Mobile card — one plan per card (below md).
+function PlanCard({ plan }: { plan: PlanListRow }) {
+  return (
+    <Link
+      href={`/admin/maintenance/${plan.id}`}
+      className="shadow-soft-md hover:bg-cream block rounded-2xl bg-paper p-4 transition-colors"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-ink-900 truncate text-sm font-medium">{plan.name}</div>
+          <div className="text-ink-500 mt-0.5 truncate text-xs">
+            {plan.propertyName} · {plan.clientName}
+          </div>
+        </div>
+        <PlanStatusBadge status={plan.status} />
+      </div>
+      <dl className="border-line-2 mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-3 text-xs">
+        <div className="min-w-0">
+          <dt className="text-ink-400 text-[10px] font-semibold tracking-wider uppercase">Dates</dt>
+          <dd className="text-ink-700 mt-0.5 tabular-nums">
+            {formatDate(plan.startDate)} – {formatDate(plan.endDate)}
+          </dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-ink-400 text-[10px] font-semibold tracking-wider uppercase">Visits</dt>
+          <dd className="text-ink-700 mt-0.5 tabular-nums">
+            {plan.completedVisitCount} / {plan.visitCount}
+          </dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-ink-400 text-[10px] font-semibold tracking-wider uppercase">Billing</dt>
+          <dd className="text-ink-700 mt-0.5 tabular-nums">
+            {plan.billingTotalCents != null ? formatCurrency(plan.billingTotalCents) : '—'}
+          </dd>
+        </div>
+      </dl>
+    </Link>
   );
 }
 

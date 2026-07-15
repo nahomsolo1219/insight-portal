@@ -182,12 +182,20 @@ function ClientTable({
   }
 
   return (
-    <div className="shadow-soft-md overflow-hidden rounded-2xl bg-paper">
-      {/* Horizontal scroll on narrow viewports — cards-on-mobile would
-          need a parallel render path; the scrolling table keeps the same
-          information dense and shareable URL. */}
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[940px]">
+    <>
+      {/* Mobile: card-per-row. The desktop table's min-w-[940px] would force
+          the whole phone viewport wide (measured ~918px), so below md we render
+          a stacked-card view instead of a horizontal-scroll table. */}
+      <div className="space-y-3 md:hidden">
+        {rows.map((client) => (
+          <ClientCard key={client.id} client={client} />
+        ))}
+      </div>
+
+      {/* Desktop: the dense sortable table, unchanged. */}
+      <div className="shadow-soft-md hidden overflow-hidden rounded-2xl bg-paper md:block">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[940px]">
           <thead>
             <tr className="bg-cream border-line border-b">
               <SortableTh
@@ -223,8 +231,92 @@ function ClientTable({
               />
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mobile card — one client per card (below md). Same data as the table row,
+// stacked as label/value pairs so nothing needs a 940px-wide horizontal scroll.
+// ---------------------------------------------------------------------------
+
+function ClientCard({ client }: { client: ClientRow }) {
+  const balanceClass = client.balanceCents > 0 ? 'text-amber-600' : 'text-ink-700';
+  return (
+    <Link
+      href={`/admin/clients/${client.id}`}
+      className="shadow-soft-md hover:bg-cream block rounded-2xl bg-paper p-4 transition-colors"
+    >
+      <div className="flex items-center gap-3">
+        {client.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={client.avatarUrl}
+            alt={client.name}
+            className="h-10 w-10 flex-shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <span className="bg-brand-teal-500 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white">
+            {initialsFrom(client.name) || 'C'}
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="text-ink-900 truncate text-sm font-medium">{client.name}</div>
+          {client.primaryAddress && (
+            <div className="text-ink-500 truncate text-xs">
+              {client.primaryAddress}
+              {client.propertyCount > 1 && (
+                <span className="text-ink-400"> +{client.propertyCount - 1}</span>
+              )}
+            </div>
+          )}
+        </div>
+        <ChevronRight size={16} strokeWidth={1.5} className="text-ink-300 flex-shrink-0" />
+      </div>
+
+      <dl className="border-line-2 mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-3 text-xs">
+        <CardStat label="Tier">
+          {client.status === 'inactive' ? (
+            <span className="text-ink-500">Inactive</span>
+          ) : (
+            (client.tierName ?? <span className="text-ink-400">—</span>)
+          )}
+        </CardStat>
+        <CardStat label="Active projects">
+          <span className="tabular-nums">{client.activeProjectCount}</span>
+        </CardStat>
+        <CardStat label="Balance">
+          <span className={cn('font-medium tabular-nums', balanceClass)}>
+            {formatCurrency(client.balanceCents)}
+          </span>
+        </CardStat>
+        <CardStat label="Assigned PM">
+          {client.assignedPmName ?? <span className="text-ink-400">Unassigned</span>}
+        </CardStat>
+        <CardStat label="Portal">
+          {client.invited ? (
+            <span className="inline-flex items-center gap-1 text-emerald-700">
+              <Check size={11} strokeWidth={2} /> Invited
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-amber-700">
+              <MailWarning size={11} strokeWidth={2} /> Not invited
+            </span>
+          )}
+        </CardStat>
+      </dl>
+    </Link>
+  );
+}
+
+function CardStat({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-ink-400 text-[10px] font-semibold tracking-wider uppercase">{label}</dt>
+      <dd className="text-ink-700 mt-0.5 truncate">{children}</dd>
     </div>
   );
 }
