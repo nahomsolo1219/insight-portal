@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 
 export type ModalSize = 'sm' | 'md' | 'lg';
@@ -56,9 +57,16 @@ export function Modal({
     };
   }, [open]);
 
-  if (!open) return null;
+  // Portal to <body> so the overlay is never trapped by a transformed/
+  // positioned ancestor's containing block. This matters on the client portal,
+  // where the Edit-profile modal is rendered inside the sidebar drawer — the
+  // drawer's `translate-x` transform makes `position: fixed` resolve against
+  // the 256px drawer instead of the viewport, so the modal came out cramped and
+  // off-centre. Modals always open from a client-side interaction (open starts
+  // false), so the SSR pass returns null here and never touches `document`.
+  if (!open || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
       onClick={() => {
@@ -97,6 +105,7 @@ export function Modal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
