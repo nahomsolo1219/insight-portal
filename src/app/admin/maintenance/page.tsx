@@ -203,13 +203,17 @@ function FilterRow({
         })}
       </nav>
 
-      <form action="/admin/maintenance" method="get" className="flex items-center gap-2">
+      <form
+        action="/admin/maintenance"
+        method="get"
+        className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap"
+      >
         <input
           type="search"
           name="q"
           placeholder="Search clients or plans"
           defaultValue={q}
-          className="w-56 rounded-xl border border-gray-200 bg-paper px-4 py-2 text-sm placeholder:text-gray-400 focus:border-brand-teal-400 focus:outline-none focus:ring-2 focus:ring-brand-teal-200"
+          className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-paper px-4 py-2 text-sm placeholder:text-gray-400 focus:border-brand-teal-400 focus:outline-none focus:ring-2 focus:ring-brand-teal-200 sm:w-56 sm:flex-none"
         />
         {/* Hidden inputs preserve the rest of the URL state when the
             search submits. */}
