@@ -174,7 +174,7 @@ function FilteredEmpty({ propertyId, filter }: { propertyId: string; filter: Sta
 
 function SummaryBar({ summary }: { summary: PortalInvoiceSummary }) {
   return (
-    <div className="shadow-card grid grid-cols-3 gap-4 rounded-2xl bg-white p-5">
+    <div className="shadow-card grid grid-cols-1 gap-4 rounded-2xl bg-white p-5 sm:grid-cols-3">
       <SummaryStat
         label="Total invoiced"
         value={formatCurrency(summary.totalInvoiced)}

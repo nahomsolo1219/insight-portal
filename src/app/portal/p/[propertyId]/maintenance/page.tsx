@@ -376,7 +376,7 @@ function DocumentCard({
 function PastPlansSection({ plans }: { plans: MaintenancePlanRow[] }) {
   return (
     <details className="group">
-      <summary className="text-ink-500 hover:text-ink-700 inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium transition-colors [&::-webkit-details-marker]:hidden">
+      <summary className="text-ink-500 hover:text-ink-700 -mx-1 inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-1 py-2.5 text-sm font-medium transition-colors [&::-webkit-details-marker]:hidden">
         <ChevronDown
           size={14}
           strokeWidth={2}
