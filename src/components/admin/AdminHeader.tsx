@@ -9,6 +9,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AdminMenuButton } from '@/components/admin/AdminMobileNav';
 import { SearchOverlay } from '@/components/admin/SearchOverlay';
 import { DashboardNewProjectButton } from '@/app/admin/DashboardNewProjectButton';
 import { NewClientButton } from '@/app/admin/clients/NewClientButton';
@@ -94,14 +95,11 @@ export function AdminHeader({
         />
       </div>
 
-      {/* Mobile-only narrow logo block. */}
-      <div className="bg-brand-teal-500 flex w-14 flex-shrink-0 items-center justify-center md:hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={logoDarkUrl || '/logo-dark.svg'}
-          alt={firmName || 'Insight'}
-          className="h-5 w-auto"
-        />
+      {/* Mobile-only hamburger — opens the off-canvas nav drawer. The desktop
+          teal logo panel above is hidden on mobile; the drawer carries the
+          logo, so the top bar just needs the menu trigger. */}
+      <div className="flex flex-shrink-0 items-center pl-2 md:hidden">
+        <AdminMenuButton />
       </div>
 
       {/* Header content area — everything except the logo panel. */}

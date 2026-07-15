@@ -31,7 +31,7 @@ interface NavSection {
   items: NavItem[];
 }
 
-const sections: NavSection[] = [
+export const sidebarSections: NavSection[] = [
   {
     heading: 'Overview',
     items: [
@@ -65,7 +65,7 @@ const sections: NavSection[] = [
   },
 ];
 
-function isActive(pathname: string, href: string): boolean {
+export function isActive(pathname: string, href: string): boolean {
   if (href === '/admin') return pathname === '/admin';
   return pathname === href || pathname.startsWith(href + '/');
 }
@@ -79,35 +79,36 @@ interface SidebarProps {
 }
 
 /**
- * Admin sidebar. Pure navigation surface.
+ * The nav + user footer that fills the sidebar column. Shared verbatim by the
+ * desktop static sidebar (`Sidebar`) and the mobile off-canvas drawer
+ * (`AdminSidebarDrawer`) so the two can never drift. `onNavigate` fires on
+ * every nav link click — the drawer passes `closeDrawer` here; the static
+ * desktop sidebar passes nothing.
  *
- * Earlier sessions threaded "what needs your attention" counts
- * (`photos pending`, `decisions awaiting client`, `invoices unpaid`)
- * into amber badges next to the relevant nav items. That moved out
- * in the Session 7 follow-up — the dashboard's "Needs attention" area
- * is the single source of truth for "what to do today", and the
- * sidebar duplicating those signals just made the chrome noisier.
- * Real notifications still live on the header bell, which polls
- * every 30s and uses a different visual treatment (red dot, not gold
- * pill) precisely so the two surfaces don't read as the same thing.
+ * Earlier sessions threaded "what needs your attention" counts into amber
+ * badges here; that moved to the dashboard's "Needs attention" surface in
+ * Session 7. The header bell owns real notifications.
  */
-export function Sidebar({ user, avatarPublicUrl }: SidebarProps) {
+export function SidebarBody({
+  user,
+  avatarPublicUrl,
+  onNavigate,
+}: SidebarProps & { onNavigate?: () => void }) {
   const pathname = usePathname();
   const displayName = user.fullName ?? user.email;
   const initials = initialsFrom(displayName);
   const readableRole = user.role.replace('_', ' ');
 
   return (
-    <aside className="border-line bg-paper flex h-full w-64 flex-shrink-0 flex-col border-r">
+    <>
       {/* Nav — starts directly under the header, with comfortable top
           breathing room since there's no longer a logo band or search
           element above it. */}
       <nav className="flex-1 overflow-y-auto px-3 pt-5 pb-2">
-        {sections.map((section) => (
+        {sidebarSections.map((section) => (
           <div key={section.heading} className="mb-6">
             {/* Section heading: amber hairline + uppercase tracked label —
-                editorial eyebrow pattern at sidebar density. brand-gold-500
-                keeps the admin token system intact. */}
+                editorial eyebrow pattern at sidebar density. */}
             <div className="mb-2 flex items-center gap-2 px-3">
               <span
                 aria-hidden="true"
@@ -125,8 +126,12 @@ export function Sidebar({ user, avatarPublicUrl }: SidebarProps) {
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      onClick={onNavigate}
                       className={cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                        // min-h-11 (44px) keeps the touch target honest on
+                        // mobile; on desktop the row is naturally taller than
+                        // its py-2 anyway so this doesn't move the layout.
+                        'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
                         active
                           ? 'text-brand-teal-500 border-brand-teal-100 border bg-[color:var(--color-brand-nav-active)] font-medium'
                           : 'hover:bg-cream hover:text-brand-teal-500 border border-transparent text-[#555]',
@@ -148,13 +153,7 @@ export function Sidebar({ user, avatarPublicUrl }: SidebarProps) {
         ))}
       </nav>
 
-      {/* User footer — kept as a compact identity strip. The canonical
-          avatar dropdown lives in the header now, but this strip still
-          surfaces who's signed in and lets sign-out happen without
-          opening the header menu. The avatar swaps to a real image
-          once the admin uploads one in the header's Edit-profile
-          modal; the rounded-lg shape (vs. the header's rounded-full)
-          keeps the two surfaces visually distinct. */}
+      {/* User footer — compact identity strip + sign-out. */}
       <div className="border-line flex items-center gap-3 border-t px-4 py-3">
         {avatarPublicUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -176,12 +175,26 @@ export function Sidebar({ user, avatarPublicUrl }: SidebarProps) {
           <button
             type="submit"
             aria-label="Sign out"
-            className="hover:bg-cream hover:text-brand-teal-500 rounded-lg p-2 text-[#8a8a8a] transition-colors"
+            className="hover:bg-cream hover:text-brand-teal-500 inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#8a8a8a] transition-colors"
           >
             <LogOut size={16} strokeWidth={1.5} />
           </button>
         </form>
       </div>
+    </>
+  );
+}
+
+/**
+ * Desktop admin sidebar — the static left column. Hidden below `md`, where the
+ * off-canvas `AdminSidebarDrawer` (opened from the header hamburger) takes
+ * over. `md:flex` restores the exact previous desktop rendering, so desktop is
+ * unchanged.
+ */
+export function Sidebar({ user, avatarPublicUrl }: SidebarProps) {
+  return (
+    <aside className="border-line bg-paper hidden h-full w-64 flex-shrink-0 flex-col border-r md:flex">
+      <SidebarBody user={user} avatarPublicUrl={avatarPublicUrl} />
     </aside>
   );
 }

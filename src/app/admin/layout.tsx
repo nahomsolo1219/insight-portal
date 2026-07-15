@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { AdminHeader } from '@/components/admin/AdminHeader';
+import { AdminNavProvider, AdminSidebarDrawer } from '@/components/admin/AdminMobileNav';
 import { NavigationProgress } from '@/components/admin/NavigationProgress';
 import { Sidebar } from '@/components/admin/Sidebar';
 import { ToastProvider } from '@/components/admin/ToastProvider';
@@ -85,30 +86,43 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // header + sidebar stay fixed in viewport.
   return (
     <ToastProvider>
-      <Suspense fallback={null}>
-        <NavigationProgress />
-      </Suspense>
-      <div className="bg-cream flex h-screen flex-col overflow-hidden text-ink-700">
-        <AdminHeader
+      <AdminNavProvider>
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
+        {/* Off-canvas nav drawer — mobile only (md:hidden); no-op on desktop. */}
+        <AdminSidebarDrawer
           user={user}
           avatarPublicUrl={avatarPublicUrl}
-          dateLabel={dateLabel}
-          dateLabelShort={dateLabelShort}
-          tiers={formOptions.tiers}
-          pms={formOptions.pms}
-          projectPickerClients={projectPickerClients}
-          notifications={notifications}
-          unreadNotificationCount={unreadNotificationCount}
           firmName={companySettings.firmName}
           logoDarkUrl={companySettings.logoDarkUrl}
         />
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          <Sidebar user={user} avatarPublicUrl={avatarPublicUrl} />
-          <main className="min-w-0 flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-[1200px] px-8 py-8">{children}</div>
-          </main>
+        <div className="bg-cream flex h-screen flex-col overflow-hidden text-ink-700">
+          <AdminHeader
+            user={user}
+            avatarPublicUrl={avatarPublicUrl}
+            dateLabel={dateLabel}
+            dateLabelShort={dateLabelShort}
+            tiers={formOptions.tiers}
+            pms={formOptions.pms}
+            projectPickerClients={projectPickerClients}
+            notifications={notifications}
+            unreadNotificationCount={unreadNotificationCount}
+            firmName={companySettings.firmName}
+            logoDarkUrl={companySettings.logoDarkUrl}
+          />
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <Sidebar user={user} avatarPublicUrl={avatarPublicUrl} />
+            <main className="min-w-0 flex-1 overflow-y-auto">
+              {/* Mobile gets tighter gutters (px-4/py-6); sm+ keeps the exact
+                  previous px-8/py-8 so desktop and tablet are unchanged. */}
+              <div className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-8 sm:py-8">
+                {children}
+              </div>
+            </main>
+          </div>
         </div>
-      </div>
+      </AdminNavProvider>
     </ToastProvider>
   );
 }
