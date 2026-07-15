@@ -146,7 +146,7 @@ export function InvoicesTabClient({
 
 function SummaryBar({ summary }: { summary: InvoiceSummary }) {
   return (
-    <div className="mb-6 grid grid-cols-3 gap-5">
+    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
       <SummaryCard
         label="Total invoiced"
         value={formatCurrency(summary.totalInvoiced)}

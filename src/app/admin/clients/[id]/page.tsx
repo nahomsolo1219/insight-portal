@@ -138,7 +138,7 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
         </div>
       </div>
 
-      <div className="mb-8 grid grid-cols-4 gap-5">
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
         <StatMini label="Properties" value={stats.propertyCount.toString()} />
         <StatMini label="Active projects" value={stats.activeProjectCount.toString()} />
         <StatMini

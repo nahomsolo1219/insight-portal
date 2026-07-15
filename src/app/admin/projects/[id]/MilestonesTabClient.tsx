@@ -284,7 +284,7 @@ function MilestoneRow({
         )}
       </div>
 
-      <div className="flex flex-shrink-0 items-start gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+      <div className="flex flex-shrink-0 items-start gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
         {canSendDecision && (
           <button
             type="button"

@@ -424,7 +424,7 @@ export function PhotosTabClient({
 
 function StatsBar({ stats }: { stats: PhotoStats }) {
   return (
-    <div className="mb-6 grid grid-cols-4 gap-4">
+    <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
       <StatMini label="Total" value={stats.total} />
       <StatMini label="Pending" value={stats.pending} tone={stats.pending > 0 ? 'gold' : 'default'} />
       <StatMini label="Categorized" value={stats.categorized} tone="emerald" />

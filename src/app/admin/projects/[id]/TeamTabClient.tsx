@@ -146,7 +146,7 @@ function AssignmentRow({
         onClick={onRemove}
         title={`Remove ${assignment.name} from this project`}
         aria-label={`Remove ${assignment.name}`}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 focus:opacity-100 group-hover:opacity-100"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 opacity-100 transition-all hover:bg-red-50 hover:text-red-600 focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
       >
         <X size={14} strokeWidth={1.75} />
       </button>

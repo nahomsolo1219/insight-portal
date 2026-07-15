@@ -70,7 +70,7 @@ export default async function MaintenancePlanDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <div className="mb-8 grid grid-cols-4 gap-5">
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
         <StatMini label="Start" value={formatDate(plan.startDate)} />
         <StatMini label="End" value={formatDate(plan.endDate)} />
         <StatMini

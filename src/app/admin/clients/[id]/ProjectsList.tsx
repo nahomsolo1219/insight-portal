@@ -222,7 +222,7 @@ function ProjectCard({
       {isOpen && (
         <div className="border-t border-line-2 px-5 py-4">
           {project.type === 'remodel' && project.contractCents != null && (
-            <div className="mb-5 grid grid-cols-4 gap-4 border-b border-line-2 pb-5">
+            <div className="mb-5 grid grid-cols-2 gap-4 border-b border-line-2 pb-5 sm:grid-cols-4">
               <BudgetStat label="Contract" value={formatCurrency(project.contractCents)} />
               <BudgetStat
                 label="Changes"

@@ -51,7 +51,7 @@ export function ProjectDetailClient({
 
   return (
     <div>
-      <div className="mb-6 flex items-center gap-1 border-b border-line-2">
+      <div className="mb-6 flex items-center gap-1 overflow-x-auto border-b border-line-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => {
           const isActive = tab === t.id;
           const Icon = t.icon;
@@ -61,7 +61,7 @@ export function ProjectDetailClient({
               type="button"
               onClick={() => setTab(t.id)}
               className={cn(
-                'relative inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors',
+                'relative inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors',
                 isActive
                   ? 'text-brand-teal-500'
                   : 'hover:text-brand-teal-500 text-gray-500',

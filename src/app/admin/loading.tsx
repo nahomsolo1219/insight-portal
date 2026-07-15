@@ -16,7 +16,7 @@ export default function AdminLoading() {
         <SkeletonLine width="260px" height="32px" />
       </div>
 
-      <div className="mb-8 grid grid-cols-4 gap-5">
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="shadow-soft-md rounded-2xl bg-paper p-5">
             <SkeletonLine width="60%" height="12px" />

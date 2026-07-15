@@ -70,7 +70,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="mb-8 grid grid-cols-4 gap-5">
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
         <StatCard
           label="Active Clients"
           value={activeClients.toString()}
@@ -98,7 +98,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Two-column: schedule + needs attention */}
-      <div className="mb-8 grid grid-cols-[1.3fr_1fr] gap-5">
+      <div className="mb-8 grid grid-cols-1 gap-5 lg:grid-cols-[1.3fr_1fr]">
         {/* Today's Schedule */}
         <div className="shadow-soft-md rounded-2xl bg-paper p-6">
           <div className="mb-5 flex items-center justify-between">
