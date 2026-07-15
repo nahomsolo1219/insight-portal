@@ -17,7 +17,7 @@ import { getActiveClientsForProjectPicker } from './queries';
 import { getClientFormOptions } from './clients/queries';
 
 export const metadata: Metadata = {
-  title: 'Insight HM — Admin Portal',
+  title: 'Insight HM — Admin',
 };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

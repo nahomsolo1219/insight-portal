@@ -4,7 +4,7 @@ import { ToastProvider } from '@/components/admin/ToastProvider';
 import { getCurrentUser } from '@/lib/auth/current-user';
 
 export const metadata: Metadata = {
-  title: 'Insight HM — Client Portal',
+  title: 'Insight HM — Client portal',
 };
 
 /**

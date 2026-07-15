@@ -1,8 +1,16 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { BrandLockup } from '@/components/BrandLockup';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { LoginForm } from './LoginForm';
+
+// Neutral, audience-appropriate title — a client signing in must never see
+// "Admin". (reset-password is a client component and can't export metadata, so
+// it inherits the root's neutral "Insight HM" default, which is also fine.)
+export const metadata: Metadata = {
+  title: 'Insight HM — Sign in',
+};
 
 // The form uses useSearchParams, which requires a Suspense boundary during
 // static rendering. Keep the page shell as a Server Component.
